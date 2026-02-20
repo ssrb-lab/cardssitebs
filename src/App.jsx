@@ -40,8 +40,7 @@ import {
   GripHorizontal,
   Hexagon,
   Volume2,
-  Settings,
-  Gem
+  Settings
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -200,8 +199,7 @@ const DEFAULT_PACKS = [
     cost: 50,
     image: "https://placehold.co/400x400/222/aaa?text=Базовий\nПак",
     customWeights: {},
-    isHidden: false,
-    isPremiumOnly: false
+    isHidden: false
   }
 ];
 
@@ -253,6 +251,7 @@ function PlayerAvatar({ profile, className = "", iconSize = 24 }) {
         );
     }
     
+    // Дефолтна логіка якщо немає аватарки
     const bgClass = profile?.isSuperAdmin ? "bg-red-900 border-red-500 text-red-200" :
                     profile?.isAdmin ? "bg-purple-900 border-purple-500 text-purple-200" : "bg-neutral-800 border-neutral-700 text-yellow-500";
     
@@ -283,11 +282,7 @@ export default function App() {
   const [cardsCatalog, setCardsCatalog] = useState([]);
   const [packsCatalog, setPacksCatalog] = useState([]);
   const [rarities, setRarities] = useState([]);
-  const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]); 
-  const [premiumDailyRewards, setPremiumDailyRewards] = useState([2000, 4000, 6000, 8000, 10000, 12000, 15000]); 
-  const [premiumPrice, setPremiumPrice] = useState(10000);
-  const [premiumDurationDays, setPremiumDurationDays] = useState(30);
-  const [premiumShopItems, setPremiumShopItems] = useState([]);
+  const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]); // Нагороди по днях
 
   // Стан Гри
   const [currentView, setCurrentView] = useState("shop");
@@ -304,7 +299,6 @@ export default function App() {
   const [listingCard, setListingCard] = useState(null);
 
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
-  const isPremiumActive = profile?.isPremium && profile?.premiumUntil && new Date(profile.premiumUntil) > new Date();
 
   useEffect(() => {
     document.title = "Card Game";
@@ -371,20 +365,12 @@ export default function App() {
         setPacksCatalog(data.packs || DEFAULT_PACKS);
         setRarities(data.rarities || DEFAULT_RARITIES);
         setDailyRewards(data.dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
-        setPremiumDailyRewards(data.premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
-        setPremiumPrice(data.premiumPrice !== undefined ? data.premiumPrice : 10000);
-        setPremiumDurationDays(data.premiumDurationDays !== undefined ? data.premiumDurationDays : 30);
-        setPremiumShopItems(data.premiumShopItems || []);
       } else {
         setDoc(settingsRef, {
           cards: DEFAULT_CARDS_DB,
           packs: DEFAULT_PACKS,
           rarities: DEFAULT_RARITIES,
-          dailyRewards: [1000, 2000, 3000, 4000, 5000, 6000, 7000],
-          premiumDailyRewards: [2000, 4000, 6000, 8000, 10000, 12000, 15000],
-          premiumPrice: 10000,
-          premiumDurationDays: 30,
-          premiumShopItems: []
+          dailyRewards: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
         }).catch((e) => console.error(e));
       }
     }, (err) => {
@@ -398,36 +384,13 @@ export default function App() {
       if (docSnap.exists()) {
         const pData = docSnap.data();
         
-        let needsUpdate = false;
-        
-        // Перевірка Бану
         if (pData.isBanned && pData.banUntil) {
           const now = new Date().getTime();
           const banEnd = new Date(pData.banUntil).getTime();
           if (now > banEnd) {
+             updateDoc(profileRef, { isBanned: false, banReason: null, banUntil: null });
              pData.isBanned = false;
-             pData.banReason = null;
-             pData.banUntil = null;
-             needsUpdate = true;
           }
-        }
-
-        // Перевірка Преміуму
-        if (pData.isPremium && pData.premiumUntil) {
-            const now = new Date().getTime();
-            const premEnd = new Date(pData.premiumUntil).getTime();
-            if (now > premEnd) {
-                pData.isPremium = false;
-                pData.premiumUntil = null;
-                needsUpdate = true;
-            }
-        }
-        
-        if (needsUpdate) {
-            updateDoc(profileRef, { 
-                isBanned: pData.isBanned, banReason: pData.banReason, banUntil: pData.banUntil,
-                isPremium: pData.isPremium, premiumUntil: pData.premiumUntil
-            });
         }
         
         setProfile(pData);
@@ -511,8 +474,6 @@ export default function App() {
           isAdmin: false,
           isSuperAdmin: false,
           isBanned: false,
-          isPremium: false,
-          premiumUntil: null,
           avatarUrl: "",
           mainShowcaseId: null
         });
@@ -558,8 +519,6 @@ export default function App() {
           isAdmin: false,
           isSuperAdmin: false,
           isBanned: false,
-          isPremium: false,
-          premiumUntil: null,
           avatarUrl: googleUser.photoURL || "",
           mainShowcaseId: null
         });
@@ -700,13 +659,6 @@ export default function App() {
   // --- ЛОГІКА ГРИ (ВІДКРИТТЯ ПАКУ) ---
   const openPack = async (packId, cost, amountToOpen = 1) => {
     if (isProcessing || !profile || openingPackId || isRouletteSpinning) return;
-    
-    const selectedPackDef = packsCatalog.find(p => p.id === packId);
-    if (selectedPackDef?.isPremiumOnly && !isPremiumActive) {
-        showToast("Цей пак доступний тільки для Преміум гравців!", "error");
-        return;
-    }
-
     const totalCost = cost * amountToOpen;
 
     if (profile.coins < totalCost) {
@@ -717,6 +669,8 @@ export default function App() {
     setIsProcessing(true);
     setOpeningPackId(packId);
     setPulledCards([]);
+
+    const selectedPackDef = packsCatalog.find(p => p.id === packId);
 
     setTimeout(async () => {
       let tempCatalog = JSON.parse(JSON.stringify(cardsCatalog));
@@ -1231,21 +1185,12 @@ export default function App() {
           <div className="flex items-center gap-3 sm:gap-6">
             <button
               onClick={() => setCurrentView("profile")}
-              className="flex items-center gap-3 hover:bg-neutral-800 p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-neutral-700 text-left relative"
+              className="flex items-center gap-3 hover:bg-neutral-800 p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-neutral-700 text-left"
             >
               <PlayerAvatar profile={profile} className="w-10 h-10 rounded-full" iconSize={20} />
-              {isPremiumActive && (
-                  <div className="absolute -top-1 -left-1 bg-neutral-900 rounded-full p-0.5 shadow-lg border border-fuchsia-500/50 animate-pulse">
-                      <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400/20" />
-                  </div>
-              )}
               <div className="hidden md:block text-left">
-                <div className="font-bold text-sm leading-tight text-white flex items-center gap-1">
-                    {profile?.nickname}
-                </div>
-                <div className="text-xs text-neutral-400 leading-tight">
-                    {isPremiumActive ? <span className="text-fuchsia-400 font-bold">Преміум</span> : "Профіль"}
-                </div>
+                <div className="font-bold text-sm leading-tight text-white">{profile?.nickname}</div>
+                <div className="text-xs text-neutral-400 leading-tight">Профіль</div>
               </div>
             </button>
 
@@ -1300,26 +1245,6 @@ export default function App() {
             setViewingCard={setViewingCard}
             isAdmin={profile?.isAdmin}
             isProcessing={isProcessing}
-            isPremiumActive={isPremiumActive}
-          />
-        )}
-        {currentView === "premium" && (
-          <PremiumShopView
-             profile={profile}
-             user={user}
-             db={db}
-             appId={GAME_ID}
-             premiumPrice={premiumPrice}
-             premiumDurationDays={premiumDurationDays}
-             premiumShopItems={premiumShopItems}
-             showToast={showToast}
-             isProcessing={isProcessing}
-             setIsProcessing={setIsProcessing}
-             addSystemLog={addSystemLog}
-             isPremiumActive={isPremiumActive}
-             cardsCatalog={cardsCatalog}
-             rarities={rarities}
-             setViewingCard={setViewingCard}
           />
         )}
         {currentView === "inventory" && (
@@ -1372,8 +1297,6 @@ export default function App() {
             fullInventory={fullInventory}
             setViewingCard={setViewingCard}
             dailyRewards={dailyRewards}
-            premiumDailyRewards={premiumDailyRewards}
-            isPremiumActive={isPremiumActive}
           />
         )}
         {currentView === "rating" && (
@@ -1407,10 +1330,6 @@ export default function App() {
             showToast={showToast}
             addSystemLog={addSystemLog}
             dailyRewards={dailyRewards}
-            premiumDailyRewards={premiumDailyRewards}
-            premiumPrice={premiumPrice}
-            premiumDurationDays={premiumDurationDays}
-            premiumShopItems={premiumShopItems}
           />
         )}
       </main>
@@ -1430,7 +1349,6 @@ export default function App() {
           <NavButton icon={<PackageOpen size={22} />} label="Магазин" isActive={currentView === "shop"} onClick={() => { setCurrentView("shop"); setPulledCards([]); setSelectedPackId(null); }} />
           <NavButton icon={<LayoutGrid size={22} />} label="Інвентар" isActive={currentView === "inventory"} onClick={() => setCurrentView("inventory")} />
           <NavButton icon={<Store size={22} />} label="Ринок" isActive={currentView === "market"} onClick={() => setCurrentView("market")} />
-          <NavButton icon={<Gem size={22} className={currentView === "premium" ? "text-fuchsia-400" : ""} />} label="Преміум" isActive={currentView === "premium"} onClick={() => setCurrentView("premium")} />
           <NavButton icon={<Trophy size={22} />} label="Рейтинг" isActive={currentView === "rating" || currentView === "publicProfile"} onClick={() => setCurrentView("rating")} />
           <NavButton icon={<User size={22} />} label="Профіль" isActive={currentView === "profile"} onClick={() => setCurrentView("profile")} />
           
@@ -1458,168 +1376,6 @@ function NavButton({ icon, label, isActive, onClick }) {
       <span className="text-[9px] sm:text-[10px] mt-1 font-bold uppercase tracking-wider">{label}</span>
     </button>
   );
-}
-
-// --- ПРЕМІУМ МАГАЗИН ---
-function PremiumShopView({ profile, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
-    
-    const buyPremium = async () => {
-        if (isProcessing) return;
-        if (profile.coins < premiumPrice) return showToast("Недостатньо монет для покупки Преміум-акаунту!");
-
-        setIsProcessing(true);
-        try {
-            const now = new Date();
-            // Якщо вже є преміум, додаємо дні до поточного терміну, якщо ні - від сьогодні
-            const currentExp = isPremiumActive ? new Date(profile.premiumUntil) : now;
-            currentExp.setDate(currentExp.getDate() + premiumDurationDays);
-            
-            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-            await updateDoc(profileRef, {
-                coins: increment(-premiumPrice),
-                isPremium: true,
-                premiumUntil: currentExp.toISOString()
-            });
-
-            showToast(`Ви успішно придбали Преміум-акаунт на ${premiumDurationDays} днів!`, "success");
-            addSystemLog("Магазин", `Гравець ${profile.nickname} купив Преміум за ${premiumPrice} монет.`);
-        } catch (e) {
-            console.error(e);
-            showToast("Помилка під час покупки преміуму.");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const buyItem = async (item) => {
-        if (isProcessing) return;
-        if (!isPremiumActive) return showToast("Цей товар доступний лише для власників Преміум-акаунту!");
-        if (profile.coins < item.price) return showToast("Недостатньо монет!");
-
-        setIsProcessing(true);
-        try {
-            const batch = writeBatch(db);
-            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-
-            if (item.type === "card") {
-                const invRef = doc(db, "artifacts", appId, "users", user.uid, "inventory", item.itemId);
-                batch.set(invRef, { amount: increment(1) }, { merge: true });
-                batch.update(profileRef, { coins: increment(-item.price), totalCards: increment(1) });
-            }
-
-            await batch.commit();
-            showToast(`Ви успішно придбали ${item.name}!`, "success");
-            addSystemLog("Магазин", `Гравець ${profile.nickname} купив ексклюзив ${item.name} за ${item.price} монет.`);
-        } catch (e) {
-            console.error(e);
-            showToast("Помилка під час покупки товару.");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    return (
-        <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="text-center mb-10">
-                <h2 className="text-4xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-600 uppercase tracking-widest flex items-center justify-center gap-3">
-                    <Gem className="text-fuchsia-500 w-10 h-10" /> Преміум Магазин
-                </h2>
-                <p className="text-neutral-400">Ексклюзивні пропозиції для елітних лордів.</p>
-            </div>
-
-            {/* БЛОК КУПІВЛІ ПРЕМІУМУ */}
-            <div className="bg-gradient-to-br from-neutral-900 to-purple-950/30 border-2 border-fuchsia-500/30 rounded-3xl p-6 sm:p-10 text-center max-w-2xl mx-auto shadow-[0_0_40px_rgba(217,70,239,0.15)] mb-12 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-fuchsia-600"></div>
-                <Gem size={60} className="mx-auto text-fuchsia-400 mb-6 drop-shadow-[0_0_20px_rgba(217,70,239,0.5)] animate-pulse" />
-                <h3 className="text-3xl font-black text-white mb-4">Преміум Акаунт ({premiumDurationDays} Днів)</h3>
-                
-                <div className="text-left max-w-sm mx-auto mb-8 space-y-3">
-                    <div className="flex items-center gap-3 text-neutral-200">
-                        <CheckCircle2 className="text-fuchsia-500" size={20}/>
-                        <span>Ексклюзивна іконка у профілі та рейтингу</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-neutral-200">
-                        <CheckCircle2 className="text-fuchsia-500" size={20}/>
-                        <span>Підвищені щоденні нагороди (+200% в середньому)</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-neutral-200">
-                        <CheckCircle2 className="text-fuchsia-500" size={20}/>
-                        <span>Доступ до Преміум-паків у магазині</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-neutral-200">
-                        <CheckCircle2 className="text-fuchsia-500" size={20}/>
-                        <span>Доступ до унікальних карток нижче</span>
-                    </div>
-                </div>
-
-                {isPremiumActive ? (
-                    <div className="bg-fuchsia-900/30 border border-fuchsia-500/50 p-4 rounded-xl text-fuchsia-100 font-bold mb-4">
-                        Ваш преміум активний до: {formatDate(profile.premiumUntil)}
-                    </div>
-                ) : null}
-
-                <button 
-                    onClick={buyPremium} 
-                    disabled={isProcessing}
-                    className="w-full sm:w-auto bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black text-lg py-4 px-12 rounded-2xl shadow-xl transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mx-auto"
-                >
-                    {isPremiumActive ? `Продовжити ще на ${premiumDurationDays} днів` : "Придбати Преміум"}
-                    <span className="bg-black/30 px-3 py-1 rounded-lg text-sm flex items-center gap-1">
-                        {premiumPrice} <Coins size={16}/>
-                    </span>
-                </button>
-            </div>
-
-            {/* ТОВАРИ ПРЕМІУМ МАГАЗИНУ */}
-            {premiumShopItems && premiumShopItems.length > 0 && (
-                <div>
-                    <h3 className="text-2xl font-black text-white text-center mb-8 uppercase tracking-widest flex items-center justify-center gap-2">
-                        <Star className="text-fuchsia-500" /> Ексклюзивні Товари
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                        {premiumShopItems.map((item, idx) => {
-                            // Якщо це картка, дістаємо її дані
-                            let cDef = null;
-                            if (item.type === "card") {
-                                cDef = cardsCatalog.find(c => c.id === item.itemId);
-                            }
-
-                            return (
-                                <div key={idx} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 flex flex-col items-center justify-between relative group hover:border-fuchsia-900 transition-colors shadow-lg">
-                                    {!isPremiumActive && (
-                                        <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center rounded-3xl border-2 border-neutral-800">
-                                            <Gem className="text-fuchsia-900/50 w-16 h-16 mb-2" />
-                                            <span className="font-bold text-neutral-500 uppercase tracking-widest text-sm">Тільки для Преміум</span>
-                                        </div>
-                                    )}
-
-                                    <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest text-center mb-1">Ексклюзив</div>
-                                    <h3 className="text-xl font-bold text-white mb-2 text-center w-full">{item.name || (cDef ? cDef.name : "Невідомий товар")}</h3>
-                                    
-                                    <div className="relative w-32 aspect-[2/3] mb-6 flex justify-center items-center shadow-xl rounded-xl overflow-hidden border-2 border-fuchsia-500/50">
-                                        <img src={item.image || (cDef ? cDef.image : "")} alt="item" className="w-full h-full object-cover" />
-                                        {cDef && (
-                                            <button onClick={() => setViewingCard({ card: cDef, amount: 1 })} className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
-                                                <Eye className="text-white w-8 h-8" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="text-center text-sm text-neutral-400 mb-4 h-10 overflow-hidden line-clamp-2">
-                                        {item.description}
-                                    </div>
-
-                                    <button onClick={() => buyItem(item)} className="w-full py-3 rounded-xl font-black text-white bg-blue-600 hover:bg-blue-500 flex items-center justify-center gap-2 transition-all">
-                                        Купити за {item.price} <Coins size={16} />
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
 }
 
 // --- РИНОК ГРАВЦІВ ---
@@ -1710,8 +1466,48 @@ function MarketView({ marketListings, cardsCatalog, rarities, currentUserUid, bu
   );
 }
 
-// --- МАГАЗИН ПАКІВ ---
-function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing, isPremiumActive }) {
+// --- МОДАЛКА ВИСТАВЛЕННЯ НА РИНОК ---
+function ListingModal({ listingCard, setListingCard, listOnMarket, isProcessing }) {
+    const [price, setPrice] = useState("");
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        listOnMarket(listingCard.id, Number(price));
+    };
+
+    return (
+       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => !isProcessing && setListingCard(null)}>
+           <div className="bg-neutral-900 border border-blue-900/50 p-6 rounded-3xl shadow-[0_0_50px_rgba(37,99,235,0.2)] max-w-sm w-full animate-in zoom-in-95 relative" onClick={e => e.stopPropagation()}>
+               <div className="flex items-center gap-3 mb-6 border-b border-neutral-800 pb-4">
+                   <div className="w-16 h-24 rounded-lg overflow-hidden border border-neutral-700 shrink-0">
+                       <img src={listingCard.image} alt={listingCard.name} className="w-full h-full object-cover" />
+                   </div>
+                   <div>
+                       <h3 className="text-lg font-black text-white leading-tight">{listingCard.name}</h3>
+                       <div className="text-xs text-neutral-400 mt-1">Виставлення на Ринок</div>
+                   </div>
+               </div>
+
+               <form onSubmit={handleSubmit} className="space-y-4">
+                   <div>
+                       <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Ваша ціна (Монети):</label>
+                       <div className="relative">
+                           <Coins className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-500 w-5 h-5" />
+                           <input type="number" min="1" value={price} onChange={e => setPrice(e.target.value)} placeholder="Наприклад: 1000" required className="w-full bg-neutral-950 border border-neutral-700 rounded-xl pl-12 pr-4 py-4 text-white focus:border-blue-500 outline-none text-lg font-bold" />
+                       </div>
+                   </div>
+                   <div className="flex gap-3 pt-2">
+                       <button type="submit" disabled={isProcessing} className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-black py-4 rounded-xl transition-colors shadow-lg shadow-blue-900/20">Продати</button>
+                       <button type="button" disabled={isProcessing} onClick={() => setListingCard(null)} className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-4 px-6 rounded-xl transition-colors">Скасувати</button>
+                   </div>
+               </form>
+           </div>
+       </div>
+    );
+}
+
+// --- МАГАЗИН ---
+function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing }) {
   
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
@@ -1734,6 +1530,7 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
       if (pulledCards && pulledCards.length > 0) {
           const cardsWithSound = pulledCards.filter(c => c.soundUrl);
           if (cardsWithSound.length > 0) {
+              // Знаходимо найрідкіснішу картку зі звуком
               cardsWithSound.sort((a,b) => {
                   const wA = rarities.find(r => r.name === a.rarity)?.weight || 100;
                   const wB = rarities.find(r => r.name === b.rarity)?.weight || 100;
@@ -1872,11 +1669,6 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
         </button>
 
         <div className="flex flex-col items-center mb-12 bg-neutral-900/50 p-6 rounded-3xl border border-neutral-800 max-w-3xl mx-auto">
-          {selectedPack.isPremiumOnly && (
-              <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
-                  <Gem size={14}/> Преміум Пак
-              </div>
-          )}
           <h2 className="text-3xl font-black mb-6 text-white text-center">{selectedPack.name}</h2>
           
           <div className="relative w-48 h-48 mb-8 flex justify-center items-center perspective-1000">
@@ -1885,7 +1677,7 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
                 <Loader2 className="animate-spin text-indigo-300 w-12 h-12" />
               </div>
             ) : (
-              <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${selectedPack.isPremiumOnly ? 'border-fuchsia-600 shadow-[0_10px_40px_rgba(217,70,239,0.3)]' : 'border-neutral-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)]'} overflow-hidden`}>
+              <div className="w-full h-full bg-neutral-800 rounded-2xl border-4 border-neutral-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden">
                 <img src={selectedPack.image} alt={selectedPack.name} className="w-full h-full object-cover" />
               </div>
             )}
@@ -1895,14 +1687,8 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
             <OpenButton amount={1} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)} opening={openingPackId === selectedPack.id || isProcessing} />
             <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-orange-950" />
             <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-red-950" />
-            <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-purple-600 hover:bg-purple-500 text-white" />
+            <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-fuchsia-600 hover:bg-fuchsia-500 text-white" />
           </div>
-          
-          {selectedPack.isPremiumOnly && !isPremiumActive && (
-              <div className="mt-6 text-red-400 font-bold bg-red-900/20 px-4 py-2 rounded-xl border border-red-900/50">
-                  У вас немає Преміум-акаунту для відкриття цього паку.
-              </div>
-          )}
         </div>
 
         <div className="border-t border-neutral-800 pt-8 w-full">
@@ -1974,19 +1760,14 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
         {displayedPacks.map((pack) => (
-          <button key={pack.id} onClick={() => setSelectedPackId(pack.id)} className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-3xl p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}>
+          <button key={pack.id} onClick={() => setSelectedPackId(pack.id)} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 flex flex-col items-center justify-between group hover:border-neutral-600 transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden">
             {pack.isHidden && (
-                <div className="absolute top-3 left-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
+                <div className="absolute top-3 right-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
                     Приховано
                 </div>
             )}
-            {pack.isPremiumOnly && (
-                <div className="absolute top-3 right-3 bg-fuchsia-900 text-fuchsia-100 text-[10px] px-2 py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
-                    <Gem size={10}/> Преміум
-                </div>
-            )}
             
-            <div className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}>{pack.category || "Базові"}</div>
+            <div className="text-[10px] text-purple-400 font-bold uppercase tracking-widest text-center mb-1 relative z-10">{pack.category || "Базові"}</div>
             <h3 className="text-xl font-bold text-white mb-2 text-center w-full relative z-10">{pack.name}</h3>
             
             <div className="flex items-center justify-center gap-1.5 text-yellow-500 font-bold mb-4 bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10">
@@ -1994,11 +1775,11 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
             </div>
 
             <div className="relative w-40 h-40 mb-6 flex justify-center items-center perspective-1000">
-              <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}>
+              <div className="w-full h-full bg-neutral-800 rounded-2xl border-4 border-neutral-700 shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300">
                 <img src={pack.image} alt={pack.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500 ${pack.isHidden ? 'grayscale' : ''}`} />
               </div>
             </div>
-            <div className={`w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10`}>
+            <div className="w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border border-neutral-800 group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10">
               Детальніше
             </div>
           </button>
@@ -2009,18 +1790,38 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
   );
 }
 
+function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-yellow-950" }) {
+  const disabled = opening;
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${
+        disabled ? "bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70" : `${color} transform hover:-translate-y-1`
+      }`}
+    >
+      Відкрити {amount}x
+      <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">
+        {cost * amount} <Coins size={14} className="ml-1" />
+      </span>
+    </button>
+  );
+}
+
 // --- ІНВЕНТАР ТА ВІТРИНИ ---
 function InventoryView({ 
     inventory, rarities, sellDuplicate, sellAllDuplicates, sellEveryDuplicate, 
     sellPrice, catalogTotal, setViewingCard, setListingCard, packsCatalog, 
     showcases, createShowcase, deleteShowcase, setMainShowcase, saveShowcaseCards, profile, cardsCatalog 
 }) {
-  const [tab, setTab] = useState("cards");
+  const [tab, setTab] = useState("cards"); // "cards" or "showcases"
   
+  // Фільтри для карток
   const [sortBy, setSortBy] = useState("rarity");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterPack, setFilterPack] = useState("all");
 
+  // Стейт для конструктора вітрин
   const [selectedShowcaseId, setSelectedShowcaseId] = useState(null);
   const [builderCards, setBuilderCards] = useState([]);
   
@@ -2059,6 +1860,7 @@ function InventoryView({
     return sum;
   }, 0);
 
+  // --- ЛОГІКА БІЛДЕРА ВІТРИН ---
   const activeShowcase = showcases.find(s => s.id === selectedShowcaseId);
 
   useEffect(() => {
@@ -2100,6 +1902,7 @@ function InventoryView({
       saveShowcaseCards(activeShowcase.id, newCards);
   };
 
+  // Drag and Drop (HTML5)
   const onDragStart = (e, cardId) => {
       e.dataTransfer.setData("cardId", cardId);
   };
@@ -2124,6 +1927,7 @@ function InventoryView({
       </div>
 
       {tab === "cards" ? (
+        // РЕЖИМ: ЗВИЧАЙНИЙ ІНВЕНТАР
         <div className="animate-in fade-in">
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-neutral-900/80 p-5 rounded-2xl border border-neutral-800 shadow-lg">
             <h2 className="text-2xl font-black flex items-center gap-3 text-white uppercase tracking-wider shrink-0">
@@ -2233,7 +2037,9 @@ function InventoryView({
           )}
         </div>
       ) : (
+        // РЕЖИМ: ВІТРИНИ
         <div className="animate-in fade-in">
+           
            {!activeShowcase ? (
                <div>
                   <div className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800 mb-6 text-center">
@@ -2257,6 +2063,7 @@ function InventoryView({
                                   </div>
                                   <div className="text-sm text-neutral-400 mb-4">{s.cardIds?.length || 0}/10 Карток</div>
                                   <div className="flex -space-x-2 overflow-hidden h-12">
+                                      {/* Мініатюри карток */}
                                       {(s.cardIds || []).slice(0,5).map((cId, i) => {
                                           const c = cardsCatalog.find(x => x.id === cId);
                                           if (!c) return null;
@@ -2270,6 +2077,7 @@ function InventoryView({
                   )}
                </div>
            ) : (
+               // РЕДАКТОР ВІТРИНИ
                <div className="animate-in slide-in-from-right-4">
                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-neutral-900 p-5 rounded-2xl border border-neutral-800">
                        <div>
@@ -2319,7 +2127,7 @@ function InventoryView({
                        })}
                        
                        {/* Пусті слоти для візуалу */}
-                       {Array.from({ length: Math.max(0, 10 - builderCards.length) }).map((_, i) => (
+                       {Array.from({ length: Math.max(0, 5 - builderCards.length) }).map((_, i) => (
                            <div key={`empty-${i}`} className="w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 border-dashed border-neutral-800 bg-neutral-950/30 flex items-center justify-center opacity-50">
                                <GripHorizontal className="text-neutral-700" size={32}/>
                            </div>
@@ -2363,8 +2171,354 @@ function InventoryView({
   );
 }
 
+// --- РЕЙТИНГ ТА ПОШУК ---
+function RatingView({ db, appId, currentUid, setViewingPlayerProfile }) {
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [ratingSort, setRatingSort] = useState("cards");
+
+  useEffect(() => {
+    const fetchAllProfiles = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
+        const list = [];
+        querySnapshot.forEach((doc) => list.push(doc.data()));
+        setAllProfiles(list);
+      } catch (e) {
+        console.error("Помилка завантаження бази гравців", e);
+      }
+      setLoading(false);
+    };
+    fetchAllProfiles();
+  }, [db, appId]);
+
+  const sortedProfiles = [...allProfiles].sort((a, b) => {
+      if (ratingSort === "coins") return (b.coins || 0) - (a.coins || 0);
+      return (b.uniqueCardsCount || 0) - (a.uniqueCardsCount || 0);
+  });
+
+  const filteredLeaders = searchTerm.trim() === "" 
+    ? sortedProfiles.slice(0, 50)
+    : sortedProfiles.filter(p => p.nickname?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  if (loading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto mb-4 w-12 h-12"/> Завантаження Залу Слави...</div>;
+
+  return (
+    <div className="max-w-3xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center mb-8">
+        <Trophy size={48} className="mx-auto text-yellow-500 mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+        <h2 className="text-3xl font-black text-white uppercase tracking-widest">Зал Слави</h2>
+        <p className="text-neutral-400 text-sm mt-2 mb-6">Знайдіть гравців або змагайтеся за першість</p>
+        
+        <div className="relative max-w-md mx-auto mb-4">
+          <input
+            type="text"
+            placeholder="Пошук гравця за нікнеймом..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-neutral-900 border border-neutral-700 rounded-2xl py-3 px-5 text-white focus:outline-none focus:border-yellow-500 transition-colors shadow-inner"
+          />
+        </div>
+
+        <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-md mx-auto">
+           <button onClick={() => setRatingSort("cards")} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${ratingSort === "cards" ? "bg-blue-600 text-white" : "text-neutral-400 hover:text-white"}`}>
+              <LayoutGrid size={16}/> За Колекцією
+           </button>
+           <button onClick={() => setRatingSort("coins")} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${ratingSort === "coins" ? "bg-yellow-600 text-white" : "text-neutral-400 hover:text-white"}`}>
+              <Coins size={16}/> За Монетами
+           </button>
+        </div>
+      </div>
+
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-xl">
+        {filteredLeaders.map((leader, index) => {
+          const realRank = sortedProfiles.findIndex(p => p.uid === leader.uid) + 1;
+
+          return (
+            <div 
+              key={leader.uid} 
+              onClick={() => setViewingPlayerProfile(leader.uid)}
+              className={`flex items-center justify-between p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group ${leader.uid === currentUid ? "bg-yellow-900/10" : "hover:bg-neutral-800/80"} ${leader.isBanned ? "opacity-50" : ""}`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 flex items-center justify-center font-black text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${
+                  realRank === 1 ? "bg-yellow-500 text-yellow-950 border-yellow-400" :
+                  realRank === 2 ? "bg-gray-300 text-gray-800 border-gray-100" :
+                  realRank === 3 ? "bg-amber-700 text-orange-100 border-amber-600" :
+                  "bg-neutral-950 text-neutral-500 border-neutral-800"
+                }`}>
+                  {realRank}
+                </div>
+                
+                <PlayerAvatar profile={leader} className="w-10 h-10 rounded-full shrink-0" iconSize={18} />
+
+                <div className="min-w-0">
+                  <div className="font-bold text-white flex items-center gap-2 text-base sm:text-lg truncate">
+                    {leader.nickname} 
+                    {leader.isBanned && <Ban size={14} className="text-red-600 shrink-0" title="Забанений" />}
+                    {leader.uid === currentUid && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full ml-2 shrink-0">ВИ</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 font-bold uppercase">{ratingSort === "cards" ? "Унікальні карти" : "Монети"}</div>
+                  <div className={`text-xl font-black ${ratingSort === "cards" ? "text-blue-400" : "text-yellow-500"}`}>
+                      {ratingSort === "cards" ? (leader.uniqueCardsCount || 0) : (leader.coins || 0)}
+                  </div>
+                </div>
+                <ArrowLeft size={16} className="text-neutral-600 group-hover:text-yellow-500 transform rotate-180 transition-colors hidden sm:block" />
+              </div>
+            </div>
+          );
+        })}
+        {filteredLeaders.length === 0 && <div className="p-8 text-center text-neutral-500">Гравців не знайдено.</div>}
+      </div>
+    </div>
+  );
+}
+
+// --- ПУБЛІЧНИЙ ПРОФІЛЬ ІНШОГО ГРАВЦЯ ---
+function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard, packsCatalog }) {
+  const [playerInfo, setPlayerInfo] = useState(null);
+  const [playerInventory, setPlayerInventory] = useState([]);
+  const [mainShowcase, setMainShowcase] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const [sortBy, setSortBy] = useState("rarity");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPack, setFilterPack] = useState("all");
+
+  useEffect(() => {
+    const fetchPlayerData = async () => {
+      try {
+        const profileSnap = await getDocs(query(collection(db, "artifacts", appId, "public", "data", "profiles")));
+        let foundProfile = null;
+        profileSnap.forEach((doc) => {
+          if (doc.id === targetUid) foundProfile = doc.data();
+        });
+        setPlayerInfo(foundProfile);
+
+        if (foundProfile) {
+          // Завантажуємо інвентар
+          const invSnap = await getDocs(collection(db, "artifacts", appId, "users", targetUid, "inventory"));
+          const invList = [];
+          invSnap.forEach((doc) => invList.push({ id: doc.id, ...doc.data() }));
+          
+          const fullInv = invList.map(item => {
+            const cardData = cardsCatalog.find(c => c.id === item.id);
+            return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
+          }).filter(Boolean);
+          
+          setPlayerInventory(fullInv);
+
+          // Завантажуємо головну вітрину
+          if (foundProfile.mainShowcaseId) {
+             const showcaseDoc = await getDoc(doc(db, "artifacts", appId, "users", targetUid, "showcases", foundProfile.mainShowcaseId));
+             if (showcaseDoc.exists()) {
+                 setMainShowcase(showcaseDoc.data());
+             }
+          }
+        }
+      } catch (err) {
+        console.error("Помилка завантаження профілю гравця", err);
+      }
+      setLoading(false);
+    };
+
+    fetchPlayerData();
+  }, [db, appId, targetUid, cardsCatalog, rarities]);
+
+  if (loading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-12 h-12 mb-4" /> Завантажуємо дані гравця...</div>;
+  if (!playerInfo) return <div className="text-center py-20 text-red-500">Гравець не знайдений або його акаунт видалено. <button onClick={goBack} className="block mx-auto mt-4 underline">Повернутись</button></div>;
+
+  const categories = ["all", ...new Set(packsCatalog.map(p => p.category || "Базові"))];
+  const relevantPacks = filterCategory === "all" ? packsCatalog : packsCatalog.filter(p => (p.category || "Базові") === filterCategory);
+
+  let filteredInventory = playerInventory.filter(item => {
+     const pack = packsCatalog.find(p => p.id === item.card.packId);
+     const cat = pack ? (pack.category || "Базові") : "Базові";
+     
+     if (filterCategory !== "all" && cat !== filterCategory) return false;
+     if (filterPack !== "all" && item.card.packId !== filterPack) return false;
+     return true;
+  });
+
+  filteredInventory.sort((a, b) => {
+    if (sortBy === "rarity") {
+       const getWeight = (rName) => rarities.find((x) => x.name === rName)?.weight || 100;
+       return getWeight(a.card.rarity) - getWeight(b.card.rarity);
+    }
+    if (sortBy === "amount") return b.amount - a.amount;
+    if (sortBy === "name") return a.card.name.localeCompare(b.card.name);
+    if (sortBy === "pack") {
+        const pA = packsCatalog.find(p => p.id === a.card.packId)?.name || "";
+        const pB = packsCatalog.find(p => p.id === b.card.packId)?.name || "";
+        return pA.localeCompare(pB);
+    }
+    return 0;
+  });
+
+  // Відображення карток вітрини (з перевіркою чи вони досі є в інвентарі гравця)
+  const validShowcaseCards = [];
+  if (mainShowcase && mainShowcase.cardIds) {
+      // Робимо копію інвентарю для коректного підрахунку кількостей
+      const tempInv = JSON.parse(JSON.stringify(playerInventory));
+      for (const cid of mainShowcase.cardIds) {
+          const invItem = tempInv.find(i => i.card.id === cid);
+          if (invItem && invItem.amount > 0) {
+              validShowcaseCards.push(invItem.card);
+              invItem.amount -= 1;
+          }
+      }
+  }
+
+  return (
+    <div className="animate-in slide-in-from-right-8 duration-500">
+      <button onClick={goBack} className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold px-4 py-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 w-fit border border-neutral-800">
+        <ArrowLeft size={20} /> До Рейтингу
+      </button>
+
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8">
+        <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${playerInfo.isBanned ? "from-red-900/40" : playerInfo.isSuperAdmin ? "from-orange-900/40" : playerInfo.isAdmin ? "from-purple-900/40" : "from-blue-900/20"} to-transparent`}></div>
+        
+        <PlayerAvatar profile={playerInfo} className="w-24 h-24 mx-auto mb-4 text-4xl rounded-full relative z-10" iconSize={48} />
+        
+        <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
+            {playerInfo.nickname}
+            {playerInfo.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-1 rounded-full uppercase tracking-widest border border-red-800">Бан</span>}
+        </h2>
+        <div className="text-neutral-500 text-sm flex justify-center gap-4 mt-2">
+            <span className="flex items-center gap-1"><CalendarDays size={14}/> З нами від: {formatDate(playerInfo.createdAt)}</span>
+        </div>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 relative z-10 mt-6 max-w-2xl mx-auto">
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <Coins className="text-yellow-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.coins}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Монети</span>
+          </div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <LayoutGrid className="text-blue-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.uniqueCardsCount || playerInventory.length}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Унікальних карт</span>
+          </div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.packsOpened || 0}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
+          </div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <Zap className="text-green-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.coinsEarnedFromPacks || 0}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Виграно <Coins size={8} className="inline"/></span>
+          </div>
+        </div>
+      </div>
+
+      {/* ВІТРИНА ГРАВЦЯ */}
+      {mainShowcase && validShowcaseCards.length > 0 && (
+         <div className="mb-10">
+             <div className="flex items-center gap-3 mb-4 justify-center">
+                 <Star className="text-yellow-500 fill-yellow-500" size={24} />
+                 <h3 className="text-2xl font-black text-white uppercase tracking-widest">{mainShowcase.name}</h3>
+             </div>
+             <div className="bg-neutral-900 border-2 border-yellow-500/30 rounded-3xl p-6 flex flex-wrap justify-center gap-4 shadow-[0_0_30px_rgba(234,179,8,0.1)]">
+                 {validShowcaseCards.map((card, idx) => {
+                    const style = getCardStyle(card.rarity, rarities);
+                    const effectClass = card.effect ? `effect-${card.effect}` : '';
+                    return (
+                        <div key={idx} onClick={() => setViewingCard({ card, amount: 1 })} className="relative group cursor-pointer animate-in zoom-in-95 hover:-translate-y-2 transition-transform">
+                            <div className={`w-28 sm:w-36 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 shadow-lg ${style.border} ${effectClass}`}>
+                                <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                                {card.soundUrl && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
+                                    className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                                    title="Відтворити звук"
+                                  >
+                                    <Volume2 size={12} />
+                                  </button>
+                                )}
+                            </div>
+                        </div>
+                    );
+                 })}
+             </div>
+         </div>
+      )}
+
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h3 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <LayoutGrid className="text-blue-500" /> Колекція гравця
+        </h3>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <select value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setFilterPack("all"); }} className="bg-neutral-900 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800">
+             {categories.map(c => <option key={c} value={c}>{c === "all" ? "Всі Категорії" : c}</option>)}
+          </select>
+          <select value={filterPack} onChange={(e) => setFilterPack(e.target.value)} className="bg-neutral-900 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800">
+             <option value="all">Всі Паки</option>
+             {relevantPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-900 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800">
+            <option value="rarity">За Рідкістю</option>
+            <option value="pack">За Паком</option>
+            <option value="amount">За Дублікатами</option>
+            <option value="name">За Алфавітом</option>
+          </select>
+        </div>
+      </div>
+
+      {filteredInventory.length === 0 ? (
+        <div className="text-center py-10 bg-neutral-900/50 rounded-2xl border border-neutral-800 text-neutral-500">
+          Картки за цим фільтром відсутні.
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+          {filteredInventory.map((item, index) => {
+            const style = getCardStyle(item.card.rarity, rarities);
+            const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
+            return (
+              <div 
+                key={item.card.id} 
+                className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95" 
+                style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}
+                onClick={() => setViewingCard({ card: item.card, amount: item.amount })}
+              >
+                <div className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 ${style.border} ${effectClass}`}>
+                  {item.amount > 1 && (
+                    <div className="absolute top-1 right-1 bg-neutral-950/90 text-white font-black text-[10px] px-2 py-0.5 rounded-full z-10 border border-neutral-700 shadow-xl">
+                      x{item.amount}
+                    </div>
+                  )}
+                  <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  {item.card.soundUrl && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); playCardSound(item.card.soundUrl, item.card.soundVolume); }}
+                        className="absolute bottom-1 right-1 bg-black/80 text-white p-1 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                        title="Відтворити звук"
+                      >
+                        <Volume2 size={12} />
+                      </button>
+                  )}
+                </div>
+                <div className="w-full text-center px-1">
+                  <div className={`text-[8px] font-black uppercase tracking-widest mb-0.5 ${style.text}`}>{item.card.rarity}</div>
+                  <div className="font-bold text-[10px] sm:text-xs leading-tight text-white truncate w-full">{item.card.name}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- ПРОФІЛЬ ---
-function ProfileView({ profile, user, db, appId, handleLogout, showToast, canClaimDaily, marketListings, cardsCatalog, rarities, showcases, fullInventory, setViewingCard, dailyRewards, premiumDailyRewards, isPremiumActive }) {
+function ProfileView({ profile, user, db, appId, handleLogout, showToast, canClaimDaily, marketListings, cardsCatalog, rarities, showcases, fullInventory, setViewingCard, dailyRewards }) {
   const [promoInput, setPromoInput] = useState("");
   const [activeTab, setActiveTab] = useState("main"); 
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
@@ -2482,8 +2636,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
         }
     }
 
-    const rewardArray = isPremiumActive ? premiumDailyRewards : dailyRewards;
-    const reward = rewardArray[newStreak - 1] || (newStreak * 1000);
+    const reward = dailyRewards[newStreak - 1] || (newStreak * 1000);
     
     try {
         const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
@@ -2501,8 +2654,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
 
   const currentStreak = profile?.dailyStreak || 0;
   const nextStreakDay = currentStreak >= 7 ? 1 : currentStreak + 1;
-  const activeRewardsArray = isPremiumActive ? premiumDailyRewards : dailyRewards;
-  const nextReward = activeRewardsArray[nextStreakDay - 1] || (nextStreakDay * 1000);
+  const nextReward = dailyRewards[nextStreakDay - 1] || (nextStreakDay * 1000);
 
   const historyItems = marketListings.filter(l => 
      l.status === "sold" && 
@@ -2569,16 +2721,11 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
       {activeTab === "main" ? (
          <>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? "from-red-900/40" : profile?.isAdmin ? "from-purple-900/40" : isPremiumActive ? "from-fuchsia-900/30" : "from-yellow-900/20"} to-transparent`}></div>
+              <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? "from-red-900/40" : profile?.isAdmin ? "from-purple-900/40" : "from-yellow-900/20"} to-transparent`}></div>
               
               {/* Блок Аватарки */}
               <div className="relative w-28 h-28 mx-auto mb-4 z-10 group">
-                 <PlayerAvatar profile={profile} className={`w-full h-full rounded-full text-5xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`} iconSize={50} />
-                 {isPremiumActive && (
-                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 rounded-full p-1 border-2 border-fuchsia-500">
-                         <Gem size={20} className="text-fuchsia-400 fill-fuchsia-400" />
-                     </div>
-                 )}
+                 <PlayerAvatar profile={profile} className="w-full h-full rounded-full text-5xl" iconSize={50} />
                  <button 
                     onClick={() => setIsEditingAvatar(!isEditingAvatar)} 
                     className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-2 border-dashed border-neutral-500"
@@ -2599,10 +2746,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
                  </form>
               )}
 
-              <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
-                  {profile?.nickname}
-                  {isPremiumActive && <Gem size={18} className="text-fuchsia-400 fill-fuchsia-400" title="Преміум Гравець" />}
-              </h2>
+              <h2 className="text-3xl font-black text-white mb-1 relative z-10">{profile?.nickname}</h2>
               <div className="text-neutral-500 text-sm mb-2">ID: {profile?.uid?.substring(0,8)}...</div>
               
               <div className="flex items-center justify-center gap-2 text-xs text-neutral-400 mb-6 bg-neutral-950 inline-flex px-3 py-1.5 rounded-full border border-neutral-800">
@@ -2678,12 +2822,12 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
             </div>
 
             {canClaimDaily ? (
-              <div className={`bg-gradient-to-r ${isPremiumActive ? 'from-fuchsia-600 to-purple-600 shadow-[0_0_30px_rgba(217,70,239,0.3)]' : 'from-yellow-600 to-orange-500 shadow-[0_0_30px_rgba(217,119,6,0.3)]'} rounded-3xl p-6 text-center relative overflow-hidden mb-6`}>
+              <div className="bg-gradient-to-r from-yellow-600 to-orange-500 rounded-3xl p-6 text-center shadow-[0_0_30px_rgba(217,119,6,0.3)] relative overflow-hidden mb-6">
                   <div className="relative z-10 flex flex-col items-center">
-                     <Gift size={40} className="text-white mb-2 animate-bounce" />
-                     <h3 className="text-xl font-black text-white uppercase tracking-widest mb-1">Щоденна Нагорода {isPremiumActive && "(Преміум)"}</h3>
-                     <p className="text-white font-bold mb-4">День {nextStreakDay}/7 - Отримайте {nextReward} монет!</p>
-                     <button onClick={handleDailyClaim} className={`bg-white ${isPremiumActive ? 'text-purple-600' : 'text-orange-600'} font-black py-3 px-8 rounded-xl hover:scale-105 transition-transform shadow-xl`}>
+                     <Gift size={40} className="text-yellow-100 mb-2 animate-bounce" />
+                     <h3 className="text-xl font-black text-white uppercase tracking-widest mb-1">Щоденна Нагорода</h3>
+                     <p className="text-yellow-100 font-bold mb-4">День {nextStreakDay}/7 - Отримайте {nextReward} монет!</p>
+                     <button onClick={handleDailyClaim} className="bg-white text-orange-600 font-black py-3 px-8 rounded-xl hover:scale-105 transition-transform shadow-xl">
                          Забрати зараз!
                      </button>
                   </div>
@@ -2779,7 +2923,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
 }
 
 // --- АДМІН ПАНЕЛЬ ---
-function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems }) {
+function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog, dailyRewards }) {
   const [activeTab, setActiveTab] = useState("users");
   const [allUsers, setAllUsers] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2793,9 +2937,6 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
   const [banDurationValue, setBanDurationValue] = useState("");
   const [banDurationUnit, setBanDurationUnit] = useState("h"); 
 
-  const [premiumModalUser, setPremiumModalUser] = useState(null);
-  const [premiumGiveDays, setPremiumGiveDays] = useState(30);
-
   const [adminAddCardId, setAdminAddCardId] = useState("");
   const [adminAddCardAmount, setAdminAddCardAmount] = useState(1);
   const [adminAddCoinsAmount, setAdminAddCoinsAmount] = useState(100);
@@ -2804,7 +2945,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
   const [editingCard, setEditingCard] = useState(null);
   const [cardForm, setCardForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5 });
   const [editingPack, setEditingPack] = useState(null);
-  const [packForm, setPackForm] = useState({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+  const [packForm, setPackForm] = useState({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false });
 
   const [allPromos, setAllPromos] = useState([]);
   const [promoForm, setPromoForm] = useState({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
@@ -2815,25 +2956,12 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
   const [adminLogs, setAdminLogs] = useState([]);
   
-  // Стейти для налаштувань (Settings)
-  const [rewardsForm, setRewardsForm] = useState(dailyRewards);
-  const [premiumRewardsForm, setPremiumRewardsForm] = useState(premiumDailyRewards);
-  const [priceForm, setPriceForm] = useState(premiumPrice);
-  const [durationDaysForm, setDurationDaysForm] = useState(premiumDurationDays);
-  const [shopItemForm, setShopItemForm] = useState({ type: "card", itemId: "", price: 500, description: "" });
+  // Стейт для налаштувань щоденних нагород
+  const [rewardsForm, setRewardsForm] = useState(dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
 
   useEffect(() => {
     setRewardsForm(dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
-    setPremiumRewardsForm(premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
-    setPriceForm(premiumPrice !== undefined ? premiumPrice : 10000);
-    setDurationDaysForm(premiumDurationDays !== undefined ? premiumDurationDays : 30);
-  }, [dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays]);
-
-  useEffect(() => {
-    setRewardsForm(dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
-    setPremiumRewardsForm(premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
-    setPriceForm(premiumPrice !== undefined ? premiumPrice : 10000);
-  }, [dailyRewards, premiumDailyRewards, premiumPrice]);
+  }, [dailyRewards]);
 
   useEffect(() => {
     if (activeTab === "users") {
@@ -3105,55 +3233,18 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
     }
   };
 
-  const handlePremiumAction = async (e, action) => {
-      e.preventDefault();
-      if (!premiumModalUser) return;
-      
-      try {
-          if (action === "revoke") {
-              await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", premiumModalUser.uid), {
-                  isPremium: false,
-                  premiumUntil: null
-              });
-              showToast(`Преміум забрано у гравця ${premiumModalUser.nickname}`, "success");
-              addSystemLog("Адмін", `Забрано Преміум у гравця ${premiumModalUser.nickname}`);
-          } else {
-              const days = Number(premiumGiveDays);
-              if (days <= 0) return showToast("Кількість днів має бути більше 0", "error");
-              
-              let currentExp = new Date();
-              if (premiumModalUser.isPremium && premiumModalUser.premiumUntil) {
-                  const existingExp = new Date(premiumModalUser.premiumUntil);
-                  if (existingExp > currentExp) currentExp = existingExp;
-              }
-              currentExp.setDate(currentExp.getDate() + days);
-
-              await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", premiumModalUser.uid), {
-                  isPremium: true,
-                  premiumUntil: currentExp.toISOString()
-              });
-              showToast(`Преміум (${days} днів) видано гравцю ${premiumModalUser.nickname}!`, "success");
-              addSystemLog("Адмін", `Видано Преміум на ${days} днів гравцю ${premiumModalUser.nickname}`);
-          }
-          setPremiumModalUser(null);
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка операції з преміумом.", "error");
-      }
-  };
-
   const savePack = async (e) => {
     e.preventDefault();
     let updatedPacks = [...packsCatalog];
     if (editingPack) {
-      updatedPacks = updatedPacks.map((p) => p.id === editingPack.id ? { ...packForm, id: editingPack.id, cost: Number(packForm.cost), isHidden: !!packForm.isHidden, isPremiumOnly: !!packForm.isPremiumOnly, category: packForm.category || "Базові" } : p);
+      updatedPacks = updatedPacks.map((p) => p.id === editingPack.id ? { ...packForm, id: editingPack.id, cost: Number(packForm.cost), isHidden: !!packForm.isHidden, category: packForm.category || "Базові" } : p);
     } else {
-      updatedPacks.push({ ...packForm, id: "p" + Date.now(), cost: Number(packForm.cost), isHidden: !!packForm.isHidden, isPremiumOnly: !!packForm.isPremiumOnly, category: packForm.category || "Базові" });
+      updatedPacks.push({ ...packForm, id: "p" + Date.now(), cost: Number(packForm.cost), isHidden: !!packForm.isHidden, category: packForm.category || "Базові" });
     }
     await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { packs: updatedPacks });
     addSystemLog("Адмін", `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
     setEditingPack(null);
-    setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+    setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false });
     showToast("Паки оновлено!", "success");
   };
 
@@ -3241,55 +3332,17 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       }
   };
 
-  const saveSettings = async (e) => {
+  const saveDailyRewards = async (e) => {
       e.preventDefault();
       try {
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { 
-              dailyRewards: rewardsForm,
-              premiumDailyRewards: premiumRewardsForm,
-              premiumPrice: Number(priceForm),
-              premiumDurationDays: Number(durationDaysForm)
-          });
-          addSystemLog("Адмін", "Оновлено налаштування гри (Нагороди / Ціна Преміуму / Термін).");
-          showToast("Налаштування оновлено!", "success");
+          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { dailyRewards: rewardsForm });
+          addSystemLog("Адмін", "Оновлено суми щоденних нагород.");
+          showToast("Щоденні нагороди оновлено!", "success");
       } catch (err) {
           console.error(err);
-          showToast("Помилка оновлення налаштувань.", "error");
+          showToast("Помилка оновлення нагород.", "error");
       }
   };
-
-  const addPremiumShopItem = async (e) => {
-      e.preventDefault();
-      try {
-          const newItem = {
-              id: "si_" + Date.now(),
-              type: shopItemForm.type,
-              itemId: shopItemForm.itemId,
-              price: Number(shopItemForm.price),
-              description: shopItemForm.description
-          };
-          const updatedItems = [...premiumShopItems, newItem];
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { premiumShopItems: updatedItems });
-          addSystemLog("Адмін", `Додано товар у Преміум Магазин.`);
-          showToast("Товар додано!", "success");
-          setShopItemForm({ type: "card", itemId: "", price: 500, description: "" });
-      } catch(err) {
-          console.error(err);
-          showToast("Помилка додавання товару.", "error");
-      }
-  };
-
-  const deletePremiumShopItem = async (itemId) => {
-      if (!confirm("Видалити товар з магазину?")) return;
-      try {
-          const updated = premiumShopItems.filter(i => i.id !== itemId);
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { premiumShopItems: updated });
-          showToast("Товар видалено.", "success");
-      } catch(err) {
-          console.error(err);
-          showToast("Помилка видалення.", "error");
-      }
-  }
 
   const clearAdminLogs = async () => {
     if (!confirm("Очистити всі системні логи? Це безповоротно!")) return;
@@ -3358,32 +3411,6 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
           </div>
       )}
 
-      {/* МОДАЛКА ПРЕМІУМУ */}
-      {premiumModalUser && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-3xl shadow-2xl max-w-sm w-full animate-in zoom-in-95">
-                  <h3 className="text-xl font-black text-fuchsia-400 mb-4 flex items-center gap-2"><Gem /> Преміум: {premiumModalUser.nickname}</h3>
-                  <div className="space-y-4">
-                      {premiumModalUser.isPremium && premiumModalUser.premiumUntil && new Date(premiumModalUser.premiumUntil) > new Date() && (
-                          <div className="bg-fuchsia-900/20 border border-fuchsia-500/30 p-3 rounded-xl text-fuchsia-300 text-sm mb-4">
-                              Поточний преміум до: <br/><span className="font-bold">{formatDate(premiumModalUser.premiumUntil)}</span>
-                          </div>
-                      )}
-                      <form onSubmit={(e) => handlePremiumAction(e, "give")}>
-                          <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Додати/Видати днів:</label>
-                          <input type="number" min="1" value={premiumGiveDays} onChange={e => setPremiumGiveDays(e.target.value)} required className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-fuchsia-500 outline-none mb-4" />
-                          <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">Видати / Продовжити</button>
-                      </form>
-                      
-                      {premiumModalUser.isPremium && (
-                          <button onClick={(e) => handlePremiumAction(e, "revoke")} className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 font-bold py-3 rounded-xl transition-colors border border-red-900/50 mt-2">Забрати Преміум</button>
-                      )}
-                      <button onClick={() => setPremiumModalUser(null)} className="w-full bg-neutral-800 text-white font-bold py-3 rounded-xl mt-2 hover:bg-neutral-700 transition-colors">Скасувати</button>
-                  </div>
-              </div>
-          </div>
-      )}
-
       <div className="flex gap-2 mb-6 bg-neutral-900 p-2 rounded-xl overflow-x-auto hide-scrollbar">
         <button onClick={() => setActiveTab("users")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "users" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Users size={18} /> Гравці</button>
         <button onClick={() => setActiveTab("packs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "packs" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Layers size={18} /> Паки</button>
@@ -3391,7 +3418,6 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
         {currentProfile.isSuperAdmin && (
             <>
                 <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
-                <button onClick={() => setActiveTab("premiumShop")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "premiumShop" ? "bg-fuchsia-600 text-white" : "text-fuchsia-400/70 hover:bg-neutral-800"}`}><Gem size={18} /> Прем Товари</button>
                 <button onClick={() => setActiveTab("settings")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "settings" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Settings size={18} /> Налаштування</button>
                 <button onClick={() => setActiveTab("logs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "logs" ? "bg-red-900/80 text-white border-red-500 border" : "text-red-400 hover:bg-neutral-800"}`}><ScrollText size={18} /> Логи</button>
             </>
@@ -3497,32 +3523,24 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               {allUsers.map((u, i) => {
                 const canBan = u.uid !== currentProfile.uid && (!u.isSuperAdmin) && (!u.isAdmin || currentProfile.isSuperAdmin);
                 const canToggleAdmin = currentProfile.isSuperAdmin && u.uid !== currentProfile.uid && !u.isSuperAdmin;
-                const isUserPremium = u.isPremium && u.premiumUntil && new Date(u.premiumUntil) > new Date();
 
                 return (
                   <div key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 px-4 border border-neutral-800 bg-neutral-950 rounded-xl gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3">
                       <PlayerAvatar profile={u} className="w-10 h-10 rounded-full shrink-0" iconSize={18} />
-                      <div className="min-w-0">
-                        <div className="font-bold text-white flex items-center gap-2 truncate">
+                      <div>
+                        <div className="font-bold text-white flex items-center gap-2">
                           {u.nickname} 
-                          {isUserPremium && <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400 shrink-0" title="Преміум" />}
-                          {u.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest shrink-0">Бан</span>}
+                          {u.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest">Бан</span>}
                         </div>
-                        <div className="text-xs text-neutral-500 truncate">{u.email || "Приховано (Google)"}</div>
+                        <div className="text-xs text-neutral-500">{u.email || "Приховано (Google)"}</div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="hidden sm:block text-right mr-2">
                          <div className="text-[10px] text-neutral-500 uppercase font-bold">Монети / Карти</div>
                          <div className="text-sm font-bold text-yellow-500">{u.coins} <Coins size={12} className="inline text-yellow-600"/> / <span className="text-blue-400">{u.uniqueCardsCount || 0}</span></div>
                       </div>
-
-                      {currentProfile.isSuperAdmin && (
-                          <button onClick={() => {setPremiumModalUser(u); setPremiumGiveDays(premiumDurationDays);}} className={`p-2 rounded-lg transition-colors ${isUserPremium ? 'bg-fuchsia-600 text-white' : 'bg-fuchsia-900/40 text-fuchsia-400 hover:bg-fuchsia-900'}`} title="Управління Преміумом">
-                              <Gem size={18} />
-                          </button>
-                      )}
 
                       {canToggleAdmin && (
                          <button onClick={() => toggleAdminStatus(u)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors border ${u.isAdmin ? "bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700" : "bg-purple-900/40 text-purple-400 border-purple-800 hover:bg-purple-900/60"}`}>
@@ -3562,104 +3580,38 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       {/* --- Вкладка: НАЛАШТУВАННЯ (Щоденні нагороди) --- */}
       {activeTab === "settings" && currentProfile.isSuperAdmin && (
          <div className="space-y-6 animate-in fade-in">
-             <form onSubmit={saveSettings} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
+             <form onSubmit={saveDailyRewards} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
                  <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2">
-                     <Settings className="text-blue-500"/> Глобальні Налаштування
+                     <Gift className="text-orange-500"/> Налаштування Щоденних Бонусів
                  </h3>
+                 <p className="text-sm text-neutral-400 mb-6">Встановіть винагороду для гравців за кожен день безперервного входу в гру. Цикл триває 7 днів.</p>
                  
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                     <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                         <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Ціна Преміум-Акаунту (Монети):</label>
-                         <div className="relative">
-                             <Coins className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 w-5 h-5" />
-                             <input type="number" min="0" value={priceForm} onChange={e => setPriceForm(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none font-bold" />
-                         </div>
-                     </div>
-                     <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                         <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Термін Преміум-Акаунту (Дні):</label>
-                         <div className="relative">
-                             <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 w-5 h-5" />
-                             <input type="number" min="1" value={durationDaysForm} onChange={e => setDurationDaysForm(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-blue-500 outline-none font-bold" />
-                         </div>
-                     </div>
-                 </div>
-
-                 <div className="mb-6">
-                     <h4 className="text-sm font-bold text-orange-400 mb-2 flex items-center gap-2"><Gift size={16}/> Щоденні Нагороди (Звичайні)</h4>
-                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                         {rewardsForm.map((val, idx) => (
-                             <div key={idx} className="bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                                 <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">День {idx + 1}</label>
-                                 <input type="number" min="0" value={val} onChange={(e) => { const newArr = [...rewardsForm]; newArr[idx] = Number(e.target.value); setRewardsForm(newArr); }} className="w-full bg-transparent text-white font-bold outline-none text-sm" />
+                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                     {rewardsForm.map((val, idx) => (
+                         <div key={idx} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800">
+                             <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">День {idx + 1}:</label>
+                             <div className="relative">
+                                 <Coins className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 w-4 h-4" />
+                                 <input 
+                                     type="number" 
+                                     min="0"
+                                     value={val} 
+                                     onChange={(e) => {
+                                         const newArr = [...rewardsForm];
+                                         newArr[idx] = Number(e.target.value);
+                                         setRewardsForm(newArr);
+                                     }} 
+                                     className="w-full bg-transparent pl-9 pr-2 py-2 text-white font-bold outline-none" 
+                                 />
                              </div>
-                         ))}
-                     </div>
+                         </div>
+                     ))}
                  </div>
-
-                 <div className="mb-6">
-                     <h4 className="text-sm font-bold text-fuchsia-400 mb-2 flex items-center gap-2"><Gem size={16}/> Щоденні Нагороди (Преміум)</h4>
-                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                         {premiumRewardsForm.map((val, idx) => (
-                             <div key={`prem-${idx}`} className="bg-neutral-950 p-2 rounded-xl border border-fuchsia-900/50">
-                                 <label className="text-[10px] font-bold text-fuchsia-500 uppercase block mb-1">День {idx + 1}</label>
-                                 <input type="number" min="0" value={val} onChange={(e) => { const newArr = [...premiumRewardsForm]; newArr[idx] = Number(e.target.value); setPremiumRewardsForm(newArr); }} className="w-full bg-transparent text-white font-bold outline-none text-sm" />
-                             </div>
-                         ))}
-                     </div>
-                 </div>
-
-                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors">
-                     Зберегти Налаштування
+                 <button type="submit" className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors">
+                     Зберегти Нагороди
                  </button>
              </form>
          </div>
-      )}
-
-      {/* --- Вкладка: ТОВАРИ ПРЕМІУМ МАГАЗИНУ --- */}
-      {activeTab === "premiumShop" && currentProfile.isSuperAdmin && (
-          <div className="space-y-6 animate-in fade-in">
-              <form onSubmit={addPremiumShopItem} className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-2xl">
-                  <h3 className="text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2"><Gem /> Додати товар у Прем. Магазин</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                      <div>
-                          <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Оберіть картку (ексклюзив):</label>
-                          <select value={shopItemForm.itemId} onChange={(e) => setShopItemForm({ ...shopItemForm, itemId: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500" required>
-                              <option value="" disabled>Оберіть...</option>
-                              {filteredCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
-                          </select>
-                      </div>
-                      <div>
-                          <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Ціна (Монети):</label>
-                          <input type="number" value={shopItemForm.price} onChange={(e) => setShopItemForm({ ...shopItemForm, price: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500" min="1" required />
-                      </div>
-                      <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Короткий опис товару:</label>
-                          <input type="text" placeholder="Наприклад: Легендарна лімітована картка тільки для преміум-гравців!" value={shopItemForm.description} onChange={(e) => setShopItemForm({ ...shopItemForm, description: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500" required />
-                      </div>
-                  </div>
-                  <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors">Додати товар</button>
-              </form>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {premiumShopItems.map(item => {
-                      const cDef = cardsCatalog.find(c => c.id === item.itemId);
-                      return (
-                          <div key={item.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex gap-4 relative">
-                              <button onClick={() => deletePremiumShopItem(item.id)} className="absolute top-2 right-2 text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                              <div className="w-16 h-24 bg-neutral-950 border border-neutral-700 rounded-md shrink-0 overflow-hidden">
-                                  <img src={cDef?.image} className="w-full h-full object-cover" alt="" />
-                              </div>
-                              <div className="flex-1 min-w-0 pr-6">
-                                  <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-1">Картка</div>
-                                  <div className="font-bold text-white text-sm truncate">{cDef?.name || "Невідомо"}</div>
-                                  <div className="text-xs text-yellow-500 font-bold mt-1 mb-2">{item.price} <Coins size={10} className="inline"/></div>
-                                  <div className="text-[10px] text-neutral-500 line-clamp-2 leading-tight">{item.description}</div>
-                              </div>
-                          </div>
-                      );
-                  })}
-              </div>
-          </div>
       )}
 
       {/* --- Вкладка: ПРОМОКОДИ --- */}
@@ -3781,23 +3733,17 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
                 </div>
               </div>
               
-              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                  <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                    <input type="checkbox" checked={packForm.isHidden || false} onChange={e => setPackForm({...packForm, isHidden: e.target.checked})} className="w-5 h-5 accent-purple-600" />
-                    Приховати пак від гравців (не видаляти)
-                  </label>
-                  <label className="flex items-center gap-2 text-fuchsia-400 font-bold cursor-pointer bg-fuchsia-950/20 p-4 rounded-xl border border-fuchsia-900/50">
-                    <input type="checkbox" checked={packForm.isPremiumOnly || false} onChange={e => setPackForm({...packForm, isPremiumOnly: e.target.checked})} className="w-5 h-5 accent-fuchsia-600" />
-                    <Gem size={18}/> Тільки для Преміум гравців
-                  </label>
-              </div>
+              <label className="flex items-center gap-2 text-white font-bold sm:col-span-2 cursor-pointer mt-2 bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                <input type="checkbox" checked={packForm.isHidden || false} onChange={e => setPackForm({...packForm, isHidden: e.target.checked})} className="w-5 h-5 accent-purple-600" />
+                Приховати пак від гравців (але не видаляти)
+              </label>
 
             </div>
             
             <div className="flex gap-3">
               <button type="submit" className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-xl">Зберегти Пак</button>
               {editingPack && (
-                <button type="button" onClick={() => { setEditingPack(null); setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
+                <button type="button" onClick={() => { setEditingPack(null); setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
               )}
             </div>
           </form>
@@ -3810,9 +3756,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {filteredPacks.map((pack) => (
-              <div key={pack.id} className={`bg-neutral-900 rounded-xl p-4 border ${pack.isPremiumOnly ? 'border-fuchsia-900' : 'border-neutral-800'} relative group`}>
+              <div key={pack.id} className="bg-neutral-900 rounded-xl p-4 border border-neutral-800 relative group">
                 {pack.isHidden && <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded border border-neutral-600 uppercase font-black tracking-widest absolute top-2 right-2 z-10">Приховано</span>}
-                {pack.isPremiumOnly && <span className="text-[10px] bg-fuchsia-900 text-fuchsia-100 px-2 py-0.5 rounded border border-fuchsia-500 uppercase font-black tracking-widest absolute top-2 left-2 z-10 flex items-center gap-1"><Gem size={10}/> Преміум</span>}
                 <img src={pack.image} alt={pack.name} className={`w-24 h-24 object-cover rounded-lg mx-auto mb-3 ${pack.isHidden ? 'opacity-50 grayscale' : ''}`} />
                 <div className="text-[10px] text-purple-400 font-bold uppercase tracking-widest text-center mb-1">{pack.category || "Базові"}</div>
                 <h4 className="text-center font-bold text-white mb-1">{pack.name}</h4>
