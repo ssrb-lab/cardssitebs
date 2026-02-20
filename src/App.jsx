@@ -32,7 +32,9 @@ import {
   History,
   CalendarDays,
   ShoppingCart,
-  Link
+  Link,
+  ScrollText,
+  Bug
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -76,7 +78,7 @@ const isToday = (dateString) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return "Невідомо";
-  const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
   return new Date(dateString).toLocaleDateString('uk-UA', options);
 };
 
@@ -227,6 +229,9 @@ export default function App() {
   const [dbInventory, setDbInventory] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // ЗАХИСТ ВІД ШВИДКИХ КЛІКІВ (Race Conditions)
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Авторизація
   const [needsRegistration, setNeedsRegistration] = useState(false);
@@ -254,12 +259,26 @@ export default function App() {
 
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
 
+  // --- ЛОГУВАННЯ СИСТЕМИ ---
+  const addSystemLog = async (type, details) => {
+    try {
+        const logRef = doc(db, "artifacts", GAME_ID, "public", "data", "adminLogs", "log_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5));
+        await setDoc(logRef, {
+            type: type,
+            details: details,
+            userUid: user?.uid || "Система",
+            userNickname: profile?.nickname || "Гість",
+            timestamp: new Date().toISOString()
+        });
+    } catch(e) { console.error("Помилка логування:", e); }
+  };
+
   // --- СИСТЕМА ЗАХИСТУ ВІД ВІЧНОЇ ЗАГРУЗКИ ---
   useEffect(() => {
     let timeout;
     if (loading && user !== undefined && !profile && !needsRegistration) {
       timeout = setTimeout(() => {
-        setDbError("Зв'язок з сервером втрачено. Перевірте підключення до інтернету або налаштування Firebase.");
+        setDbError("Зв'язок з сервером втрачено. Перевірте підключення до інтернету.");
         setLoading(false);
       }, 8000);
     }
@@ -346,7 +365,6 @@ export default function App() {
     const unsubMarket = onSnapshot(marketRef, (snapshot) => {
       const listings = [];
       snapshot.forEach((doc) => listings.push({ id: doc.id, ...doc.data() }));
-      // Сортуємо новіші зверху
       setMarketListings(listings.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
     });
 
@@ -358,12 +376,12 @@ export default function App() {
     };
   }, [user]);
 
-  // АВТОМАТИЧНА СИНХРОНІЗАЦІЯ КІЛЬКОСТІ УНІКАЛЬНИХ КАРТОК (ДЛЯ РЕЙТИНГУ)
+  // АВТОМАТИЧНА СИНХРОНІЗАЦІЯ КІЛЬКОСТІ УНІКАЛЬНИХ КАРТОК
   useEffect(() => {
     if (user && profile && dbInventory) {
       if (profile.uniqueCardsCount !== dbInventory.length) {
         const profileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid);
-        updateDoc(profileRef, { uniqueCardsCount: dbInventory.length }).catch(e => console.error("Помилка синхронізації карток:", e));
+        updateDoc(profileRef, { uniqueCardsCount: dbInventory.length }).catch(e => console.error("Помилка синхронізації:", e));
       }
     }
   }, [user, profile?.uniqueCardsCount, dbInventory.length]);
@@ -391,6 +409,9 @@ export default function App() {
           coins: 200,
           totalCards: 0,
           uniqueCardsCount: 0,
+          packsOpened: 0,
+          coinsSpentOnPacks: 0,
+          coinsEarnedFromPacks: 0,
           lastDailyClaim: null,
           dailyStreak: 0,
           createdAt: new Date().toISOString(),
@@ -420,7 +441,6 @@ export default function App() {
       const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
 
-      // Перевіряємо чи є вже профіль в базі
       const profileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", googleUser.uid);
       const profileSnap = await getDoc(profileRef);
 
@@ -432,6 +452,9 @@ export default function App() {
           coins: 200,
           totalCards: 0,
           uniqueCardsCount: 0,
+          packsOpened: 0,
+          coinsSpentOnPacks: 0,
+          coinsEarnedFromPacks: 0,
           lastDailyClaim: null,
           dailyStreak: 0,
           createdAt: new Date().toISOString(),
@@ -465,10 +488,12 @@ export default function App() {
 
   // --- ЛОГІКА РИНКУ ТА ІНВЕНТАРЮ ---
   const listOnMarket = async (cardId, price) => {
+      if (isProcessing) return;
       const existing = dbInventory.find((i) => i.id === cardId);
       if (!existing || existing.amount < 1) return showToast("У вас немає цієї картки!");
       if (price < 1 || !Number.isInteger(price)) return showToast("Невірна ціна!");
 
+      setIsProcessing(true);
       try {
           const batch = writeBatch(db);
           const invDocRef = doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId);
@@ -489,7 +514,7 @@ export default function App() {
               sellerNickname: profile.nickname,
               price: Number(price),
               createdAt: new Date().toISOString(),
-              status: "active" // Додаємо статус для історії
+              status: "active"
           });
 
           await batch.commit();
@@ -498,13 +523,18 @@ export default function App() {
       } catch(e) {
           console.error(e);
           showToast(`Помилка: ${e.message}`);
+          addSystemLog("Помилка", `Виставлення на ринок: ${e.message}`);
+      } finally {
+          setIsProcessing(false);
       }
   };
 
   const buyFromMarket = async (listing) => {
+      if (isProcessing) return;
       if (profile.coins < listing.price) return showToast("Недостатньо монет, Мій лорд!");
       if (listing.sellerUid === user.uid) return showToast("Ви не можете купити власний лот!");
 
+      setIsProcessing(true);
       try {
           const batch = writeBatch(db);
           
@@ -517,7 +547,6 @@ export default function App() {
           const sellerProfileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", listing.sellerUid);
           batch.update(sellerProfileRef, { coins: increment(listing.price) });
 
-          // ЗМІНА ДЛЯ ІСТОРІЇ: Замість видалення, змінюємо статус на "sold"
           const marketRef = doc(db, "artifacts", GAME_ID, "public", "data", "market", listing.id);
           batch.update(marketRef, {
               status: "sold",
@@ -531,16 +560,20 @@ export default function App() {
       } catch (e) {
           console.error(e);
           showToast("Помилка покупки. Можливо, лот вже продано іншому гравцю.");
+          addSystemLog("Помилка", `Покупка на ринку: ${e.message}`);
+      } finally {
+          setIsProcessing(false);
       }
   };
 
   const cancelMarketListing = async (listing) => {
+      if (isProcessing) return;
       if (listing.sellerUid !== user.uid && !profile.isAdmin) return;
 
+      setIsProcessing(true);
       try {
           const batch = writeBatch(db);
           
-          // При скасуванні повністю видаляємо з бази
           const marketRef = doc(db, "artifacts", GAME_ID, "public", "data", "market", listing.id);
           batch.delete(marketRef);
 
@@ -552,15 +585,20 @@ export default function App() {
 
           await batch.commit();
           showToast(listing.sellerUid === user.uid ? "Ваш лот знято з продажу." : "Лот гравця примусово видалено.", "success");
+          if (listing.sellerUid !== user.uid) {
+             addSystemLog("Адмін", `Адмін ${profile.nickname} примусово видалив лот гравця ${listing.sellerNickname}`);
+          }
       } catch (e) {
           console.error(e);
           showToast("Помилка скасування лоту.");
+      } finally {
+          setIsProcessing(false);
       }
   };
 
   // --- ЛОГІКА ГРИ (ВІДКРИТТЯ ПАКУ) ---
   const openPack = async (packId, cost, amountToOpen = 1) => {
-    if (!profile || openingPackId || isRouletteSpinning) return;
+    if (isProcessing || !profile || openingPackId || isRouletteSpinning) return;
     const totalCost = cost * amountToOpen;
 
     if (profile.coins < totalCost) {
@@ -568,6 +606,7 @@ export default function App() {
       return;
     }
 
+    setIsProcessing(true);
     setOpeningPackId(packId);
     setPulledCards([]);
 
@@ -578,6 +617,7 @@ export default function App() {
       let results = [];
       let countsMap = {};
       let needsCatalogUpdate = false; 
+      let totalEarnedCoins = 0; // Для статистики
       const availablePackCards = tempCatalog.filter((c) => c.packId === packId);
 
       for (let i = 0; i < amountToOpen; i++) {
@@ -588,6 +628,7 @@ export default function App() {
         if (availableNow.length === 0) {
           if (i === 0) {
             setOpeningPackId(null);
+            setIsProcessing(false);
             showToast("У цьому паку не залишилось доступних карток!");
             return;
           }
@@ -635,10 +676,12 @@ export default function App() {
 
         results.push(newCard);
         countsMap[newCard.id] = (countsMap[newCard.id] || 0) + 1;
+        totalEarnedCoins += (newCard.sellPrice ? Number(newCard.sellPrice) : SELL_PRICE);
       }
 
       if (results.length === 0) {
         setOpeningPackId(null);
+        setIsProcessing(false);
         return;
       }
 
@@ -648,7 +691,10 @@ export default function App() {
         const profileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid);
         batch.update(profileRef, { 
           coins: increment(-totalCost),
-          totalCards: increment(results.length)
+          totalCards: increment(results.length),
+          packsOpened: increment(amountToOpen),
+          coinsSpentOnPacks: increment(totalCost),
+          coinsEarnedFromPacks: increment(totalEarnedCoins)
         });
 
         if (needsCatalogUpdate) {
@@ -674,24 +720,30 @@ export default function App() {
             setTimeout(() => {
                 setIsRouletteSpinning(false);
                 setPulledCards(results);
+                setIsProcessing(false);
             }, 5000); 
         } else {
             setOpeningPackId(null);
             setPulledCards(results);
+            setIsProcessing(false);
         }
 
       } catch (err) {
         console.error("Помилка під час відкриття:", err);
         showToast(`Виникла помилка під час збереження: ${err.message}`);
+        addSystemLog("Помилка", `Відкриття паку: ${err.message}`);
         setOpeningPackId(null);
+        setIsProcessing(false);
       }
     }, amountToOpen === 1 ? 100 : 1500);
   };
 
   const sellDuplicate = async (cardId) => {
+    if (isProcessing) return;
     const existing = dbInventory.find((i) => i.id === cardId);
     if (!existing || existing.amount <= 1) return;
     
+    setIsProcessing(true);
     const cardDef = cardsCatalog.find(c => c.id === cardId);
     const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
 
@@ -711,16 +763,21 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast("Помилка під час продажу.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const sellAllDuplicates = async (cardId, currentAmount) => {
-    if (currentAmount <= 1) return;
+  const sellAllDuplicates = async (cardId) => {
+    if (isProcessing) return;
+    const existing = dbInventory.find((i) => i.id === cardId);
+    if (!existing || existing.amount <= 1) return;
     
+    setIsProcessing(true);
     const cardDef = cardsCatalog.find(c => c.id === cardId);
     const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
     
-    const sellCount = currentAmount - 1;
+    const sellCount = existing.amount - 1;
     const earnedCoins = sellCount * cardPrice;
 
     try {
@@ -739,15 +796,19 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast("Помилка під час масового продажу.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const sellEveryDuplicate = async () => {
+    if (isProcessing) return;
     const duplicates = dbInventory.filter(item => item.amount > 1);
     if (duplicates.length === 0) {
       return showToast("У вас немає дублікатів для продажу!", "error");
     }
 
+    setIsProcessing(true);
     let totalEarned = 0;
     let totalCardsRemoved = 0;
     const batch = writeBatch(db);
@@ -776,6 +837,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
       showToast("Помилка під час масового продажу інвентарю.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1004,6 +1067,7 @@ export default function App() {
             setSelectedPackId={setSelectedPackId}
             setViewingCard={setViewingCard}
             isAdmin={profile?.isAdmin}
+            isProcessing={isProcessing}
           />
         )}
         {currentView === "inventory" && (
@@ -1017,6 +1081,7 @@ export default function App() {
             catalogTotal={cardsCatalog.length}
             setViewingCard={setViewingCard}
             setListingCard={setListingCard}
+            packsCatalog={packsCatalog}
           />
         )}
         {currentView === "market" && (
@@ -1063,6 +1128,7 @@ export default function App() {
             cardsCatalog={cardsCatalog}
             rarities={rarities}
             setViewingCard={setViewingCard}
+            packsCatalog={packsCatalog}
           />
         )}
         {currentView === "admin" && profile?.isAdmin && (
@@ -1074,6 +1140,7 @@ export default function App() {
             packsCatalog={packsCatalog}
             rarities={rarities}
             showToast={showToast}
+            addSystemLog={addSystemLog}
           />
         )}
       </main>
@@ -1085,7 +1152,7 @@ export default function App() {
 
       {/* Модалка для виставлення картки на Ринок */}
       {listingCard && (
-         <ListingModal listingCard={listingCard} setListingCard={setListingCard} listOnMarket={listOnMarket} />
+         <ListingModal listingCard={listingCard} setListingCard={setListingCard} listOnMarket={listOnMarket} isProcessing={isProcessing} />
       )}
 
       <nav className="fixed bottom-0 w-full bg-neutral-900 border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
@@ -1126,7 +1193,6 @@ function NavButton({ icon, label, isActive, onClick }) {
 function MarketView({ marketListings, cardsCatalog, rarities, currentUserUid, buyFromMarket, cancelMarketListing, setViewingCard, isAdmin }) {
   const [tab, setTab] = useState("all");
 
-  // Фільтруємо ТІЛЬКИ активні лоти (статус 'active' або взагалі без статусу для сумісності зі старими)
   const activeListings = marketListings.filter(l => (!l.status || l.status === "active") && (tab === "my" ? l.sellerUid === currentUserUid : true));
 
   return (
@@ -1203,7 +1269,7 @@ function MarketView({ marketListings, cardsCatalog, rarities, currentUserUid, bu
 }
 
 // --- МОДАЛКА ВИСТАВЛЕННЯ НА РИНОК ---
-function ListingModal({ listingCard, setListingCard, listOnMarket }) {
+function ListingModal({ listingCard, setListingCard, listOnMarket, isProcessing }) {
     const [price, setPrice] = useState("");
 
     const handleSubmit = (e) => {
@@ -1212,7 +1278,7 @@ function ListingModal({ listingCard, setListingCard, listOnMarket }) {
     };
 
     return (
-       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => setListingCard(null)}>
+       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => !isProcessing && setListingCard(null)}>
            <div className="bg-neutral-900 border border-blue-900/50 p-6 rounded-3xl shadow-[0_0_50px_rgba(37,99,235,0.2)] max-w-sm w-full animate-in zoom-in-95 relative" onClick={e => e.stopPropagation()}>
                <div className="flex items-center gap-3 mb-6 border-b border-neutral-800 pb-4">
                    <div className="w-16 h-24 rounded-lg overflow-hidden border border-neutral-700 shrink-0">
@@ -1233,8 +1299,8 @@ function ListingModal({ listingCard, setListingCard, listOnMarket }) {
                        </div>
                    </div>
                    <div className="flex gap-3 pt-2">
-                       <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl transition-colors shadow-lg shadow-blue-900/20">Продати</button>
-                       <button type="button" onClick={() => setListingCard(null)} className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-4 px-6 rounded-xl transition-colors">Скасувати</button>
+                       <button type="submit" disabled={isProcessing} className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-black py-4 rounded-xl transition-colors shadow-lg shadow-blue-900/20">Продати</button>
+                       <button type="button" disabled={isProcessing} onClick={() => setListingCard(null)} className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-4 px-6 rounded-xl transition-colors">Скасувати</button>
                    </div>
                </form>
            </div>
@@ -1243,7 +1309,7 @@ function ListingModal({ listingCard, setListingCard, listOnMarket }) {
 }
 
 // --- МАГАЗИН ---
-function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin }) {
+function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing }) {
   
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
@@ -1311,25 +1377,25 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
           Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : "!"}
         </h2>
         
-        <div className="flex flex-wrap justify-center gap-6 mb-10 w-full">
+        <div className="flex flex-wrap justify-center gap-6 mb-10 w-full max-h-[60vh] overflow-y-auto hide-scrollbar p-4">
           {pulledCards.map((card, index) => {
             const style = getCardStyle(card.rarity, rarities);
             const effectClass = card.effect ? `effect-${card.effect}` : '';
             return (
-              <div key={index} className="flex flex-col items-center animate-in zoom-in slide-in-from-bottom-6" style={{ animationDelay: `${index * 150}ms`, fillMode: 'both' }}>
-                <div className={`w-40 sm:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all hover:scale-105 hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}>
+              <div key={index} className="flex flex-col items-center animate-in zoom-in slide-in-from-bottom-6" style={{ animationDelay: `${Math.min(index * 50, 2000)}ms`, fillMode: 'both' }}>
+                <div className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all hover:scale-105 hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}>
                   <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
                   {card.maxSupply > 0 && (
-                    <div className="absolute top-2 right-2 bg-black/90 text-white text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
+                    <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
                       Лімітка
                     </div>
                   )}
                 </div>
-                <div className="text-center">
-                  <div className={`text-xs font-black uppercase tracking-widest flex justify-center items-center gap-1 ${style.text}`}>
-                    <Sparkles size={14} /> {card.rarity}
+                <div className="text-center w-full px-2">
+                  <div className={`text-[10px] sm:text-xs font-black uppercase tracking-widest flex justify-center items-center gap-1 ${style.text}`}>
+                    <Sparkles size={12} /> {card.rarity}
                   </div>
-                  <h3 className="font-bold text-white max-w-[150px] truncate">{card.name}</h3>
+                  <h3 className="font-bold text-white text-xs sm:text-sm truncate w-full">{card.name}</h3>
                 </div>
               </div>
             );
@@ -1349,13 +1415,13 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
   const selectedPack = packs.find((p) => p.id === selectedPackId);
 
   if (selectedPack) {
-    // ТУТ ДОДАНО СОРТУВАННЯ КАРТОК ПАКУ ЗА РІДКІСТЮ
+    // СОРТУВАННЯ КАРТОК ПАКУ ЗА РІДКІСТЮ (Найрідкісніші ЗВЕРХУ)
     const packCards = cardsCatalog
       .filter((c) => c.packId === selectedPackId)
       .sort((a, b) => {
-          const wA = rarities.find(r => r.name === a.rarity)?.weight || 0;
-          const wB = rarities.find(r => r.name === b.rarity)?.weight || 0;
-          return wB - wA; // Від Звичайних до найрідкісніших
+          const wA = rarities.find(r => r.name === a.rarity)?.weight || 100;
+          const wB = rarities.find(r => r.name === b.rarity)?.weight || 100;
+          return wA - wB; // Чим менша вага (шанс), тим вище картка в списку
       });
 
     return (
@@ -1364,7 +1430,7 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
           <ArrowLeft size={20} /> Назад
         </button>
 
-        <div className="flex flex-col items-center mb-12 bg-neutral-900/50 p-6 rounded-3xl border border-neutral-800 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center mb-12 bg-neutral-900/50 p-6 rounded-3xl border border-neutral-800 max-w-3xl mx-auto">
           <h2 className="text-3xl font-black mb-6 text-white text-center">{selectedPack.name}</h2>
           
           <div className="relative w-48 h-48 mb-8 flex justify-center items-center perspective-1000">
@@ -1380,15 +1446,16 @@ function ShopView({ packs, cardsCatalog, rarities, openPack, openingPackId, isRo
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 w-full">
-            <OpenButton amount={1} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)} opening={openingPackId === selectedPack.id} />
-            <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id} color="bg-orange-500 hover:bg-orange-400 text-orange-950" />
-            <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id} color="bg-red-500 hover:bg-red-400 text-red-950" />
+            <OpenButton amount={1} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)} opening={openingPackId === selectedPack.id || isProcessing} />
+            <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-orange-950" />
+            <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-red-950" />
+            <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-fuchsia-600 hover:bg-fuchsia-500 text-white" />
           </div>
         </div>
 
         <div className="border-t border-neutral-800 pt-8 w-full">
           <h3 className="text-xl font-black mb-6 text-white text-center uppercase tracking-wider">
-            Можливі картки в цьому паку
+            Можливі картки в цьому паку (від найрідкісніших)
           </h3>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
             {packCards.map((card) => {
@@ -1495,18 +1562,41 @@ function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hov
 }
 
 // --- ІНВЕНТАР ---
-function InventoryView({ inventory, rarities, sellDuplicate, sellAllDuplicates, sellEveryDuplicate, sellPrice, catalogTotal, setViewingCard, setListingCard }) {
+function InventoryView({ inventory, rarities, sellDuplicate, sellAllDuplicates, sellEveryDuplicate, sellPrice, catalogTotal, setViewingCard, setListingCard, packsCatalog }) {
   const [sortBy, setSortBy] = useState("rarity");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPack, setFilterPack] = useState("all");
 
-  const sortedInventory = [...inventory].sort((a, b) => {
-    const getWeight = (rName) => rarities.find((x) => x.name === rName)?.weight || 100;
-    if (sortBy === "rarity") return getWeight(b.card.rarity) - getWeight(a.card.rarity);
+  const categories = ["all", ...new Set(packsCatalog.map(p => p.category || "Базові"))];
+  const relevantPacks = filterCategory === "all" ? packsCatalog : packsCatalog.filter(p => (p.category || "Базові") === filterCategory);
+
+  // Спочатку фільтруємо
+  let filteredInventory = inventory.filter(item => {
+     const pack = packsCatalog.find(p => p.id === item.card.packId);
+     const cat = pack ? (pack.category || "Базові") : "Базові";
+     
+     if (filterCategory !== "all" && cat !== filterCategory) return false;
+     if (filterPack !== "all" && item.card.packId !== filterPack) return false;
+     return true;
+  });
+
+  // Потім сортуємо
+  filteredInventory.sort((a, b) => {
+    if (sortBy === "rarity") {
+       const getWeight = (rName) => rarities.find((x) => x.name === rName)?.weight || 100;
+       return getWeight(a.card.rarity) - getWeight(b.card.rarity); // Найрідкісніші зверху
+    }
     if (sortBy === "amount") return b.amount - a.amount;
     if (sortBy === "name") return a.card.name.localeCompare(b.card.name);
+    if (sortBy === "pack") {
+        const pA = packsCatalog.find(p => p.id === a.card.packId)?.name || "";
+        const pB = packsCatalog.find(p => p.id === b.card.packId)?.name || "";
+        return pA.localeCompare(pB);
+    }
     return 0;
   });
 
-  const duplicatesEarnedCoins = inventory.reduce((sum, item) => {
+  const duplicatesEarnedCoins = filteredInventory.reduce((sum, item) => {
     if (item.amount > 1) {
         const cardPrice = item.card.sellPrice ? Number(item.card.sellPrice) : sellPrice;
         return sum + (cardPrice * (item.amount - 1));
@@ -1516,52 +1606,62 @@ function InventoryView({ inventory, rarities, sellDuplicate, sellAllDuplicates, 
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 bg-neutral-900/80 p-5 rounded-2xl border border-neutral-800 shadow-lg">
-        <h2 className="text-2xl font-black flex items-center gap-3 text-white uppercase tracking-wider">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-neutral-900/80 p-5 rounded-2xl border border-neutral-800 shadow-lg">
+        <h2 className="text-2xl font-black flex items-center gap-3 text-white uppercase tracking-wider shrink-0">
           <LayoutGrid className="text-yellow-500 w-8 h-8" /> Моя Колекція <span className="text-neutral-500 text-lg">({inventory.length}/{catalogTotal})</span>
         </h2>
         
-        <div className="flex flex-wrap justify-center sm:justify-end items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap justify-center md:justify-end items-center gap-3 w-full">
           {duplicatesEarnedCoins > 0 && (
             <button 
               onClick={() => {
-                  if (confirm(`Продати всі дублікати та отримати ${duplicatesEarnedCoins} монет?`)) {
+                  if (confirm(`Продати всі відображені дублікати та отримати ${duplicatesEarnedCoins} монет?`)) {
                       sellEveryDuplicate();
                   }
               }} 
-              className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-bold py-3 px-5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center gap-2 whitespace-nowrap transition-transform transform hover:scale-105"
-              title="Залишити по 1 екземпляру кожної карти"
+              className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white font-bold py-3 px-5 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center gap-2 whitespace-nowrap transition-transform transform hover:scale-105 order-last lg:order-first w-full lg:w-auto justify-center"
+              title="Залишити по 1 екземпляру кожної карти з поточного списку"
             >
               <Zap size={18} /> Продати дублікати (+{duplicatesEarnedCoins} <Coins size={14}/>)
             </button>
           )}
 
+          <select value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setFilterPack("all"); }} className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full">
+             {categories.map(c => <option key={c} value={c}>{c === "all" ? "Всі Категорії" : c}</option>)}
+          </select>
+          
+          <select value={filterPack} onChange={(e) => setFilterPack(e.target.value)} className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full">
+             <option value="all">Всі Паки</option>
+             {relevantPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full"
+            className="bg-neutral-950 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800 h-full"
           >
-            <option value="rarity">Сортувати за Рідкістю</option>
-            <option value="amount">Сортувати за Дублікатами</option>
-            <option value="name">Сортувати за Алфавітом</option>
+            <option value="rarity">За Рідкістю</option>
+            <option value="pack">За Паком</option>
+            <option value="amount">За Дублікатами</option>
+            <option value="name">За Алфавітом</option>
           </select>
         </div>
       </div>
 
-      {inventory.length === 0 ? (
+      {filteredInventory.length === 0 ? (
         <div className="text-center py-32 text-neutral-500 bg-neutral-900/30 rounded-3xl border-2 border-dashed border-neutral-800">
           <PackageOpen size={80} className="mx-auto mb-6 opacity-20" />
-          <p className="text-xl font-medium mb-2 text-neutral-400">Ваш інвентар порожній.</p>
+          <p className="text-xl font-medium mb-2 text-neutral-400">Картки не знайдено.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {sortedInventory.map((item, index) => {
+          {filteredInventory.map((item, index) => {
             const style = getCardStyle(item.card.rarity, rarities);
             const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
             const currentSellPrice = item.card.sellPrice ? Number(item.card.sellPrice) : sellPrice;
 
             return (
-              <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 20}ms`, fillMode: "backwards" }}>
+              <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}>
                 <div onClick={() => setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass}`}>
                   {item.amount > 1 && (
                     <div className="absolute top-2 right-2 bg-neutral-950/90 backdrop-blur text-white font-black text-xs px-3 py-1.5 rounded-full z-10 border border-neutral-700 shadow-xl">
@@ -1581,7 +1681,7 @@ function InventoryView({ inventory, rarities, sellDuplicate, sellAllDuplicates, 
                       </button>
                       <div className="flex gap-1.5 w-full">
                          {item.amount > 2 && (
-                            <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id, item.amount); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
+                            <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
                                Всі (-1)
                             </button>
                          )}
@@ -1615,7 +1715,7 @@ function RatingView({ db, appId, currentUid, setViewingPlayerProfile }) {
   const [allProfiles, setAllProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [ratingSort, setRatingSort] = useState("cards"); // "cards" або "coins"
+  const [ratingSort, setRatingSort] = useState("cards");
 
   useEffect(() => {
     const fetchAllProfiles = async () => {
@@ -1718,10 +1818,14 @@ function RatingView({ db, appId, currentUid, setViewingPlayerProfile }) {
 }
 
 // --- ПУБЛІЧНИЙ ПРОФІЛЬ ІНШОГО ГРАВЦЯ ---
-function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard }) {
+function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard, packsCatalog }) {
   const [playerInfo, setPlayerInfo] = useState(null);
   const [playerInventory, setPlayerInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [sortBy, setSortBy] = useState("rarity");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPack, setFilterPack] = useState("all");
 
   useEffect(() => {
     const fetchPlayerData = async () => {
@@ -1742,11 +1846,6 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
             const cardData = cardsCatalog.find(c => c.id === item.id);
             return cardData ? { card: cardData, amount: item.amount } : null;
           }).filter(Boolean);
-
-          fullInv.sort((a, b) => {
-            const getW = (rName) => rarities.find(x => x.name === rName)?.weight || 100;
-            return getW(b.card.rarity) - getW(a.card.rarity);
-          });
           
           setPlayerInventory(fullInv);
         }
@@ -1761,6 +1860,34 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
 
   if (loading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-12 h-12 mb-4" /> Завантажуємо дані гравця...</div>;
   if (!playerInfo) return <div className="text-center py-20 text-red-500">Гравець не знайдений або його акаунт видалено. <button onClick={goBack} className="block mx-auto mt-4 underline">Повернутись</button></div>;
+
+  const categories = ["all", ...new Set(packsCatalog.map(p => p.category || "Базові"))];
+  const relevantPacks = filterCategory === "all" ? packsCatalog : packsCatalog.filter(p => (p.category || "Базові") === filterCategory);
+
+  let filteredInventory = playerInventory.filter(item => {
+     const pack = packsCatalog.find(p => p.id === item.card.packId);
+     const cat = pack ? (pack.category || "Базові") : "Базові";
+     
+     if (filterCategory !== "all" && cat !== filterCategory) return false;
+     if (filterPack !== "all" && item.card.packId !== filterPack) return false;
+     return true;
+  });
+
+  filteredInventory.sort((a, b) => {
+    if (sortBy === "rarity") {
+       const getWeight = (rName) => rarities.find((x) => x.name === rName)?.weight || 100;
+       return getWeight(a.card.rarity) - getWeight(b.card.rarity);
+    }
+    if (sortBy === "amount") return b.amount - a.amount;
+    if (sortBy === "name") return a.card.name.localeCompare(b.card.name);
+    if (sortBy === "pack") {
+        const pA = packsCatalog.find(p => p.id === a.card.packId)?.name || "";
+        const pB = packsCatalog.find(p => p.id === b.card.packId)?.name || "";
+        return pA.localeCompare(pB);
+    }
+    return 0;
+  });
+
 
   return (
     <div className="animate-in slide-in-from-right-8 duration-500">
@@ -1781,7 +1908,7 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
             <span className="flex items-center gap-1"><CalendarDays size={14}/> З нами від: {formatDate(playerInfo.createdAt)}</span>
         </div>
         
-        <div className="grid grid-cols-2 gap-4 relative z-10 mt-6 max-w-md mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 relative z-10 mt-6 max-w-2xl mx-auto">
           <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
             <Coins className="text-yellow-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">{playerInfo.coins}</span>
@@ -1792,20 +1919,48 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
             <span className="text-xl font-black text-white">{playerInfo.uniqueCardsCount || playerInventory.length}</span>
             <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Унікальних карт</span>
           </div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.packsOpened || 0}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
+          </div>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+            <Zap className="text-green-500 mb-2 w-6 h-6" />
+            <span className="text-xl font-black text-white">{playerInfo.coinsEarnedFromPacks || 0}</span>
+            <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Виграно <Coins size={8} className="inline"/></span>
+          </div>
         </div>
       </div>
 
-      <h3 className="text-xl font-black text-white mb-6 uppercase tracking-wider flex items-center gap-2">
-        <LayoutGrid className="text-blue-500" /> Колекція гравця
-      </h3>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h3 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <LayoutGrid className="text-blue-500" /> Колекція гравця
+        </h3>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <select value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setFilterPack("all"); }} className="bg-neutral-900 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800">
+             {categories.map(c => <option key={c} value={c}>{c === "all" ? "Всі Категорії" : c}</option>)}
+          </select>
+          <select value={filterPack} onChange={(e) => setFilterPack(e.target.value)} className="bg-neutral-900 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800">
+             <option value="all">Всі Паки</option>
+             {relevantPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-900 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-2 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800">
+            <option value="rarity">За Рідкістю</option>
+            <option value="pack">За Паком</option>
+            <option value="amount">За Дублікатами</option>
+            <option value="name">За Алфавітом</option>
+          </select>
+        </div>
+      </div>
 
-      {playerInventory.length === 0 ? (
+      {filteredInventory.length === 0 ? (
         <div className="text-center py-10 bg-neutral-900/50 rounded-2xl border border-neutral-800 text-neutral-500">
-          У цього гравця ще немає карток.
+          Картки за цим фільтром відсутні.
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-          {playerInventory.map((item, index) => {
+          {filteredInventory.map((item, index) => {
             const style = getCardStyle(item.card.rarity, rarities);
             const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
             return (
@@ -1839,9 +1994,8 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
 // --- ПРОФІЛЬ ---
 function ProfileView({ profile, user, db, appId, handleLogout, showToast, canClaimDaily, marketListings, cardsCatalog, rarities }) {
   const [promoInput, setPromoInput] = useState("");
-  const [activeTab, setActiveTab] = useState("main"); // "main" або "history"
+  const [activeTab, setActiveTab] = useState("main"); 
   
-  // Перевірка чи прив'язаний Google
   const isGoogleLinked = user?.providerData?.some(p => p.providerId === 'google.com');
 
   const handleLinkGoogle = async () => {
@@ -1960,7 +2114,6 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
   const currentStreak = profile?.dailyStreak || 0;
   const nextStreakDay = currentStreak >= 7 ? 1 : currentStreak + 1;
 
-  // Збираємо і покупки, і продажі
   const historyItems = marketListings.filter(l => 
      l.status === "sold" && 
      ((l.sellerUid === user.uid && !l.sellerHidden) || (l.buyerUid === user.uid && !l.buyerHidden))
@@ -1981,7 +2134,6 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
               const willSellerBeHidden = isSeller ? true : l.sellerHidden;
               const willBuyerBeHidden = isBuyer ? true : l.buyerHidden;
 
-              // Якщо обидва учасники угоди приховали запис — видаляємо його з БД повністю для економії місця
               if (willSellerBeHidden && willBuyerBeHidden) {
                   batch.delete(ref);
               } else {
@@ -2037,6 +2189,27 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
                   <span className="text-xs text-neutral-500 font-bold uppercase mt-1">Унікальних карт</span>
                 </div>
               </div>
+            </div>
+
+            {/* БЛОК СТАТИСТИКИ */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 mb-6">
+               <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
+                 <PackageOpen className="text-purple-500" /> Статистика Паків
+               </h3>
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
+                    <div className="text-2xl font-black text-white">{profile?.packsOpened || 0}</div>
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</div>
+                 </div>
+                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
+                    <div className="text-2xl font-black text-red-400">{profile?.coinsSpentOnPacks || 0}</div>
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Витрачено <Coins size={10} className="inline"/></div>
+                 </div>
+                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
+                    <div className="text-2xl font-black text-green-400">{profile?.coinsEarnedFromPacks || 0}</div>
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Виграно <Coins size={10} className="inline"/></div>
+                 </div>
+               </div>
             </div>
 
             {canClaimDaily ? (
@@ -2141,7 +2314,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, canCla
 }
 
 // --- АДМІН ПАНЕЛЬ ---
-function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast }) {
+function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog }) {
   const [activeTab, setActiveTab] = useState("users");
   const [allUsers, setAllUsers] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2153,7 +2326,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
   const [banModalUser, setBanModalUser] = useState(null);
   const [banReason, setBanReason] = useState("");
   const [banDurationValue, setBanDurationValue] = useState("");
-  const [banDurationUnit, setBanDurationUnit] = useState("h"); // m, h, d, perm
+  const [banDurationUnit, setBanDurationUnit] = useState("h"); 
 
   const [adminAddCardId, setAdminAddCardId] = useState("");
   const [adminAddCardAmount, setAdminAddCardAmount] = useState(1);
@@ -2171,6 +2344,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
   const [packSearchTerm, setPackSearchTerm] = useState("");
   const [cardSearchTerm, setCardSearchTerm] = useState("");
   const [cardPackFilter, setCardPackFilter] = useState("all");
+
+  const [adminLogs, setAdminLogs] = useState([]);
 
   useEffect(() => {
     if (activeTab === "users") {
@@ -2190,10 +2365,20 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       });
       return () => unsub();
     }
+
+    if (activeTab === "logs" && currentProfile.isSuperAdmin) {
+      const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "adminLogs"), (snap) => {
+          const lList = [];
+          snap.forEach(d => lList.push({ id: d.id, ...d.data() }));
+          lList.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+          setAdminLogs(lList);
+      });
+      return () => unsub();
+    }
   }, [activeTab, db, appId, currentProfile]);
 
   const syncAllProfiles = async () => {
-    if (!confirm("Це може зайняти певний час. Ця дія перерахує інвентар кожного гравця і оновить його статистику для рейтингу. Продовжити?")) return;
+    if (!confirm("Це може зайняти певний час. Продовжити?")) return;
     setIsSyncing(true);
     showToast("Синхронізація розпочата...", "success");
 
@@ -2228,6 +2413,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
         }
         
         showToast("Синхронізацію успішно завершено!", "success");
+        addSystemLog("Адмін", "Масова синхронізація профілів завершена.");
     } catch (e) {
         console.error(e);
         showToast("Сталася помилка під час синхронізації.", "error");
@@ -2239,11 +2425,12 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
     if (userToDelete.isSuperAdmin) return showToast("Не можна видалити Супер Адміністратора!", "error");
     if (userToDelete.isAdmin && !currentProfile.isSuperAdmin) return showToast("У вас немає прав видаляти інших адміністраторів!", "error");
     
-    if (!confirm(`Мій лорд, Ви впевнені, що хочете БЕЗПОВОРОТНО видалити гравця ${userToDelete.nickname}? Це зітре всі його дані назавжди!`)) return;
+    if (!confirm(`Мій лорд, Ви впевнені, що хочете БЕЗПОВОРОТНО видалити гравця ${userToDelete.nickname}?`)) return;
     
     try {
       await deleteDoc(doc(db, "artifacts", appId, "public", "data", "profiles", userToDelete.uid));
       showToast(`Гравця ${userToDelete.nickname} видалено.`, "success");
+      addSystemLog("Адмін", `Видалено акаунт гравця: ${userToDelete.nickname} (${userToDelete.uid})`);
     } catch (e) {
       console.error(e);
       showToast("Помилка під час видалення гравця");
@@ -2292,6 +2479,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               banUntil: banUntil
           });
           showToast(`Гравця ${banModalUser.nickname} заблоковано.`, "success");
+          addSystemLog("Адмін", `БАН: Гравець ${banModalUser.nickname}. Причина: ${banReason}. Термін: ${banUntil ? banUntil : 'Назавжди'}`);
           setBanModalUser(null);
           setBanReason("");
           setBanDurationValue("");
@@ -2309,6 +2497,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               banUntil: null
           });
           showToast("Гравця успішно розблоковано.", "success");
+          const targetUser = allUsers.find(u => u.uid === uid);
+          addSystemLog("Адмін", `РОЗБАН: Гравець ${targetUser?.nickname || uid}`);
       } catch (e) {
           console.error(e);
           showToast("Помилка під час розблокування.", "error");
@@ -2323,6 +2513,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               isAdmin: newStatus
           });
           showToast(`Права адміна ${newStatus ? 'надано' : 'забрано'}.`, "success");
+          addSystemLog("Адмін", `Зміна прав: ${userObj.nickname} тепер ${newStatus ? 'Адмін' : 'Гравець'}`);
       } catch(e) {
           console.error(e);
           showToast("Помилка зміни прав.", "error");
@@ -2334,6 +2525,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", currentProfile.uid);
       await updateDoc(profileRef, { coins: increment(amount) });
       showToast(`Видано собі ${amount} монет!`, "success");
+      addSystemLog("Адмін", `Видано собі ${amount} монет.`);
     } catch (e) {
       console.error(e);
       showToast("Помилка нарахування собі.", "error");
@@ -2351,7 +2543,11 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       batch.update(profileRef, { totalCards: increment(adminAddCardAmount) });
 
       await batch.commit();
+      
+      const cDef = cardsCatalog.find(c => c.id === adminAddCardId);
       showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, "success");
+      addSystemLog("Адмін", `Видано ${adminAddCardAmount} шт. картки '${cDef?.name}' гравцю ${viewingUser.nickname}`);
+      
       setAdminAddCardAmount(1);
       handleInspectUser(viewingUser.uid); 
     } catch (e) {
@@ -2368,6 +2564,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       
       const actionText = adminAddCoinsAmount > 0 ? "нараховано" : "віднято";
       showToast(`Успішно ${actionText} ${Math.abs(adminAddCoinsAmount)} монет.`, "success");
+      addSystemLog("Адмін", `${actionText} ${Math.abs(adminAddCoinsAmount)} монет гравцю ${viewingUser.nickname}`);
       
       setViewingUser(prev => ({...prev, coins: prev.coins + adminAddCoinsAmount}));
       setAdminSetCoinsAmount(prev => prev + adminAddCoinsAmount);
@@ -2386,6 +2583,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       await updateDoc(profileRef, { coins: val });
       
       showToast(`Баланс змінено на рівно ${val} монет.`, "success");
+      addSystemLog("Адмін", `Встановлено точний баланс ${val} монет гравцю ${viewingUser.nickname}`);
       setViewingUser(prev => ({...prev, coins: val}));
     } catch (e) {
       console.error(e);
@@ -2410,6 +2608,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
       await batch.commit();
       showToast("Картку вилучено.", "success");
+      const cDef = cardsCatalog.find(c => c.id === cardId);
+      addSystemLog("Адмін", `Вилучено 1 шт. картки '${cDef?.name}' у гравця ${viewingUser.nickname}`);
       handleInspectUser(viewingUser.uid);
     } catch (e) {
       console.error(e);
@@ -2426,6 +2626,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       updatedPacks.push({ ...packForm, id: "p" + Date.now(), cost: Number(packForm.cost), isHidden: !!packForm.isHidden, category: packForm.category || "Базові" });
     }
     await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { packs: updatedPacks });
+    addSystemLog("Адмін", `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
     setEditingPack(null);
     setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false });
     showToast("Паки оновлено!", "success");
@@ -2433,8 +2634,10 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
   const deletePack = async (packId) => {
     if (!confirm("Видалити цей пак?")) return;
+    const pDef = packsCatalog.find(p => p.id === packId);
     const updated = packsCatalog.filter((p) => p.id !== packId);
     await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { packs: updated });
+    addSystemLog("Адмін", `Видалено пак: ${pDef?.name}`);
     showToast("Пак видалено!", "success");
   };
 
@@ -2462,6 +2665,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
     }
     
     await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { cards: updatedCatalog });
+    addSystemLog("Адмін", `${editingCard ? 'Оновлено' : 'Створено'} картку: ${cardForm.name}`);
     
     setEditingCard(null);
     setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", maxSupply: "", weight: "", sellPrice: "", effect: "" });
@@ -2470,8 +2674,10 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
   const deleteCard = async (cardId) => {
     if (!confirm("Видалити цю картку?")) return;
+    const cDef = cardsCatalog.find(c => c.id === cardId);
     const updated = cardsCatalog.filter((c) => c.id !== cardId);
     await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { cards: updated });
+    addSystemLog("Адмін", `Видалено картку: ${cDef?.name}`);
     showToast("Картку видалено!", "success");
   };
 
@@ -2488,6 +2694,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               currentGlobalUses: 0
           });
           showToast("Промокод створено!", "success");
+          addSystemLog("Адмін", `Створено промокод: ${codeId} (нагорода ${promoForm.reward})`);
           setPromoForm({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
       } catch (err) {
           console.error(err);
@@ -2499,6 +2706,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       if (!confirm("Видалити промокод?")) return;
       try {
           await deleteDoc(doc(db, "artifacts", appId, "public", "data", "promoCodes", codeId));
+          addSystemLog("Адмін", `Видалено промокод: ${codeId}`);
           showToast("Промокод видалено.", "success");
       } catch (err) {
           console.error(err);
@@ -2506,9 +2714,25 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       }
   }
 
+  const clearAdminLogs = async () => {
+    if (!confirm("Очистити всі системні логи? Це безповоротно!")) return;
+    try {
+        const batch = writeBatch(db);
+        adminLogs.forEach(log => {
+            const ref = doc(db, "artifacts", appId, "public", "data", "adminLogs", log.id);
+            batch.delete(ref);
+        });
+        await batch.commit();
+        showToast("Логи успішно очищено!", "success");
+    } catch(e) {
+        console.error(e);
+        showToast("Помилка очищення логів.", "error");
+    }
+  }
+
   const filteredPacks = packsCatalog.filter(p => p.name.toLowerCase().includes(packSearchTerm.toLowerCase()));
   
-  // ТУТ ДОДАНО СОРТУВАННЯ В АДМІН-ПАНЕЛІ ЗА РІДКІСТЮ
+  // СОРТУВАННЯ КАРТОК: НАЙРІДКІСНІШІ ЗВЕРХУ
   const filteredCards = cardsCatalog
     .filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(cardSearchTerm.toLowerCase());
@@ -2516,9 +2740,9 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       return matchesSearch && matchesPack;
     })
     .sort((a, b) => {
-        const wA = rarities.find(r => r.name === a.rarity)?.weight || 0;
-        const wB = rarities.find(r => r.name === b.rarity)?.weight || 0;
-        return wB - wA; // Від Звичайних до найрідкісніших
+        const wA = rarities.find(r => r.name === a.rarity)?.weight || 100;
+        const wB = rarities.find(r => r.name === b.rarity)?.weight || 100;
+        return wA - wB; // Менша вага (рідкісніші) йдуть першими
     });
 
   return (
@@ -2557,12 +2781,15 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
           </div>
       )}
 
-      <div className="flex gap-2 mb-6 bg-neutral-900 p-2 rounded-xl overflow-x-auto">
+      <div className="flex gap-2 mb-6 bg-neutral-900 p-2 rounded-xl overflow-x-auto hide-scrollbar">
         <button onClick={() => setActiveTab("users")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "users" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Users size={18} /> Гравці</button>
         <button onClick={() => setActiveTab("packs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "packs" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Layers size={18} /> Паки</button>
         <button onClick={() => setActiveTab("cards")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "cards" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><LayoutGrid size={18} /> Картки</button>
         {currentProfile.isSuperAdmin && (
-            <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
+            <>
+                <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
+                <button onClick={() => setActiveTab("logs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "logs" ? "bg-red-900/80 text-white border-red-500 border" : "text-red-400 hover:bg-neutral-800"}`}><ScrollText size={18} /> Логи</button>
+            </>
         )}
       </div>
 
@@ -2595,8 +2822,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
                 <div className="flex-1 w-full">
                     <label className="text-xs text-neutral-400 font-bold mb-1 block">Нарахувати картку гравцю:</label>
                     <select value={adminAddCardId} onChange={(e) => setAdminAddCardId(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500">
-                        <option value="" disabled>Оберіть картку з бази...</option>
-                        {cardsCatalog.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+                        <option value="" disabled>Оберіть картку (найрідкісніші зверху)...</option>
+                        {filteredCards.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
                     </select>
                 </div>
                 <div className="w-full sm:w-24">
@@ -2720,7 +2947,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
       {/* --- Вкладка: ПРОМОКОДИ --- */}
       {activeTab === "promos" && currentProfile.isSuperAdmin && (
-         <div className="space-y-6">
+         <div className="space-y-6 animate-in fade-in">
             <form onSubmit={savePromo} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
               <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center gap-2"><Ticket /> Створити Промокод</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -2767,9 +2994,49 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
          </div>
       )}
 
+      {/* --- Вкладка: ЛОГИ (Супер Адмін) --- */}
+      {activeTab === "logs" && currentProfile.isSuperAdmin && (
+         <div className="space-y-4 animate-in fade-in">
+             <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-xl font-bold text-red-400 flex items-center gap-2"><ScrollText /> Системні Логи</h3>
+                 {adminLogs.length > 0 && (
+                     <button onClick={clearAdminLogs} className="bg-red-900 hover:bg-red-800 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
+                         <Trash2 size={16} /> Очистити Логи
+                     </button>
+                 )}
+             </div>
+
+             {adminLogs.length === 0 ? (
+                 <div className="text-center py-10 bg-neutral-900 rounded-2xl border border-neutral-800">
+                     <Bug size={40} className="mx-auto mb-3 text-neutral-700" />
+                     <p className="text-neutral-500">Системних записів немає.</p>
+                 </div>
+             ) : (
+                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
+                     {adminLogs.map((log) => (
+                         <div key={log.id} className="p-4 border-b border-neutral-800 last:border-0 hover:bg-neutral-950 transition-colors flex flex-col sm:flex-row gap-2 sm:gap-6 sm:items-center">
+                             <div className="w-32 shrink-0">
+                                 <div className="text-xs text-neutral-500">{formatDate(log.timestamp)}</div>
+                                 <div className={`text-xs font-bold uppercase tracking-wider mt-0.5 ${log.type === 'Помилка' ? 'text-red-500' : 'text-purple-400'}`}>
+                                     {log.type}
+                                 </div>
+                             </div>
+                             <div className="flex-1">
+                                 <div className="text-white text-sm break-words">{log.details}</div>
+                                 <div className="text-[10px] text-neutral-500 mt-1 flex items-center gap-1">
+                                    <User size={10} /> {log.userNickname} <span className="text-neutral-700">({log.userUid})</span>
+                                 </div>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
+         </div>
+      )}
+
       {/* --- Вкладка: ПАКИ --- */}
       {activeTab === "packs" && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in">
           <form onSubmit={savePack} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
             <h3 className="text-xl font-bold mb-4 text-purple-400">{editingPack ? `Редагування Паку` : "Створити Пак"}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -2843,7 +3110,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
       {/* --- Вкладка: КАРТКИ --- */}
       {activeTab === "cards" && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in">
            <form onSubmit={saveCard} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
               <h3 className="text-xl font-bold mb-4 text-purple-400">{editingCard ? `Редагування Картки` : "Додати Картку"}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
