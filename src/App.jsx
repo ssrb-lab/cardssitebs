@@ -509,6 +509,18 @@ export default function App() {
         const nickname = e.target.nickname.value.trim();
         if (!nickname) throw new Error("Введіть нікнейм!");
 
+        // ПЕРЕВІРКА НА УНІКАЛЬНІСТЬ НІКНЕЙМА
+        const allProfilesSnap = await getDocs(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"));
+        let exists = false;
+        allProfilesSnap.forEach(d => {
+            if (d.data().nickname?.toLowerCase() === nickname.toLowerCase()) exists = true;
+        });
+        if (exists) {
+            setDbError("Цей нікнейм вже зайнятий іншим гравцем!");
+            setLoading(false);
+            return;
+        }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUid = userCredential.user.uid;
 
@@ -559,9 +571,22 @@ export default function App() {
       const profileSnap = await getDoc(profileRef);
 
       if (!profileSnap.exists()) {
+        let baseNickname = googleUser.displayName || "Гість";
+        
+        // ПЕРЕВІРКА НА УНІКАЛЬНІСТЬ НІКНЕЙМА ДЛЯ GOOGLE
+        const allProfilesSnap = await getDocs(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"));
+        let exists = false;
+        allProfilesSnap.forEach(d => {
+            if (d.data().nickname?.toLowerCase() === baseNickname.toLowerCase()) exists = true;
+        });
+        
+        if (exists) {
+            baseNickname = `${baseNickname}_${googleUser.uid.substring(0,4)}`;
+        }
+
         await setDoc(profileRef, {
           uid: googleUser.uid,
-          nickname: googleUser.displayName || "Гість",
+          nickname: baseNickname,
           email: googleUser.email || "",
           coins: 200,
           totalCards: 0,
@@ -1429,6 +1454,8 @@ export default function App() {
             premiumPrice={premiumPrice}
             premiumDurationDays={premiumDurationDays}
             premiumShopItems={premiumShopItems}
+            setViewingPlayerProfile={setViewingPlayerProfile}
+            setCurrentView={setCurrentView}
           />
         )}
       </main>
@@ -1478,9 +1505,225 @@ function NavButton({ icon, label, isActive, onClick }) {
   );
 }
 
+// --- ПРОФІЛЬ ГРАВЦЯ ---
+function ProfileView({ profile, user, db, appId, handleLogout, showToast, inventoryCount, canClaimDaily, dailyRewards, premiumDailyRewards, isPremiumActive }) {
+    const [avatarInput, setAvatarInput] = useState("");
+    const [promoInput, setPromoInput] = useState("");
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const claimDaily = async () => {
+        if (isProcessing || !canClaimDaily) return;
+        setIsProcessing(true);
+        try {
+            const streak = profile.dailyStreak || 0;
+            const rewardsArr = isPremiumActive ? premiumDailyRewards : dailyRewards;
+            const dayIndex = streak % rewardsArr.length;
+            const reward = rewardsArr[dayIndex];
+
+            const newStreak = streak + 1;
+            await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", user.uid), {
+                coins: increment(reward),
+                lastDailyClaim: new Date().toISOString(),
+                dailyStreak: newStreak
+            });
+            showToast(`Мій лорд, Ви отримали щоденну нагороду: ${reward} монет!`, "success");
+        } catch (e) {
+            console.error(e);
+            showToast("Помилка отримання нагороди");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleAvatarUpdate = async (e) => {
+        e.preventDefault();
+        if (isProcessing) return;
+        setIsProcessing(true);
+        try {
+            await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", user.uid), {
+                avatarUrl: avatarInput
+            });
+            showToast("Аватар успішно оновлено!", "success");
+            setAvatarInput("");
+        } catch (e) {
+            console.error(e);
+            showToast("Помилка оновлення аватару");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const redeemPromo = async (e) => {
+        e.preventDefault();
+        if (isProcessing || !promoInput.trim()) return;
+        setIsProcessing(true);
+        const codeId = promoInput.trim().toUpperCase();
+        try {
+            const promoRef = doc(db, "artifacts", appId, "public", "data", "promoCodes", codeId);
+            const promoSnap = await getDoc(promoRef);
+            if (!promoSnap.exists()) {
+                showToast("Промокод не знайдено!", "error");
+                setIsProcessing(false);
+                return;
+            }
+            const promoData = promoSnap.data();
+
+            const usesRef = collection(db, "artifacts", appId, "users", user.uid, "promoUses");
+            const userUseDoc = await getDoc(doc(usesRef, codeId));
+            const userUsesCount = userUseDoc.exists() ? userUseDoc.data().count : 0;
+
+            if (promoData.maxGlobalUses > 0 && promoData.currentGlobalUses >= promoData.maxGlobalUses) {
+                showToast("Ліміт використання промокоду на сервері вичерпано!", "error");
+                setIsProcessing(false);
+                return;
+            }
+            if (promoData.maxUserUses > 0 && userUsesCount >= promoData.maxUserUses) {
+                showToast("Ви вже використали цей промокод максимальну кількість разів!", "error");
+                setIsProcessing(false);
+                return;
+            }
+
+            const batch = writeBatch(db);
+            batch.update(promoRef, { currentGlobalUses: increment(1) });
+            batch.set(doc(usesRef, codeId), { count: increment(1) }, { merge: true });
+            batch.update(doc(db, "artifacts", appId, "public", "data", "profiles", user.uid), {
+                coins: increment(promoData.reward)
+            });
+            await batch.commit();
+            showToast(`Промокод успішно застосовано! Отримано: ${promoData.reward} монет`, "success");
+            setPromoInput("");
+        } catch (e) {
+            console.error(e);
+            showToast("Помилка застосування промокоду");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
+                <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? "from-orange-900/40" : profile?.isAdmin ? "from-purple-900/40" : isPremiumActive ? "from-fuchsia-900/30" : "from-blue-900/20"} to-transparent`}></div>
+                
+                <div className="relative w-24 h-24 mx-auto mb-4 z-10">
+                    <PlayerAvatar profile={profile} className={`w-full h-full rounded-full text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`} iconSize={48} />
+                    {isPremiumActive && (
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 rounded-full p-1 border-2 border-fuchsia-500 z-20">
+                            <Gem size={16} className="text-fuchsia-400 fill-fuchsia-400" />
+                        </div>
+                    )}
+                </div>
+                
+                <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
+                    {profile?.nickname}
+                    {isPremiumActive && <Gem size={18} className="text-fuchsia-400 fill-fuchsia-400" title="Преміум Гравець" />}
+                </h2>
+                <div className="text-neutral-500 text-sm flex justify-center gap-4 mt-2 mb-6">
+                    <span className="flex items-center gap-1"><CalendarDays size={14}/> З нами від: {formatDate(profile?.createdAt)}</span>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 relative z-10 max-w-2xl mx-auto">
+                    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+                        <Coins className="text-yellow-500 mb-2 w-6 h-6" />
+                        <span className="text-xl font-black text-white">{profile?.coins}</span>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Монети</span>
+                    </div>
+                    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+                        <LayoutGrid className="text-blue-500 mb-2 w-6 h-6" />
+                        <span className="text-xl font-black text-white">{inventoryCount}</span>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Унікальних карт</span>
+                    </div>
+                    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+                        <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
+                        <span className="text-xl font-black text-white">{profile?.packsOpened || 0}</span>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
+                    </div>
+                    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+                        <Zap className="text-green-500 mb-2 w-6 h-6" />
+                        <span className="text-xl font-black text-white">{profile?.coinsEarnedFromPacks || 0}</span>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Виграно <Coins size={8} className="inline"/></span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                {/* Щоденна нагорода */}
+                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
+                    <div className="absolute -right-6 -bottom-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Gift size={120} />
+                    </div>
+                    <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gift className="text-orange-500" /> Щоденна Нагорода</h3>
+                    <p className="text-sm text-neutral-400 mb-4 relative z-10">Отримуйте монети кожного дня! {isPremiumActive ? 'Преміум дає більше нагород.' : ''}</p>
+                    <button 
+                        onClick={claimDaily} 
+                        disabled={!canClaimDaily || isProcessing}
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${
+                            canClaimDaily 
+                            ? "bg-gradient-to-r from-orange-600 to-yellow-500 text-yellow-950 hover:from-orange-500 hover:to-yellow-400 shadow-[0_0_20px_rgba(249,115,22,0.4)]" 
+                            : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                        }`}
+                    >
+                        {canClaimDaily ? "Отримати нагороду" : "Вже отримано (Чекайте завтра)"}
+                    </button>
+                </div>
+
+                {/* Промокоди */}
+                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
+                    <div className="absolute -right-6 -bottom-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <Ticket size={120} />
+                    </div>
+                    <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Ticket className="text-purple-500" /> Промокоди</h3>
+                    <p className="text-sm text-neutral-400 mb-4 relative z-10">Введіть код для отримання бонусів.</p>
+                    <form onSubmit={redeemPromo} className="flex gap-2 relative z-10">
+                        <input 
+                            type="text" 
+                            value={promoInput} 
+                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())} 
+                            placeholder="Код..." 
+                            className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white uppercase focus:border-purple-500 outline-none" 
+                        />
+                        <button type="submit" disabled={isProcessing || !promoInput.trim()} className="bg-purple-600 hover:bg-purple-500 disabled:bg-neutral-800 text-white font-bold px-6 py-3 rounded-xl transition-colors">
+                            Ок
+                        </button>
+                    </form>
+                </div>
+
+                {/* Налаштування профілю */}
+                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group md:col-span-2">
+                    <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Settings className="text-blue-500" /> Налаштування</h3>
+                    <div className="flex flex-col sm:flex-row gap-6 mt-4">
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Змінити Аватар (URL картинки):</label>
+                            <form onSubmit={handleAvatarUpdate} className="flex gap-2 relative z-10">
+                                <input 
+                                    type="text" 
+                                    value={avatarInput} 
+                                    onChange={(e) => setAvatarInput(e.target.value)} 
+                                    placeholder="https://..." 
+                                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm" 
+                                />
+                                <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm">
+                                    Зберегти
+                                </button>
+                            </form>
+                        </div>
+                        <div className="flex-1 flex items-end">
+                            <button onClick={handleLogout} className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 border border-red-900/50">
+                                <LogOut size={18} /> Вийти з акаунту
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- ПРЕМІУМ МАГАЗИН ---
 function PremiumShopView({ profile, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
     
+    const [newNickname, setNewNickname] = useState("");
+
     const buyPremium = async () => {
         if (isProcessing) return;
         if (profile.coins < premiumPrice) return showToast("Недостатньо монет для покупки Преміум-акаунту!");
@@ -1504,6 +1747,45 @@ function PremiumShopView({ profile, user, db, appId, premiumPrice, premiumDurati
         } catch (e) {
             console.error(e);
             showToast("Помилка під час покупки преміуму.");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleNicknameChange = async (e) => {
+        e.preventDefault();
+        if (isProcessing) return;
+        const nn = newNickname.trim();
+        if (!nn) return showToast("Введіть новий нікнейм!");
+        if (profile.coins < 100000) return showToast("Недостатньо монет!");
+        
+        setIsProcessing(true);
+        try {
+            // Перевірка на унікальність
+            const profilesSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
+            let exists = false;
+            profilesSnap.forEach(d => {
+                if (d.data().nickname?.toLowerCase() === nn.toLowerCase()) exists = true;
+            });
+            
+            if (exists) {
+                showToast("Цей нікнейм вже зайнятий іншим гравцем!", "error");
+                setIsProcessing(false);
+                return;
+            }
+            
+            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
+            await updateDoc(profileRef, {
+                nickname: nn,
+                coins: increment(-100000)
+            });
+            
+            showToast("Мій лорд, ваш нікнейм успішно змінено!", "success");
+            addSystemLog("Магазин", `Гравець змінив нікнейм на ${nn} за 100000 монет.`);
+            setNewNickname("");
+        } catch (err) {
+            console.error(err);
+            showToast("Помилка зміни нікнейму.");
         } finally {
             setIsProcessing(false);
         }
@@ -1586,6 +1868,20 @@ function PremiumShopView({ profile, user, db, appId, premiumPrice, premiumDurati
                         {premiumPrice} <Coins size={16}/>
                     </span>
                 </button>
+            </div>
+
+            {/* БЛОК ЗМІНИ НІКНЕЙМУ */}
+            <div className="bg-gradient-to-br from-neutral-900 to-blue-950/30 border-2 border-blue-500/30 rounded-3xl p-6 sm:p-10 text-center max-w-2xl mx-auto shadow-[0_0_40px_rgba(59,130,246,0.15)] mb-12 relative overflow-hidden">
+                <Edit2 size={48} className="mx-auto text-blue-400 mb-4 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                <h3 className="text-2xl font-black text-white mb-2">Зміна Нікнейму</h3>
+                <p className="text-neutral-400 text-sm mb-6">Бажаєте нове ім'я, Мій лорд? Унікальне ім'я коштує 100,000 монет.</p>
+                
+                <form onSubmit={handleNicknameChange} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                    <input type="text" value={newNickname} onChange={(e) => setNewNickname(e.target.value)} placeholder="Новий нікнейм" required className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none" />
+                    <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        Купити <span className="bg-black/30 px-2 py-1 rounded-lg text-xs flex items-center gap-1">100k <Coins size={12}/></span>
+                    </button>
+                </form>
             </div>
 
             {/* ТОВАРИ ПРЕМІУМ МАГАЗИНУ */}
@@ -2247,6 +2543,11 @@ function InventoryView({
                 return (
                   <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}>
                     <div onClick={() => setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass}`}>
+                      {Number(item.card.maxSupply) > 0 && (
+                          <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
+                              ЛІМІТКА
+                          </div>
+                      )}
                       {item.amount > 1 && (
                         <div className="absolute top-2 right-2 bg-neutral-950/90 backdrop-blur text-white font-black text-xs px-3 py-1.5 rounded-full z-10 border border-neutral-700 shadow-xl">
                           x{item.amount}
@@ -2640,7 +2941,7 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
         <ArrowLeft size={20} /> До Рейтингу
       </button>
 
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
         <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${playerInfo.isBanned ? "from-red-900/40" : playerInfo.isSuperAdmin ? "from-orange-900/40" : playerInfo.isAdmin ? "from-purple-900/40" : isPlayerPremium ? "from-fuchsia-900/30" : "from-blue-900/20"} to-transparent`}></div>
         
         <div className="relative w-24 h-24 mx-auto mb-4 z-10">
@@ -2699,6 +3000,11 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
                     return (
                         <div key={idx} onClick={() => setViewingCard({ card, amount: 1 })} className="relative group cursor-pointer animate-in zoom-in-95 hover:-translate-y-2 transition-transform">
                             <div className={`w-28 sm:w-36 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 shadow-lg ${style.border} ${effectClass}`}>
+                                {Number(card.maxSupply) > 0 && (
+                                    <div className="absolute top-1 left-1 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
+                                        ЛІМІТКА
+                                    </div>
+                                )}
                                 <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
                                 {card.soundUrl && (
                                   <button
@@ -2756,6 +3062,11 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
                 onClick={() => setViewingCard({ card: item.card, amount: item.amount })}
               >
                 <div className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 ${style.border} ${effectClass}`}>
+                  {Number(item.card.maxSupply) > 0 && (
+                      <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
+                          ЛІМІТКА
+                      </div>
+                  )}
                   {item.amount > 1 && (
                     <div className="absolute top-1 right-1 bg-neutral-950/90 text-white font-black text-[10px] px-2 py-0.5 rounded-full z-10 border border-neutral-700 shadow-xl">
                       x{item.amount}
@@ -2785,424 +3096,8 @@ function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, raritie
   );
 }
 
-// --- ПРОФІЛЬ ---
-function ProfileView({ profile, user, db, appId, handleLogout, showToast, canClaimDaily, marketListings, cardsCatalog, rarities, showcases, fullInventory, setViewingCard, dailyRewards, premiumDailyRewards, isPremiumActive }) {
-  const [promoInput, setPromoInput] = useState("");
-  const [activeTab, setActiveTab] = useState("main"); 
-  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
-  
-  const isGoogleLinked = user?.providerData?.some(p => p.providerId === 'google.com');
-
-  const handleLinkGoogle = async () => {
-     try {
-        const provider = new GoogleAuthProvider();
-        await linkWithPopup(user, provider);
-        showToast("Google акаунт успішно прив'язано!", "success");
-     } catch (e) {
-        if (e.code === 'auth/credential-already-in-use') {
-            showToast("Цей Google акаунт вже прив'язаний до іншого профілю.", "error");
-        } else if (e.code !== "auth/popup-closed-by-user") {
-            showToast("Помилка прив'язки: " + e.message, "error");
-        }
-     }
-  };
-
-  const handleAvatarSubmit = async (e) => {
-      e.preventDefault();
-      const url = e.target.avatarUrl.value.trim();
-      try {
-          const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-          await updateDoc(profileRef, { avatarUrl: url });
-          showToast("Аватарку успішно оновлено!", "success");
-          setIsEditingAvatar(false);
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка оновлення аватарки.", "error");
-      }
-  };
-
-  const handlePromoSubmit = async (e) => {
-    e.preventDefault();
-    const code = promoInput.trim().toUpperCase();
-    
-    if (code === "I_AM_SUPER_LORD") {
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-      await updateDoc(profileRef, { isSuperAdmin: true, isAdmin: true });
-      showToast("Вітаю, Мій Супер Лорд! Найвищі права надано.", "success");
-      setPromoInput("");
-      return;
-    } else if (code === "I_AM_LORD") {
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-      await updateDoc(profileRef, { isAdmin: true });
-      showToast("Вітаю, Мій лорд! Права адміністратора надано.", "success");
-      setPromoInput("");
-      return;
-    }
-
-    try {
-        const promoRef = doc(db, "artifacts", appId, "public", "data", "promoCodes", code);
-        const pSnap = await getDoc(promoRef);
-        
-        if (!pSnap.exists()) {
-           showToast("Невірний промокод!", "error");
-           return;
-        }
-        
-        const pData = pSnap.data();
-        const promoVersion = pData.version || 0; 
-        
-        if (pData.maxGlobalUses > 0 && pData.currentGlobalUses >= pData.maxGlobalUses) {
-            showToast("Цей промокод більше не дійсний (ліміт вичерпано).", "error");
-            return;
-        }
-        
-        const userPromoRef = doc(db, "artifacts", appId, "users", user.uid, "usedPromos", code);
-        const uSnap = await getDoc(userPromoRef);
-        
-        let uUses = 0; 
-        if (uSnap.exists()) {
-            const uData = uSnap.data();
-            if (!pData.version || uData.version === pData.version) {
-                uUses = uData.uses || 0;
-            } else {
-                uUses = 0; 
-            }
-        }
-        
-        if (pData.maxUserUses > 0 && uUses >= pData.maxUserUses) {
-            showToast("Ви вже використали цей промокод максимально можливу кількість разів.", "error");
-            return;
-        }
-        
-        const batch = writeBatch(db);
-        batch.update(promoRef, { currentGlobalUses: increment(1) });
-        batch.set(userPromoRef, { uses: uUses + 1, version: promoVersion }, { merge: true }); 
-        
-        const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-        batch.update(profileRef, { coins: increment(pData.reward) });
-        
-        await batch.commit();
-        showToast(`Промокод застосовано! Отримано ${pData.reward} монет.`, "success");
-        setPromoInput("");
-        
-    } catch(err) {
-        console.error(err);
-        showToast("Помилка обробки промокоду.", "error");
-    }
-  };
-
-  const handleDailyClaim = async () => {
-    if (!profile) return;
-    const now = new Date();
-    let newStreak = 1;
-
-    if (profile.lastDailyClaim) {
-        const lastDate = new Date(profile.lastDailyClaim);
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const lastStart = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
-        
-        const diffDays = Math.round((todayStart - lastStart) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 0) {
-            showToast("Ви вже забрали винагороду сьогодні!", "error");
-            return;
-        } else if (diffDays === 1) {
-            newStreak = (profile.dailyStreak || 0) + 1;
-            if (newStreak > 7) newStreak = 1;
-        } else {
-            newStreak = 1; 
-        }
-    }
-
-    const rewardArray = isPremiumActive ? premiumDailyRewards : dailyRewards;
-    const reward = rewardArray[newStreak - 1] || (newStreak * 1000);
-    
-    try {
-        const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-        await updateDoc(profileRef, {
-            coins: increment(reward),
-            lastDailyClaim: now.toISOString(),
-            dailyStreak: newStreak
-        });
-        showToast(`Щоденний бонус: +${reward} монет! (День ${newStreak}/7)`, "success");
-    } catch (e) {
-        console.error(e);
-        showToast("Помилка нарахування бонусу.", "error");
-    }
-  };
-
-  const currentStreak = profile?.dailyStreak || 0;
-  const nextStreakDay = currentStreak >= 7 ? 1 : currentStreak + 1;
-  const activeRewardsArray = isPremiumActive ? premiumDailyRewards : dailyRewards;
-  const nextReward = activeRewardsArray[nextStreakDay - 1] || (nextStreakDay * 1000);
-
-  const historyItems = marketListings.filter(l => 
-     l.status === "sold" && 
-     ((l.sellerUid === user.uid && !l.sellerHidden) || (l.buyerUid === user.uid && !l.buyerHidden))
-  ).sort((a, b) => new Date(b.soldAt) - new Date(a.soldAt));
-
-  const handleClearHistory = async () => {
-      if (historyItems.length === 0) return;
-      if (!confirm("Очистити історію? Це приховає записи назавжди.")) return;
-
-      try {
-          const batch = writeBatch(db);
-          
-          historyItems.forEach(l => {
-              const ref = doc(db, "artifacts", appId, "public", "data", "market", l.id);
-              const isSeller = l.sellerUid === user.uid;
-              const isBuyer = l.buyerUid === user.uid;
-
-              const willSellerBeHidden = isSeller ? true : l.sellerHidden;
-              const willBuyerBeHidden = isBuyer ? true : l.buyerHidden;
-
-              if (willSellerBeHidden && willBuyerBeHidden) {
-                  batch.delete(ref);
-              } else {
-                  if (isSeller) batch.update(ref, { sellerHidden: true });
-                  if (isBuyer) batch.update(ref, { buyerHidden: true });
-              }
-          });
-
-          await batch.commit();
-          showToast("Історію очищено!", "success");
-      } catch(e) {
-          console.error(e);
-          showToast("Помилка під час очищення історії.", "error");
-      }
-  };
-
-  // Логіка відображення вітрини у власному профілі
-  const mainShowcase = showcases.find(s => s.id === profile?.mainShowcaseId);
-  const validShowcaseCards = [];
-  if (mainShowcase && mainShowcase.cardIds) {
-      const tempInv = JSON.parse(JSON.stringify(fullInventory));
-      for (const cid of mainShowcase.cardIds) {
-          const invItem = tempInv.find(i => i.card.id === cid);
-          if (invItem && invItem.amount > 0) {
-              validShowcaseCards.push(invItem.card);
-              invItem.amount -= 1;
-          }
-      }
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
-      
-      <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-sm mx-auto mb-6">
-         <button onClick={() => setActiveTab("main")} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${activeTab === "main" ? "bg-blue-600 text-white" : "text-neutral-400 hover:text-white"}`}>
-            <User size={16}/> Головна
-         </button>
-         <button onClick={() => setActiveTab("history")} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${activeTab === "history" ? "bg-blue-600 text-white" : "text-neutral-400 hover:text-white"}`}>
-            <History size={16}/> Історія Ринку
-         </button>
-      </div>
-
-      {activeTab === "main" ? (
-         <>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? "from-red-900/40" : profile?.isAdmin ? "from-purple-900/40" : isPremiumActive ? "from-fuchsia-900/30" : "from-yellow-900/20"} to-transparent`}></div>
-              
-              {/* Блок Аватарки */}
-              <div className="relative w-28 h-28 mx-auto mb-4 z-10 group">
-                 <PlayerAvatar profile={profile} className={`w-full h-full rounded-full text-5xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`} iconSize={50} />
-                 {isPremiumActive && (
-                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 rounded-full p-1 border-2 border-fuchsia-500">
-                         <Gem size={20} className="text-fuchsia-400 fill-fuchsia-400" />
-                     </div>
-                 )}
-                 <button 
-                    onClick={() => setIsEditingAvatar(!isEditingAvatar)} 
-                    className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-2 border-dashed border-neutral-500"
-                 >
-                    <Camera className="text-white mb-1" size={24} />
-                    <span className="text-[10px] text-white font-bold uppercase tracking-widest">Змінити</span>
-                 </button>
-              </div>
-
-              {isEditingAvatar && (
-                 <form onSubmit={handleAvatarSubmit} className="relative z-10 mb-6 bg-neutral-950 p-4 rounded-2xl border border-neutral-800 animate-in zoom-in-95">
-                    <label className="text-xs text-neutral-400 font-bold mb-2 block">Пряме посилання на картинку (URL):</label>
-                    <div className="flex gap-2">
-                        <input type="url" name="avatarUrl" defaultValue={profile?.avatarUrl} placeholder="https://..." className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-white outline-none focus:border-blue-500 text-sm" />
-                        <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors">Зберегти</button>
-                    </div>
-                    <button type="button" onClick={() => {setIsEditingAvatar(false); handleAvatarSubmit({preventDefault:()=>{}, target: {avatarUrl: {value: ""}}})}} className="text-xs text-red-400 mt-3 underline hover:text-red-300">Видалити аватарку</button>
-                 </form>
-              )}
-
-              <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
-                  {profile?.nickname}
-                  {isPremiumActive && <Gem size={18} className="text-fuchsia-400 fill-fuchsia-400" title="Преміум Гравець" />}
-              </h2>
-              <div className="text-neutral-500 text-sm mb-2">ID: {profile?.uid?.substring(0,8)}...</div>
-              
-              <div className="flex items-center justify-center gap-2 text-xs text-neutral-400 mb-6 bg-neutral-950 inline-flex px-3 py-1.5 rounded-full border border-neutral-800">
-                 <CalendarDays size={14} className="text-blue-500"/>
-                 Акаунт створено: <span className="text-white font-bold">{formatDate(profile?.createdAt)}</span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 relative z-10">
-                <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <Coins className="text-yellow-500 mb-2 w-8 h-8" />
-                  <span className="text-2xl font-black text-white">{profile?.coins}</span>
-                  <span className="text-xs text-neutral-500 font-bold uppercase mt-1">Монети</span>
-                </div>
-                <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <LayoutGrid className="text-blue-500 mb-2 w-8 h-8" />
-                  <span className="text-2xl font-black text-white">{profile?.uniqueCardsCount || 0}</span>
-                  <span className="text-xs text-neutral-500 font-bold uppercase mt-1">Унікальних карт</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ВІТРИНА ГРАВЦЯ У ВЛАСНОМУ ПРОФІЛІ */}
-            {mainShowcase && validShowcaseCards.length > 0 && (
-               <div className="mb-6">
-                   <div className="flex items-center gap-3 mb-4 justify-center">
-                       <Star className="text-yellow-500 fill-yellow-500" size={24} />
-                       <h3 className="text-2xl font-black text-white uppercase tracking-widest">{mainShowcase.name}</h3>
-                   </div>
-                   <div className="bg-neutral-900 border-2 border-yellow-500/30 rounded-3xl p-6 flex flex-wrap justify-center gap-4 shadow-[0_0_30px_rgba(234,179,8,0.1)]">
-                       {validShowcaseCards.map((card, idx) => {
-                          const style = getCardStyle(card.rarity, rarities);
-                          const effectClass = card.effect ? `effect-${card.effect}` : '';
-                          return (
-                              <div key={idx} onClick={() => setViewingCard({ card, amount: 1 })} className="relative group cursor-pointer animate-in zoom-in-95 hover:-translate-y-2 transition-transform">
-                                  <div className={`w-24 sm:w-32 md:w-36 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 shadow-lg ${style.border} ${effectClass}`}>
-                                      <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
-                                  </div>
-                              </div>
-                          );
-                       })}
-                   </div>
-               </div>
-            )}
-
-            {/* БЛОК СТАТИСТИКИ */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 mb-6">
-               <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
-                 <PackageOpen className="text-purple-500" /> Статистика Паків
-               </h3>
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
-                    <div className="text-2xl font-black text-white">{profile?.packsOpened || 0}</div>
-                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</div>
-                 </div>
-                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
-                    <div className="text-2xl font-black text-red-400">{profile?.coinsSpentOnPacks || 0}</div>
-                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Витрачено <Coins size={10} className="inline"/></div>
-                 </div>
-                 <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 text-center">
-                    <div className="text-2xl font-black text-green-400">{profile?.coinsEarnedFromPacks || 0}</div>
-                    <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Виграно <Coins size={10} className="inline"/></div>
-                 </div>
-               </div>
-            </div>
-
-            {canClaimDaily ? (
-              <div className={`bg-gradient-to-r ${isPremiumActive ? 'from-fuchsia-600 to-purple-600 shadow-[0_0_30px_rgba(217,70,239,0.3)]' : 'from-yellow-600 to-orange-500 shadow-[0_0_30px_rgba(217,119,6,0.3)]'} rounded-3xl p-6 text-center relative overflow-hidden mb-6`}>
-                  <div className="relative z-10 flex flex-col items-center">
-                     <Gift size={40} className="text-white mb-2 animate-bounce" />
-                     <h3 className="text-xl font-black text-white uppercase tracking-widest mb-1">Щоденна Нагорода {isPremiumActive && "(Преміум)"}</h3>
-                     <p className="text-white font-bold mb-4">День {nextStreakDay}/7 - Отримайте {nextReward} монет!</p>
-                     <button onClick={handleDailyClaim} className={`bg-white ${isPremiumActive ? 'text-purple-600' : 'text-orange-600'} font-black py-3 px-8 rounded-xl hover:scale-105 transition-transform shadow-xl`}>
-                         Забрати зараз!
-                     </button>
-                  </div>
-              </div>
-            ) : (
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 text-center mb-6">
-                  <CheckCircle2 size={32} className="text-neutral-500 mx-auto mb-2" />
-                  <h3 className="text-neutral-400 font-bold">Нагороду вже забрано</h3>
-                  <p className="text-xs text-neutral-500 mt-1">Повертайтеся завтра за наступним бонусом (Ваш стрік: День {currentStreak}/7)</p>
-              </div>
-            )}
-
-            {!profile?.isSuperAdmin && (
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Gift className="text-purple-500" /> Ввести Промокод</h3>
-                <form onSubmit={handlePromoSubmit} className="flex gap-3">
-                  <input type="text" value={promoInput} onChange={(e) => setPromoInput(e.target.value)} placeholder="Код..." className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white uppercase" />
-                  <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl transition-colors">Застосувати</button>
-                </form>
-              </div>
-            )}
-            
-            {!isGoogleLinked && (
-               <button onClick={handleLinkGoogle} className="w-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 p-4 rounded-xl text-left transition-colors flex justify-between items-center group">
-                 <span className="font-bold text-white flex items-center gap-2"><Link size={18} className="text-blue-500"/> Прив'язати Google Акаунт</span>
-                 <span className="text-xs text-neutral-500">Для безпеки</span>
-               </button>
-            )}
-
-            <button onClick={handleLogout} className="w-full bg-neutral-900 border border-red-900/50 hover:bg-red-900/20 p-4 rounded-xl text-left transition-colors flex justify-between group">
-              <span className="font-bold text-red-400">Вийти з акаунта</span>
-              <LogOut size={18} className="text-red-500" />
-            </button>
-         </>
-      ) : (
-         <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 animate-in slide-in-from-right-8 relative">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 border-b border-neutral-800 pb-4">
-               <h3 className="text-xl font-black text-white flex items-center gap-3">
-                  <History className="text-blue-500" /> Історія Угод
-               </h3>
-               {historyItems.length > 0 && (
-                   <button onClick={handleClearHistory} className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 border border-red-900/50 bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors">
-                       <Trash2 size={14} /> Очистити історію
-                   </button>
-               )}
-            </div>
-            
-            {historyItems.length === 0 ? (
-               <div className="text-center py-10">
-                  <ShoppingCart size={40} className="mx-auto text-neutral-600 mb-3" />
-                  <p className="text-neutral-400 font-bold">У вас ще немає завершених угод.</p>
-               </div>
-            ) : (
-               <div className="space-y-3">
-                  {historyItems.map(listing => {
-                     const card = cardsCatalog.find(c => c.id === listing.cardId);
-                     if (!card) return null;
-                     const style = getCardStyle(card.rarity, rarities);
-                     
-                     const isSale = listing.sellerUid === user.uid;
-
-                     return (
-                        <div key={listing.id} className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-4 hover:border-neutral-700 transition-colors">
-                           <div className={`w-12 h-16 shrink-0 rounded-md border-2 overflow-hidden ${style.border}`}>
-                              <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
-                           </div>
-                           <div className="flex-1 min-w-0">
-                              <div className="text-xs text-neutral-400 mb-0.5">{formatDate(listing.soldAt)}</div>
-                              <div className="font-bold text-white truncate">{card.name}</div>
-                              <div className="text-[10px] text-neutral-500 mt-1 flex items-center gap-1">
-                                 {isSale ? (
-                                    <>Покупець: <User size={10} className="text-green-400"/> <span className="text-green-400 font-bold">{listing.buyerNickname || "Невідомо"}</span></>
-                                 ) : (
-                                    <>Продавець: <User size={10} className="text-red-400"/> <span className="text-red-400 font-bold">{listing.sellerNickname || "Невідомо"}</span></>
-                                 )}
-                              </div>
-                           </div>
-                           <div className="text-right shrink-0">
-                              <div className="text-xs text-neutral-500 uppercase font-bold mb-1">{isSale ? "Продано" : "Куплено"}</div>
-                              <div className={`font-black text-lg flex items-center justify-end gap-1 ${isSale ? "text-green-400" : "text-red-400"}`}>
-                                 {isSale ? "+" : "-"}{listing.price} <Coins size={14} className="text-yellow-500" />
-                              </div>
-                           </div>
-                        </div>
-                     );
-                  })}
-               </div>
-            )}
-         </div>
-      )}
-    </div>
-  );
-}
-
 // --- АДМІН ПАНЕЛЬ ---
-function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems }) {
+function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView }) {
   const [activeTab, setActiveTab] = useState("users");
   const [allUsers, setAllUsers] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -3210,6 +3105,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
   const [viewingUser, setViewingUser] = useState(null);
   const [userInventory, setUserInventory] = useState([]);
   const [loadingUserInv, setLoadingUserInv] = useState(false);
+  const [adminUserSearchTerm, setAdminUserSearchTerm] = useState("");
   
   const [banModalUser, setBanModalUser] = useState(null);
   const [banReason, setBanReason] = useState("");
@@ -3218,6 +3114,9 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
   const [premiumModalUser, setPremiumModalUser] = useState(null);
   const [premiumGiveDays, setPremiumGiveDays] = useState(30);
+
+  // Для зміни нікнейму гравця
+  const [adminNewNickname, setAdminNewNickname] = useState("");
 
   const [adminAddCardId, setAdminAddCardId] = useState("");
   const [adminAddCardAmount, setAdminAddCardAmount] = useState(1);
@@ -3346,7 +3245,10 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
     setLoadingUserInv(true);
     const u = allUsers.find(x => x.uid === uid);
     setViewingUser(u);
-    if(u) setAdminSetCoinsAmount(u.coins || 0);
+    if(u) {
+        setAdminSetCoinsAmount(u.coins || 0);
+        setAdminNewNickname(u.nickname || "");
+    }
     try {
       const invRef = collection(db, "artifacts", appId, "users", uid, "inventory");
       const snap = await getDocs(invRef);
@@ -3422,6 +3324,29 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       } catch(e) {
           console.error(e);
           showToast("Помилка зміни прав.", "error");
+      }
+  };
+
+  const changeUserNickname = async () => {
+      if (!adminNewNickname.trim() || adminNewNickname.trim() === viewingUser.nickname) return;
+      try {
+          const profilesSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
+          let exists = false;
+          profilesSnap.forEach(d => {
+              if (d.data().nickname?.toLowerCase() === adminNewNickname.trim().toLowerCase() && d.id !== viewingUser.uid) exists = true;
+          });
+          
+          if (exists) return showToast("Цей нікнейм вже зайнятий іншим гравцем!", "error");
+
+          await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid), {
+              nickname: adminNewNickname.trim()
+          });
+          showToast("Нікнейм успішно змінено!", "success");
+          addSystemLog("Адмін", `Змінено нікнейм гравцю з ${viewingUser.nickname} на ${adminNewNickname.trim()}`);
+          setViewingUser(prev => ({...prev, nickname: adminNewNickname.trim()}));
+      } catch (e) {
+          console.error(e);
+          showToast("Помилка зміни нікнейму.", "error");
       }
   };
 
@@ -3727,7 +3652,6 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
 
   const filteredPacks = packsCatalog.filter(p => p.name.toLowerCase().includes(packSearchTerm.toLowerCase()));
   
-  // СОРТУВАННЯ КАРТОК: НАЙРІДКІСНІШІ ЗВЕРХУ
   const filteredCards = cardsCatalog
     .filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(cardSearchTerm.toLowerCase());
@@ -3739,6 +3663,8 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
         const wB = rarities.find(r => r.name === b.rarity)?.weight || 100;
         return wA - wB; // Менша вага (рідкісніші) йдуть першими
     });
+    
+  const filteredAdminUsers = allUsers.filter(u => u.nickname?.toLowerCase().includes(adminUserSearchTerm.toLowerCase()));
 
   return (
     <div className="max-w-4xl mx-auto pb-10 relative">
@@ -3842,6 +3768,16 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               <button onClick={() => setViewingUser(null)} className="mb-4 text-neutral-400 hover:text-white flex items-center gap-2 font-bold"><ArrowLeft size={18}/> Назад до списку</button>
               
               <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mb-4 flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+                  <div className="flex-1 w-full">
+                      <label className="text-xs text-neutral-400 font-bold mb-1 block">Змінити нікнейм гравцю:</label>
+                      <input type="text" value={adminNewNickname} onChange={(e) => setAdminNewNickname(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500" />
+                  </div>
+                  <button onClick={changeUserNickname} disabled={!adminNewNickname.trim() || adminNewNickname === viewingUser.nickname} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-700 text-white font-bold px-4 py-2 rounded-lg w-full sm:w-auto transition-colors h-10">
+                      Змінити
+                  </button>
+              </div>
+
+              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mb-4 flex flex-col sm:flex-row gap-3 items-end sm:items-center">
                 <div className="flex-1 w-full">
                     <label className="text-xs text-neutral-400 font-bold mb-1 block">Нарахувати картку гравцю:</label>
                     <select value={adminAddCardId} onChange={(e) => setAdminAddCardId(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500">
@@ -3911,67 +3847,81 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
               )}
             </div>
           ) : (
-            <div className="space-y-2">
-              {allUsers.map((u, i) => {
-                const canBan = u.uid !== currentProfile.uid && (!u.isSuperAdmin) && (!u.isAdmin || currentProfile.isSuperAdmin);
-                const canToggleAdmin = currentProfile.isSuperAdmin && u.uid !== currentProfile.uid && !u.isSuperAdmin;
-                const isUserPremium = u.isPremium && u.premiumUntil && new Date(u.premiumUntil) > new Date();
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <input type="text" placeholder="Пошук гравця за нікнеймом..." value={adminUserSearchTerm} onChange={(e) => setAdminUserSearchTerm(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none" />
+              </div>
+              
+              <div className="space-y-2">
+                  {filteredAdminUsers.map((u, i) => {
+                    const canBan = u.uid !== currentProfile.uid && (!u.isSuperAdmin) && (!u.isAdmin || currentProfile.isSuperAdmin);
+                    const canToggleAdmin = currentProfile.isSuperAdmin && u.uid !== currentProfile.uid && !u.isSuperAdmin;
+                    const isUserPremium = u.isPremium && u.premiumUntil && new Date(u.premiumUntil) > new Date();
 
-                return (
-                  <div key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 px-4 border border-neutral-800 bg-neutral-950 rounded-xl gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <PlayerAvatar profile={u} className="w-10 h-10 rounded-full shrink-0" iconSize={18} />
-                      <div className="min-w-0">
-                        <div className="font-bold text-white flex items-center gap-2 truncate">
-                          {u.nickname} 
-                          {isUserPremium && <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400 shrink-0" title="Преміум" />}
-                          {u.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest shrink-0">Бан</span>}
+                    return (
+                      <div key={i} className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 px-4 border border-neutral-800 bg-neutral-950 rounded-xl gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <PlayerAvatar profile={u} className="w-10 h-10 rounded-full shrink-0" iconSize={18} />
+                          <div className="min-w-0">
+                            <div 
+                                className="font-bold text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-2 truncate cursor-pointer transition-colors"
+                                onClick={() => {
+                                    setViewingPlayerProfile(u.uid);
+                                    setCurrentView("publicProfile");
+                                }}
+                            >
+                              {u.nickname} 
+                              {isUserPremium && <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400 shrink-0" title="Преміум" />}
+                              {u.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest shrink-0">Бан</span>}
+                            </div>
+                            <div className="text-xs text-neutral-500 truncate">{u.email || "Приховано (Google)"}</div>
+                          </div>
                         </div>
-                        <div className="text-xs text-neutral-500 truncate">{u.email || "Приховано (Google)"}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <div className="hidden sm:block text-right mr-2">
-                         <div className="text-[10px] text-neutral-500 uppercase font-bold">Монети / Карти</div>
-                         <div className="text-sm font-bold text-yellow-500">{u.coins} <Coins size={12} className="inline text-yellow-600"/> / <span className="text-blue-400">{u.uniqueCardsCount || 0}</span></div>
-                      </div>
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <div className="hidden sm:block text-right mr-2">
+                             <div className="text-[10px] text-neutral-500 uppercase font-bold">Монети / Карти</div>
+                             <div className="text-sm font-bold text-yellow-500">{u.coins} <Coins size={12} className="inline text-yellow-600"/> / <span className="text-blue-400">{u.uniqueCardsCount || 0}</span></div>
+                          </div>
 
-                      {currentProfile.isSuperAdmin && (
-                          <button onClick={() => {setPremiumModalUser(u); setPremiumGiveDays(premiumDurationDays);}} className={`p-2 rounded-lg transition-colors ${isUserPremium ? 'bg-fuchsia-600 text-white' : 'bg-fuchsia-900/40 text-fuchsia-400 hover:bg-fuchsia-900'}`} title="Управління Преміумом">
-                              <Gem size={18} />
+                          {currentProfile.isSuperAdmin && (
+                              <button onClick={() => {setPremiumModalUser(u); setPremiumGiveDays(premiumDurationDays);}} className={`p-2 rounded-lg transition-colors ${isUserPremium ? 'bg-fuchsia-600 text-white' : 'bg-fuchsia-900/40 text-fuchsia-400 hover:bg-fuchsia-900'}`} title="Управління Преміумом">
+                                  <Gem size={18} />
+                              </button>
+                          )}
+
+                          {canToggleAdmin && (
+                             <button onClick={() => toggleAdminStatus(u)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors border ${u.isAdmin ? "bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700" : "bg-purple-900/40 text-purple-400 border-purple-800 hover:bg-purple-900/60"}`}>
+                                {u.isAdmin ? "- Адмінку" : "+ Адмінку"}
+                             </button>
+                          )}
+
+                          <button onClick={() => handleInspectUser(u.uid)} className="p-2 bg-blue-900/40 text-blue-400 hover:bg-blue-900 rounded-lg transition-colors" title="Управління гравцем (Інвентар)">
+                            <Eye size={18} />
                           </button>
-                      )}
-
-                      {canToggleAdmin && (
-                         <button onClick={() => toggleAdminStatus(u)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors border ${u.isAdmin ? "bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700" : "bg-purple-900/40 text-purple-400 border-purple-800 hover:bg-purple-900/60"}`}>
-                            {u.isAdmin ? "- Адмінку" : "+ Адмінку"}
-                         </button>
-                      )}
-
-                      <button onClick={() => handleInspectUser(u.uid)} className="p-2 bg-blue-900/40 text-blue-400 hover:bg-blue-900 rounded-lg transition-colors" title="Управління гравцем">
-                        <Eye size={18} />
-                      </button>
-                      
-                      {canBan && (
-                        <>
-                            {u.isBanned ? (
-                                <button onClick={() => handleUnban(u.uid)} className="p-2 bg-green-900/40 text-green-400 hover:bg-green-900 rounded-lg transition-colors" title="Розбанити">
-                                    <CheckCircle2 size={18} />
+                          
+                          {canBan && (
+                            <>
+                                {u.isBanned ? (
+                                    <button onClick={() => handleUnban(u.uid)} className="p-2 bg-green-900/40 text-green-400 hover:bg-green-900 rounded-lg transition-colors" title="Розбанити">
+                                        <CheckCircle2 size={18} />
+                                    </button>
+                                ) : (
+                                    <button onClick={() => setBanModalUser(u)} className="p-2 bg-orange-900/40 text-orange-400 hover:bg-orange-900 rounded-lg transition-colors" title="Заблокувати (Бан)">
+                                        <Ban size={18} />
+                                    </button>
+                                )}
+                                <button onClick={() => handleDeleteUser(u)} className="p-2 bg-red-900/40 text-red-500 hover:bg-red-900 rounded-lg transition-colors ml-1" title="Видалити акаунт назавжди">
+                                    <Trash2 size={18} />
                                 </button>
-                            ) : (
-                                <button onClick={() => setBanModalUser(u)} className="p-2 bg-orange-900/40 text-orange-400 hover:bg-orange-900 rounded-lg transition-colors" title="Заблокувати (Бан)">
-                                    <Ban size={18} />
-                                </button>
-                            )}
-                            <button onClick={() => handleDeleteUser(u)} className="p-2 bg-red-900/40 text-red-500 hover:bg-red-900 rounded-lg transition-colors ml-1" title="Видалити акаунт назавжди">
-                                <Trash2 size={18} />
-                            </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {filteredAdminUsers.length === 0 && <div className="text-center py-8 text-neutral-500">Гравців за запитом не знайдено.</div>}
+              </div>
             </div>
           )}
         </div>
@@ -4006,7 +3956,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
                      <h4 className="text-sm font-bold text-orange-400 mb-2 flex items-center gap-2"><Gift size={16}/> Щоденні Нагороди (Звичайні)</h4>
                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                          {rewardsForm.map((val, idx) => (
-                             <div key={idx} className="bg-neutral-950 p-2 rounded-xl border border-neutral-800">
+                             <div key={`norm-${idx}`} className="bg-neutral-950 p-2 rounded-xl border border-neutral-800">
                                  <label className="text-[10px] font-bold text-neutral-500 uppercase block mb-1">День {idx + 1}</label>
                                  <input type="number" min="0" value={val} onChange={(e) => { const newArr = [...rewardsForm]; newArr[idx] = Number(e.target.value); setRewardsForm(newArr); }} className="w-full bg-transparent text-white font-bold outline-none text-sm" />
                              </div>
@@ -4168,6 +4118,212 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
              )}
          </div>
       )}
+      {/* --- Вкладка: ПАКИ --- */}
+      {activeTab === "packs" && (
+        <div className="space-y-6 animate-in fade-in">
+          <form onSubmit={savePack} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
+            <h3 className="text-xl font-bold mb-4 text-purple-400">{editingPack ? `Редагування Паку` : "Створити Пак"}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <input type="text" placeholder="Назва Паку" value={packForm.name} onChange={(e) => setPackForm({ ...packForm, name: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+              <input type="text" placeholder="Категорія (напр. Базові)" value={packForm.category} onChange={(e) => setPackForm({ ...packForm, category: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+              <input type="number" placeholder="Вартість" value={packForm.cost} onChange={(e) => setPackForm({ ...packForm, cost: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" min="0" required />
+              <input type="text" placeholder="URL Картинки" value={packForm.image} onChange={(e) => setPackForm({ ...packForm, image: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+              
+              <div className="sm:col-span-2 mt-2 p-4 border border-neutral-800 rounded-xl bg-neutral-950/50">
+                <h4 className="text-neutral-400 text-sm font-bold mb-3">Кастомні шанси випадіння (залиште пустим, щоб використовувати глобальні):</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {rarities.map(r => (
+                    <div key={r.name} className="flex flex-col">
+                      <label className={`text-xs font-bold mb-1 ${COLOR_PRESETS[r.color]?.text}`}>{r.name} (Глоб: {r.weight})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Замовчування"
+                        value={packForm.customWeights?.[r.name] || ""}
+                        onChange={(e) => setPackForm({...packForm, customWeights: {...(packForm.customWeights || {}), [r.name]: e.target.value}})}
+                        className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                    <input type="checkbox" checked={packForm.isHidden || false} onChange={e => setPackForm({...packForm, isHidden: e.target.checked})} className="w-5 h-5 accent-purple-600" />
+                    Приховати пак від гравців (не видаляти)
+                  </label>
+                  <label className="flex items-center gap-2 text-fuchsia-400 font-bold cursor-pointer bg-fuchsia-950/20 p-4 rounded-xl border border-fuchsia-900/50">
+                    <input type="checkbox" checked={packForm.isPremiumOnly || false} onChange={e => setPackForm({...packForm, isPremiumOnly: e.target.checked})} className="w-5 h-5 accent-fuchsia-600" />
+                    <Gem size={18}/> Тільки для Преміум гравців
+                  </label>
+              </div>
+
+            </div>
+            
+            <div className="flex gap-3">
+              <button type="submit" className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-xl">Зберегти Пак</button>
+              {editingPack && (
+                <button type="button" onClick={() => { setEditingPack(null); setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
+              )}
+            </div>
+          </form>
+
+          {/* Фільтр та список Паків */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+            <input type="text" placeholder="Пошук паку..." value={packSearchTerm} onChange={(e) => setPackSearchTerm(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {filteredPacks.map((pack) => (
+              <div key={pack.id} className={`bg-neutral-900 rounded-xl p-4 border ${pack.isPremiumOnly ? 'border-fuchsia-900' : 'border-neutral-800'} relative group`}>
+                {pack.isHidden && <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded border border-neutral-600 uppercase font-black tracking-widest absolute top-2 right-2 z-10">Приховано</span>}
+                {pack.isPremiumOnly && <span className="text-[10px] bg-fuchsia-900 text-fuchsia-100 px-2 py-0.5 rounded border border-fuchsia-500 uppercase font-black tracking-widest absolute top-2 left-2 z-10 flex items-center gap-1"><Gem size={10}/> Преміум</span>}
+                <img src={pack.image} alt={pack.name} className={`w-24 h-24 object-cover rounded-lg mx-auto mb-3 ${pack.isHidden ? 'opacity-50 grayscale' : ''}`} />
+                <div className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1`}>{pack.category || "Базові"}</div>
+                <h4 className="text-center font-bold text-white mb-1">{pack.name}</h4>
+                <div className="text-center text-yellow-500 font-bold text-sm mb-4">{pack.cost} Монет</div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditingPack(pack); setPackForm({...pack, customWeights: pack.customWeights || {}, category: pack.category || "Базові"}); }} className="flex-1 py-2 bg-blue-600/20 text-blue-400 rounded-lg text-sm font-bold">
+                    Редагувати
+                  </button>
+                  <button onClick={() => deletePack(pack.id)} className="flex-1 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm font-bold">
+                    Видалити
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredPacks.length === 0 && <p className="col-span-full text-center text-neutral-500">Паків не знайдено.</p>}
+          </div>
+        </div>
+      )}
+
+      {/* --- Вкладка: КАРТКИ --- */}
+      {activeTab === "cards" && (
+        <div className="space-y-6 animate-in fade-in">
+           <form onSubmit={saveCard} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
+              <h3 className="text-xl font-bold mb-4 text-purple-400">{editingCard ? `Редагування Картки` : "Додати Картку"}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <input type="text" placeholder="Назва картки" value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                  <select value={cardForm.packId} onChange={(e) => setCardForm({ ...cardForm, packId: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required>
+                    <option value="" disabled>Оберіть пак...</option>
+                    {packsCatalog.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <select value={cardForm.rarity} onChange={(e) => setCardForm({ ...cardForm, rarity: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white">
+                    {rarities.map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                  </select>
+                  <input type="number" placeholder="Ліміт (0=Безлім)" value={cardForm.maxSupply} onChange={(e) => setCardForm({ ...cardForm, maxSupply: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" />
+                  
+                  <input type="number" step="0.01" placeholder="Індивід. Шанс (Вага)" value={cardForm.weight} onChange={(e) => setCardForm({ ...cardForm, weight: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" title="Якщо заповнено - ігнорує глобальний шанс рідкості" />
+                  <input type="number" placeholder="Ціна продажу (замовч. 15)" value={cardForm.sellPrice} onChange={(e) => setCardForm({ ...cardForm, sellPrice: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white text-green-400" title="Скільки монет отримає гравець за дублікат" />
+                  
+                  <select value={cardForm.effect} onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-2 text-purple-400 font-bold">
+                    {EFFECT_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
+                  </select>
+
+                  <input type="text" placeholder="URL Картинки" value={cardForm.image} onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-4" required />
+                  
+                  <div className="md:col-span-4 flex flex-col sm:flex-row gap-4 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3">
+                      <input type="text" placeholder="URL Звуку (mp3/wav) необов'язково" value={cardForm.soundUrl || ""} onChange={(e) => setCardForm({ ...cardForm, soundUrl: e.target.value })} className="flex-1 bg-transparent text-white outline-none" />
+                      {cardForm.soundUrl && (
+                          <div className="w-full sm:w-40 flex flex-col justify-center sm:border-l sm:border-neutral-800 sm:pl-4 pt-2 sm:pt-0 border-t border-neutral-800 sm:border-t-0 mt-2 sm:mt-0">
+                              <label className="text-[10px] font-bold text-neutral-400 uppercase mb-1">Гучність: {cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5}</label>
+                              <input type="range" min="0.1" max="1" step="0.1" value={cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5} onChange={(e) => setCardForm({ ...cardForm, soundVolume: parseFloat(e.target.value) })} className="accent-purple-500 w-full" />
+                          </div>
+                      )}
+                  </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button type="submit" disabled={!cardForm.packId} className="flex-1 bg-purple-600 disabled:bg-neutral-700 text-white font-bold py-3 rounded-xl">Зберегти картку</button>
+                {editingCard && (
+                  <button type="button" onClick={() => { setEditingCard(null); setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5 }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
+                )}
+              </div>
+           </form>
+
+           {/* Фільтри Карток */}
+           <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <input type="text" placeholder="Пошук картки..." value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none" />
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                <select value={cardPackFilter} onChange={(e) => setCardPackFilter(e.target.value)} className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none appearance-none">
+                    <option value="all">Усі паки</option>
+                    {packsCatalog.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+           </div>
+
+           {/* Список Карток */}
+           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {filteredCards.map((card) => {
+              const packInfo = packsCatalog.find((p) => p.id === card.packId);
+              const style = getCardStyle(card.rarity, rarities);
+              const effectClass = card.effect ? `effect-${card.effect}` : '';
+              
+              return (
+                <div key={card.id} className={`bg-neutral-900 rounded-xl overflow-hidden border-2 ${style.border} group relative flex flex-col`}>
+                  <div className={`aspect-[2/3] w-full relative shrink-0 ${effectClass}`}>
+                    <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                    {card.maxSupply > 0 && (
+                      <div className="absolute top-1 left-1 bg-black/80 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 z-10">
+                        {card.maxSupply - (card.pulledCount || 0)}/{card.maxSupply}
+                      </div>
+                    )}
+                    {card.soundUrl && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
+                          className="absolute bottom-1 right-1 bg-black/80 text-white p-1 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                          title="Відтворити звук"
+                        >
+                          <Volume2 size={12} />
+                        </button>
+                    )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
+                      <button onClick={() => { setEditingCard(card); setCardForm({ ...card, maxSupply: card.maxSupply || "", weight: card.weight || "", sellPrice: card.sellPrice || "", effect: card.effect || "", soundUrl: card.soundUrl || "", soundVolume: card.soundVolume !== undefined ? card.soundVolume : 0.5 }); }} className="p-2 bg-blue-600 rounded-lg text-white shadow-lg transform hover:scale-110 transition-transform">
+                        <Edit2 size={18} />
+                      </button>
+                      <button onClick={() => deleteCard(card.id)} className="p-2 bg-red-600 rounded-lg text-white shadow-lg transform hover:scale-110 transition-transform">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-2 text-center flex flex-col items-center flex-1 justify-between">
+                    <div className="w-full">
+                        <div className={`text-[10px] font-black uppercase ${style.text}`}>{card.rarity}</div>
+                        <div className="font-bold text-xs truncate mb-1 text-white w-full">{card.name}</div>
+                        <div className="text-[9px] text-neutral-500 truncate bg-neutral-950 rounded py-0.5 px-1 inline-block w-full">
+                        {packInfo ? packInfo.name : "Без паку!"}
+                        </div>
+                    </div>
+                    <div className="w-full flex flex-wrap justify-center gap-1 mt-1">
+                        {card.weight && (
+                            <div className="text-[9px] text-yellow-500/80 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20" title="Індивідуальна вага">
+                                ⚖️ {card.weight}
+                            </div>
+                        )}
+                        <div className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20" title="Ціна продажу дубліката">
+                            +{card.sellPrice || SELL_PRICE} <Coins size={8} className="inline" />
+                        </div>
+                        {card.effect && (
+                            <div className="text-[9px] text-purple-400 font-bold bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 w-full mt-0.5 uppercase tracking-widest">
+                                {card.effect}
+                            </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredCards.length === 0 && <p className="col-span-full text-center text-neutral-500 py-10">Карток не знайдено.</p>}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
