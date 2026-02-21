@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Coins, PackageOpen, LayoutGrid, AlertCircle, Loader2, Mail, User,
   CheckCircle2, Shield, KeyRound, Trophy, Store, Hexagon, Gem, Swords, Gift
@@ -76,58 +76,45 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
-// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ФІНАЛЬНИЙ ФІКС ЗАПУСКУ)
-  useEffect(() => {
-    console.log("🛠️ [ШПИГУН] useEffect спрацював! Стан: User є?", !!user, "| Profile є?", !!profile);
+// Реф для захисту від безкінечного циклу проксі
+  const checkedIpForUid = useRef(null);
 
-    if (!user || !profile) {
-        console.log("💤 [ШПИГУН] Ще вантажимось, чекаю...");
-        return;
-    }
+  // АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ЗАХИСТ ВІД ПРОКСІ-СПАМУ)
+  useEffect(() => {
+    // Якщо профілю ще немає, АБО ми вже перевіряли IP для цього гравця - виходимо
+    if (!user || !profile || checkedIpForUid.current === user.uid) return;
 
     const trackIp = async () => {
-      console.log(`🕵️‍♂️ [ШПИГУН] Профіль завантажено! Починаю пошук IP для: ${profile.nickname}`);
+      // Одразу блокуємо повторні запуски для цього гравця
+      checkedIpForUid.current = user.uid; 
       
       try {
         let currentIp = null;
         
-        const apis = [
-            { url: 'https://checkip.amazonaws.com/', type: 'text' },
-            { url: 'https://api.ipify.org?format=json', type: 'json', field: 'ip' },
-            { url: 'https://api.seeip.org/jsonip', type: 'json', field: 'ip' }
+        const sneakyApis = [
+            { url: 'https://httpbin.org/ip', field: 'origin' },
+            { url: 'https://worldtimeapi.org/api/ip', field: 'client_ip' },
+            { url: 'https://api.seeip.org/jsonip', field: 'ip' },
+            { url: 'https://myexternalip.com/json', field: 'ip' }
         ];
 
-        for (const api of apis) {
+        for (const api of sneakyApis) {
             try {
-                console.log(`⏳ [ШПИГУН] Стукаю до ${api.url}...`);
                 const response = await fetch(api.url);
+                const data = await response.json();
                 
-                if (api.type === 'text') {
-                    const text = await response.text();
-                    currentIp = text.trim();
-                } else {
-                    const data = await response.json();
-                    currentIp = data[api.field];
-                }
-                
-                if (currentIp) {
-                    console.log(`✅ [ШПИГУН] БІНГО! IP отримано: ${currentIp}`);
+                let rawIp = data[api.field];
+                if (rawIp) {
+                    currentIp = rawIp.split(',')[0].trim();
                     break;
                 }
-            } catch (e) { 
-                console.warn(`❌ [ШПИГУН] Провал з ${api.url}. Причина:`, e.message);
-            }
+            } catch (e) { }
         }
 
-        if (!currentIp) {
-            console.error("⛔ [ШПИГУН] Всі запити заблоковані браузером (CORS або AdBlock).");
-            return; 
-        }
+        if (!currentIp) return; 
 
-        console.log(`🕵️‍♂️ [ШПИГУН] Поточний IP: ${currentIp}. В базі: ${profile.lastIp || "порожньо"}`);
-
+        // Перевіряємо, чи IP дійсно новий
         if (profile.lastIp !== currentIp) {
-          console.log("🚨 [ШПИГУН] IP змінився! Пишу в базу та шукаю твінків...");
           
           const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
           const snap = await getDocs(q);
@@ -148,18 +135,14 @@ export default function App() {
           await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
               lastIp: currentIp
           });
-          
-          console.log("💾 [ШПИГУН] Успішно збережено в Firebase!");
-        } else {
-            console.log("💤 [ШПИГУН] IP не змінився. Нічого не роблю.");
         }
       } catch (e) {
-        console.error("💥 [ШПИГУН] КРИТИЧНА ПОМИЛКА КОДУ:", e);
+        console.error("Помилка IP-трекера", e);
       }
     };
 
     trackIp();
-  }, [user, profile?.uid, profile?.lastIp]); // <-- ОСЬ ТЕПЕР ВІН ТОЧНО ЗАПУСТИТЬСЯ
+  }, [user, profile?.uid]); // Видалили profile?.lastIp з масиву залежностей!
 
   useEffect(() => { document.title = "Card Game"; }, []);
 
