@@ -1693,7 +1693,7 @@ function ProfileView({ profile, user, db, appId, handleLogout, showToast, invent
                     </div>
                 </div>
             )}
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {/* Щоденна нагорода */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
@@ -3839,7 +3839,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
         <button onClick={() => setActiveTab("users")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "users" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Users size={18} /> Гравці</button>
         <button onClick={() => setActiveTab("packs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "packs" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Layers size={18} /> Паки</button>
         <button onClick={() => setActiveTab("cards")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "cards" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><LayoutGrid size={18} /> Картки</button>
-        {currentProfile.isSuperAdmin && (
+        {currentProfile.isAdmin && (
             <>
                 <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
                 <button onClick={() => setActiveTab("premiumShop")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "premiumShop" ? "bg-fuchsia-600 text-white" : "text-fuchsia-400/70 hover:bg-neutral-800"}`}><Gem size={18} /> Прем Товари</button>
@@ -4035,24 +4035,9 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       )}
 
       {/* --- Вкладка: НАЛАШТУВАННЯ (Щоденні нагороди) --- */}
-      {activeTab === "settings" && currentProfile.isSuperAdmin && (
+      {activeTab === "settings" && currentProfile.isAdmin && (
          <div className="space-y-6 animate-in fade-in">
-                    <div className="bg-red-950/40 border border-red-900 p-6 rounded-2xl text-center">
-              <h3 className="text-xl font-black text-red-500 mb-2 flex items-center justify-center gap-2">
-                  <AlertCircle /> ВЕЛИКА ЧИСТКА (ВАЙП)
-              </h3>
-              <p className="text-sm text-red-400/80 mb-4">
-                  Ця кнопка видалить ВСІ картки з інвентарів, закриє ринок, видалить вітрини та скине баланс і статистику ВСІМ гравцям до стартових 200 монет.
-              </p>
-              <button 
-                  onClick={globalWipe} 
-                  disabled={isSyncing}
-                  className="bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 text-white font-black py-3 px-8 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all flex items-center justify-center gap-2 mx-auto"
-              >
-                  {isSyncing ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                  СТЕРТИ ВСІ ДАНІ ГРАВЦІВ
-              </button>
-          </div>
+          
              <form onSubmit={saveSettings} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
                  <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2">
                      <Settings className="text-blue-500"/> Глобальні Налаштування
@@ -4107,7 +4092,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       )}
 
       {/* --- Вкладка: ТОВАРИ ПРЕМІУМ МАГАЗИНУ --- */}
-      {activeTab === "premiumShop" && currentProfile.isSuperAdmin && (
+      {activeTab === "premiumShop" && currentProfile.isAdmin && (
           <div className="space-y-6 animate-in fade-in">
               <form onSubmit={addPremiumShopItem} className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-2xl">
                   <h3 className="text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2"><Gem /> Додати товар у Прем. Магазин</h3>
@@ -4154,7 +4139,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       )}
 
       {/* --- Вкладка: ПРОМОКОДИ --- */}
-      {activeTab === "promos" && currentProfile.isSuperAdmin && (
+      {activeTab === "promos" && currentProfile.isAdmin && (
          <div className="space-y-6 animate-in fade-in">
             <form onSubmit={savePromo} className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl">
               <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center gap-2"><Ticket /> Створити Промокод</h3>
@@ -4203,7 +4188,7 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
       )}
 
       {/* --- Вкладка: ЛОГИ (Супер Адмін) --- */}
-      {activeTab === "logs" && currentProfile.isSuperAdmin && (
+      {activeTab === "logs" && currentProfile.isAdmin && (
          <div className="space-y-4 animate-in fade-in">
              <div className="flex justify-between items-center mb-4">
                  <h3 className="text-xl font-bold text-red-400 flex items-center gap-2"><ScrollText /> Системні Логи</h3>
