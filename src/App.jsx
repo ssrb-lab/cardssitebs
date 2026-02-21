@@ -76,7 +76,7 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
-// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ЕКСТРЕМАЛЬНИЙ ДЕБАГ)
+// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ФІНАЛЬНИЙ ФІКС ЗАПУСКУ)
   useEffect(() => {
     console.log("🛠️ [ШПИГУН] useEffect спрацював! Стан: User є?", !!user, "| Profile є?", !!profile);
 
@@ -159,7 +159,7 @@ export default function App() {
     };
 
     trackIp();
-  }, [user, profile?.lastIp]);
+  }, [user, profile?.uid, profile?.lastIp]); // <-- ОСЬ ТЕПЕР ВІН ТОЧНО ЗАПУСТИТЬСЯ
 
   useEffect(() => { document.title = "Card Game"; }, []);
 
