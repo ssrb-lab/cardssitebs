@@ -548,74 +548,64 @@ export default function App() {
     });
   }, [dbInventory, showcases, user]);
 
-// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP ТА МУЛЬТИАКАУНТІВ (ГОВІРКИЙ ШПИГУН)
+// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP ТА МУЛЬТИАКАУНТІВ (ФІНАЛЬНА ВЕРСІЯ ДЛЯ АДМІНКИ)
   useEffect(() => {
-    // Чекаємо, поки завантажиться профіль
     if (!user || !profile) return;
 
     const trackIp = async () => {
-      console.log("🕵️‍♂️ Шпигун: Починаю перевірку IP...");
-      
       try {
         let currentIp = null;
         
-        // Масив надійних сервісів
+        // Надійні сервіси, які підтримують запити з браузера (CORS)
         const apis = [
             'https://api.ipify.org?format=json',
             'https://ipwho.is/',
             'https://api.myip.com'
         ];
 
+        // Стукаємо по черзі, щоб обійти блокувальники реклами
         for (const url of apis) {
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 currentIp = data.ip || data.ip_addr || data.query; 
-                if (currentIp) {
-                    console.log(`🕵️‍♂️ Шпигун: IP успішно отримано через ${url} ->`, currentIp);
-                    break;
-                }
-            } catch (e) {
-                console.warn(`🕵️‍♂️ Шпигун: Запит до ${url} заблоковано.`);
-            }
+                if (currentIp) break; // Знайшли IP - припиняємо пошук
+            } catch (e) { /* Ігноруємо заблоковані запити */ }
         }
 
-        if (!currentIp) {
-            console.error("❌ Шпигун: Не вдалося отримати IP. Можливо, увімкнено жорсткий AdBlock.");
-            return;
+        if (!currentIp) return; // Якщо жорсткий AdBlock заблокував усе
+
+        // Якщо IP ЗМІНИВСЯ або це ПЕРШИЙ вхід гравця
+        if (profile.lastIp !== currentIp) {
+          
+          // 1. Шукаємо збіги (твінків) по всій базі
+          const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
+          const snap = await getDocs(q);
+          
+          let altAccounts = [];
+          snap.forEach(d => {
+              if (d.id !== user.uid) altAccounts.push(d.data().nickname);
+          });
+
+          // 2. ПИШЕМО ПРЯМО В АДМІН ЛОГИ!
+          if (altAccounts.length > 0) {
+              // Якщо знайдено мультиакаунт
+              addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
+          } else if (!profile.lastIp) {
+              // Перший раз зайшов
+              addSystemLog("ℹ️ Новий IP", `Гравець ${profile.nickname} вперше зафіксував IP: ${currentIp}`);
+          } else {
+              // Змінив мережу
+              addSystemLog("ℹ️ Зміна мережі", `Гравець ${profile.nickname} змінив IP на: ${currentIp}`);
+          }
+
+          // 3. Зберігаємо новий IP в профіль гравця
+          await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
+              lastIp: currentIp
+          });
         }
-
-        // Якщо IP НЕ змінився з минулого разу - просто мовчимо і нічого не робимо
-        if (profile.lastIp === currentIp) {
-            console.log("✅ Шпигун: IP не змінився. Все чисто.");
-            return; 
-        }
-
-        console.log("🚨 Шпигун: Виявлено новий IP! Перевіряю на твінки...");
-        
-        // 1. Шукаємо твінків у базі
-        const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
-        const snap = await getDocs(q);
-        
-        let altAccounts = [];
-        snap.forEach(d => {
-            if (d.id !== user.uid) altAccounts.push(d.data().nickname);
-        });
-
-        if (altAccounts.length > 0) {
-            console.log("⚠️ Шпигун: Знайдено інші акаунти на цьому IP:", altAccounts);
-            addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
-        }
-
-        // 2. Зберігаємо новий IP в профіль
-        await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
-            lastIp: currentIp
-        });
-        
-        console.log("💾 Шпигун: Новий IP успішно збережено в базу!");
-
       } catch (e) {
-        console.error("❌ Шпигун: Критична помилка коду", e);
+        console.error("Помилка IP-трекера", e);
       }
     };
 
