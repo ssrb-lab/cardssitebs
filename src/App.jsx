@@ -66,6 +66,7 @@ import {
   onSnapshot,
   updateDoc,
   deleteDoc,
+  where,
   writeBatch,
   increment,
   getDocs,
@@ -546,6 +547,47 @@ export default function App() {
         }
     });
   }, [dbInventory, showcases, user]);
+
+  // АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP ТА МУЛЬТИАКАУНТІВ
+  useEffect(() => {
+    if (!user || !profile) return;
+
+    const trackIp = async () => {
+      try {
+        // Отримуємо IP гравця через безкоштовне API
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        const currentIp = data.ip;
+
+        // Якщо IP визначено і він відрізняється від того, що вже записаний у профілі
+        if (currentIp && profile.lastIp !== currentIp) {
+          
+          // 1. Шукаємо в базі, чи є ВЖЕ гравці з таким IP
+          const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
+          const snap = await getDocs(q);
+          
+          let altAccounts = [];
+          snap.forEach(d => {
+              if (d.id !== user.uid) altAccounts.push(d.data().nickname);
+          });
+
+          // 2. Якщо знайшли збіги - б'ємо на сполох у Логи!
+          if (altAccounts.length > 0) {
+              addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який вже використовують: ${altAccounts.join(", ")}`);
+          }
+
+          // 3. Зберігаємо новий IP цьому гравцю тихо і непомітно
+          await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
+              lastIp: currentIp
+          });
+        }
+      } catch (e) {
+        console.error("Не вдалося отримати IP", e);
+      }
+    };
+
+    trackIp();
+  }, [user, profile?.lastIp]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -4110,7 +4152,14 @@ function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rari
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">Інвентар: <span className="text-yellow-500">{viewingUser.nickname}</span> ({viewingUser.coins} <Coins size={16} />)</h3>
+              <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      Інвентар: <span className="text-yellow-500">{viewingUser.nickname}</span> ({viewingUser.coins} <Coins size={16} />)
+                  </h3>
+                  <div className="text-[11px] text-neutral-500 font-mono mb-4 mt-1 bg-neutral-900 inline-block px-2 py-1 rounded border border-neutral-800">
+                      Останній IP: <span className="text-red-400">{viewingUser.lastIp || "Ще не заходив"}</span>
+                  </div>
+              </div>
               
               {loadingUserInv ? (
                  <div className="py-10 text-center text-neutral-500"><Loader2 className="animate-spin mx-auto w-8 h-8"/></div>
