@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Swords, Coins, Zap, Loader2, Timer } from "lucide-react";
-// Додано writeBatch для створення транзакцій!
 import { doc, getDoc, setDoc, updateDoc, increment, writeBatch } from "firebase/firestore";
 
 export default function FarmView({ profile, db, appId, cardsCatalog, showToast, bosses }) {
     const playerLevel = profile?.farmLevel || 1;
 
     const sortedBosses = [...(bosses || [])].sort((a, b) => a.level - b.level);
+    
+    // ЗНАХОДИМО МАКСИМАЛЬНИЙ РІВЕНЬ БОСА У ГРІ
+    const maxBossLevel = sortedBosses.length > 0 ? sortedBosses[sortedBosses.length - 1].level : 1;
+
     let currentBoss = sortedBosses.find(b => b.level === playerLevel);
     if (!currentBoss && sortedBosses.length > 0) {
         currentBoss = sortedBosses[sortedBosses.length - 1]; 
@@ -26,7 +29,6 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
 
     const isLoadedRef = useRef(false);
     
-    // Трюк для збереження при перемиканні вкладок (додали isProcessing)
     const stateRef = useRef({ hp, tempCoins, bossId: currentBoss?.id, playerUid: profile?.uid, cdEnd: cooldownEnd, isProcessing });
     useEffect(() => {
         stateRef.current = { hp, tempCoins, bossId: currentBoss?.id, playerUid: profile?.uid, cdEnd: cooldownEnd, isProcessing };
@@ -94,13 +96,12 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
         return () => clearInterval(interval);
     }, [cooldownEnd, currentBoss]);
 
-    // НАДІЙНЕ АВТОЗБЕРЕЖЕННЯ (ФІКС ВІДКАТУ БАГУ ТА ДЮПУ)
+    // НАДІЙНЕ АВТОЗБЕРЕЖЕННЯ
     useEffect(() => {
         if (!profile || !currentBoss) return;
 
         const saveInterval = setInterval(() => {
             const { hp: currentHp, tempCoins: currentCoins, bossId, playerUid, cdEnd, isProcessing: currentIsProcessing } = stateRef.current;
-            // НЕ зберігаємо, якщо йде процес відправки монет (щоб не перезаписати нулі старим значенням)
             if (isLoadedRef.current && !cdEnd && !currentIsProcessing) {
                 const farmRef = doc(db, "artifacts", appId, "users", playerUid, "farmState", "main");
                 setDoc(farmRef, { 
@@ -129,7 +130,6 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
 
     // УДАР ПО БОСУ
     const handleHit = () => {
-        // Блокуємо удари, якщо йде відправка на сервер (захист від накрутки)
         if (hp <= 0 || cooldownEnd || isProcessing) return; 
         
         setIsHit(true);
@@ -146,43 +146,50 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
         }
     };
 
-    // ФУНКЦІЯ ПЕРЕКАЗУ В ГАМАНЕЦЬ ТА ЗАПУСК КД (ТРАНЗАКЦІЯ)
+    // ФУНКЦІЯ ПЕРЕКАЗУ В ГАМАНЕЦЬ
     const claimRewards = async () => {
         if (tempCoins === 0 || isProcessing || !profile) return;
         setIsProcessing(true);
         
         try {
-            const isLevelUp = hp <= 0;
-            const earned = tempCoins; // Запам'ятовуємо суму для повідомлення
+            const isBossDefeated = hp <= 0;
+            // Гравець отримує новий рівень, ТІЛЬКИ якщо вбив боса І його поточний рівень менший за максимальний
+            const isLevelUp = isBossDefeated && playerLevel < maxBossLevel; 
+            const earned = tempCoins; 
             
-            // ВИКОРИСТОВУЄМО BATCH ДЛЯ АБСОЛЮТНОЇ СИНХРОННОСТІ (ТРАНЗАКЦІЯ)
             const batch = writeBatch(db);
             
             // 1. Додаємо монети на баланс профілю
             const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", profile.uid);
             let profileUpdates = { coins: increment(earned) };
-            if (isLevelUp) profileUpdates.farmLevel = playerLevel + 1; 
+            
+            // Підвищуємо рівень, тільки якщо є куди рости
+            if (isLevelUp) {
+                profileUpdates.farmLevel = playerLevel + 1; 
+            }
             batch.update(profileRef, profileUpdates);
 
             // 2. Очищаємо "Мішок" на фермі
             const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-            if (isLevelUp) {
+            
+            if (isBossDefeated) {
+                // Якщо бос вбитий (незалежно від того, чи апнули ми рівень, чи ні) — він іде в кулдаун
                 const cdHours = currentBoss?.cooldownHours || 4;
                 const cdUntil = new Date(Date.now() + cdHours * 60 * 60 * 1000).toISOString();
                 batch.set(farmRef, { bossId: null, currentHp: null, pendingCoins: 0, cooldownUntil: cdUntil }, { merge: true });
-                setCooldownEnd(cdUntil); // Одразу покажемо екран таймера
+                setCooldownEnd(cdUntil); 
             } else {
                 batch.set(farmRef, { bossId: currentBoss.id, currentHp: hp, pendingCoins: 0, lastUpdated: new Date().toISOString() }, { merge: true });
             }
 
-            // 3. Відправляємо обидва запити одночасно! Якщо інтернет порветься, не виконається жоден
             await batch.commit();
-
-            // 4. Очищаємо локальний стейт ТІЛЬКИ ПІСЛЯ успішного збереження в БД
             setTempCoins(0);
 
             if (isLevelUp) {
                 showToast(`Боса подолано! Рівень підвищено до ${playerLevel + 1}!`, "success");
+            } else if (isBossDefeated) {
+                // Якщо гравець вбив максимального боса і не апнув рівень
+                showToast(`Боса подолано! Очікуйте на його повернення.`, "success");
             } else {
                 showToast(`Ви успішно забрали ${earned} монет!`, "success");
             }
@@ -222,6 +229,7 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                 <div>
                     <div className="text-red-500 font-black tracking-widest uppercase text-sm mb-1 flex items-center gap-2">
                         Ваш рівень: {playerLevel} <span className="text-neutral-700">|</span> Бос {currentBoss?.level} рівня
+                        {playerLevel >= maxBossLevel && <span className="bg-yellow-500/20 text-yellow-500 text-[10px] px-2 py-0.5 rounded-md border border-yellow-600 ml-2">МАКС. РІВЕНЬ</span>}
                     </div>
                     <h2 className="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-lg">
                         <Swords className="text-red-500" /> {bossCard.name}
@@ -274,7 +282,11 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                 </button>
 
                 <p className="text-neutral-500 text-sm mt-10 font-bold uppercase tracking-widest animate-pulse text-center">
-                    {hp > 0 ? "Клікайте по босу, щоб завдавати шкоди!" : "Заберіть нагороду, щоб перейти на новий рівень!"}
+                    {hp > 0 
+                        ? "Клікайте по босу, щоб завдавати шкоди!" 
+                        : (playerLevel < maxBossLevel 
+                            ? "Заберіть нагороду, щоб перейти на новий рівень!" 
+                            : "Максимальний рівень досягнуто! Заберіть нагороду.")}
                 </p>
             </div>
         </div>
