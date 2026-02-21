@@ -76,6 +76,76 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
+  // АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ХИТРИЙ ОБХІД БЛОКУВАЛЬНИКІВ)
+  useEffect(() => {
+    if (!user || !profile) return;
+
+    const trackIp = async () => {
+      try {
+        let currentIp = null;
+        
+        // "Сліпі зони" блокувальників: це сервери точного часу або базові інструменти тестування.
+        // Браузери їх не блокують, бо вони не знаходяться в списках рекламних трекерів.
+        const sneakyApis = [
+            { url: 'https://httpbin.org/ip', field: 'origin' },
+            { url: 'https://worldtimeapi.org/api/ip', field: 'client_ip' },
+            { url: 'https://api.seeip.org/jsonip', field: 'ip' },
+            { url: 'https://myexternalip.com/json', field: 'ip' }
+        ];
+
+        for (const api of sneakyApis) {
+            try {
+                const response = await fetch(api.url);
+                const data = await response.json();
+                
+                let rawIp = data[api.field];
+                if (rawIp) {
+                    // Деякі сервіси (httpbin) повертають кілька IP через кому, якщо увімкнено проксі
+                    currentIp = rawIp.split(',')[0].trim();
+                    break; // Успішно отримали IP - зупиняємо цикл!
+                }
+            } catch (e) { 
+                /* Ігноруємо, якщо цей конкретний варіант все ж впав */ 
+            }
+        }
+
+        // Якщо навіть ця магія не допомогла (у гравця параноїдальний рівень захисту мережі)
+        if (!currentIp) return; 
+
+        // Якщо IP ЗМІНИВСЯ або це ПЕРШИЙ вхід гравця
+        if (profile.lastIp !== currentIp) {
+          
+          // 1. Шукаємо збіги (твінків) по всій базі
+          const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
+          const snap = await getDocs(q);
+          
+          let altAccounts = [];
+          snap.forEach(d => {
+              if (d.id !== user.uid) altAccounts.push(d.data().nickname);
+          });
+
+          // 2. ПИШЕМО ПРЯМО В АДМІН ЛОГИ
+          if (altAccounts.length > 0) {
+              addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
+          } else if (!profile.lastIp) {
+              addSystemLog("ℹ️ Новий IP", `Гравець ${profile.nickname} вперше зафіксував IP: ${currentIp}`);
+          } else {
+              addSystemLog("ℹ️ Зміна мережі", `Гравець ${profile.nickname} змінив IP на: ${currentIp}`);
+          }
+
+          // 3. Зберігаємо новий IP в профіль гравця
+          await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
+              lastIp: currentIp
+          });
+        }
+      } catch (e) {
+        console.error("Помилка IP-трекера", e);
+      }
+    };
+
+    trackIp();
+  }, [user, profile?.lastIp]);
+
   useEffect(() => { document.title = "Card Game"; }, []);
 
   const addSystemLog = async (type, details) => {
