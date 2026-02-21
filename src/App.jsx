@@ -76,46 +76,59 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
-  // АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ХИТРИЙ ОБХІД БЛОКУВАЛЬНИКІВ)
+// АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ЕКСТРЕМАЛЬНИЙ ДЕБАГ)
   useEffect(() => {
-    if (!user || !profile) return;
+    console.log("🛠️ [ШПИГУН] useEffect спрацював! Стан: User є?", !!user, "| Profile є?", !!profile);
+
+    if (!user || !profile) {
+        console.log("💤 [ШПИГУН] Ще вантажимось, чекаю...");
+        return;
+    }
 
     const trackIp = async () => {
+      console.log(`🕵️‍♂️ [ШПИГУН] Профіль завантажено! Починаю пошук IP для: ${profile.nickname}`);
+      
       try {
         let currentIp = null;
         
-        // "Сліпі зони" блокувальників: це сервери точного часу або базові інструменти тестування.
-        // Браузери їх не блокують, бо вони не знаходяться в списках рекламних трекерів.
-        const sneakyApis = [
-            { url: 'https://httpbin.org/ip', field: 'origin' },
-            { url: 'https://worldtimeapi.org/api/ip', field: 'client_ip' },
-            { url: 'https://api.seeip.org/jsonip', field: 'ip' },
-            { url: 'https://myexternalip.com/json', field: 'ip' }
+        const apis = [
+            { url: 'https://checkip.amazonaws.com/', type: 'text' },
+            { url: 'https://api.ipify.org?format=json', type: 'json', field: 'ip' },
+            { url: 'https://api.seeip.org/jsonip', type: 'json', field: 'ip' }
         ];
 
-        for (const api of sneakyApis) {
+        for (const api of apis) {
             try {
+                console.log(`⏳ [ШПИГУН] Стукаю до ${api.url}...`);
                 const response = await fetch(api.url);
-                const data = await response.json();
                 
-                let rawIp = data[api.field];
-                if (rawIp) {
-                    // Деякі сервіси (httpbin) повертають кілька IP через кому, якщо увімкнено проксі
-                    currentIp = rawIp.split(',')[0].trim();
-                    break; // Успішно отримали IP - зупиняємо цикл!
+                if (api.type === 'text') {
+                    const text = await response.text();
+                    currentIp = text.trim();
+                } else {
+                    const data = await response.json();
+                    currentIp = data[api.field];
+                }
+                
+                if (currentIp) {
+                    console.log(`✅ [ШПИГУН] БІНГО! IP отримано: ${currentIp}`);
+                    break;
                 }
             } catch (e) { 
-                /* Ігноруємо, якщо цей конкретний варіант все ж впав */ 
+                console.warn(`❌ [ШПИГУН] Провал з ${api.url}. Причина:`, e.message);
             }
         }
 
-        // Якщо навіть ця магія не допомогла (у гравця параноїдальний рівень захисту мережі)
-        if (!currentIp) return; 
+        if (!currentIp) {
+            console.error("⛔ [ШПИГУН] Всі запити заблоковані браузером (CORS або AdBlock).");
+            return; 
+        }
 
-        // Якщо IP ЗМІНИВСЯ або це ПЕРШИЙ вхід гравця
+        console.log(`🕵️‍♂️ [ШПИГУН] Поточний IP: ${currentIp}. В базі: ${profile.lastIp || "порожньо"}`);
+
         if (profile.lastIp !== currentIp) {
+          console.log("🚨 [ШПИГУН] IP змінився! Пишу в базу та шукаю твінків...");
           
-          // 1. Шукаємо збіги (твінків) по всій базі
           const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
           const snap = await getDocs(q);
           
@@ -124,7 +137,6 @@ export default function App() {
               if (d.id !== user.uid) altAccounts.push(d.data().nickname);
           });
 
-          // 2. ПИШЕМО ПРЯМО В АДМІН ЛОГИ
           if (altAccounts.length > 0) {
               addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
           } else if (!profile.lastIp) {
@@ -133,13 +145,16 @@ export default function App() {
               addSystemLog("ℹ️ Зміна мережі", `Гравець ${profile.nickname} змінив IP на: ${currentIp}`);
           }
 
-          // 3. Зберігаємо новий IP в профіль гравця
           await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
               lastIp: currentIp
           });
+          
+          console.log("💾 [ШПИГУН] Успішно збережено в Firebase!");
+        } else {
+            console.log("💤 [ШПИГУН] IP не змінився. Нічого не роблю.");
         }
       } catch (e) {
-        console.error("Помилка IP-трекера", e);
+        console.error("💥 [ШПИГУН] КРИТИЧНА ПОМИЛКА КОДУ:", e);
       }
     };
 

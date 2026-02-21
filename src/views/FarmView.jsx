@@ -20,13 +20,12 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     
-    // СТАНИ ДЛЯ КУЛДАУНУ
     const [cooldownEnd, setCooldownEnd] = useState(null);
     const [timeLeft, setTimeLeft] = useState("");
 
     const isLoadedRef = useRef(false);
     
-    // Трюк для збереження при перемиканні вкладок (додали cdEnd)
+    // Трюк для збереження при перемиканні вкладок
     const stateRef = useRef({ hp, tempCoins, bossId: currentBoss?.id, playerUid: profile?.uid, cdEnd: cooldownEnd });
     useEffect(() => {
         stateRef.current = { hp, tempCoins, bossId: currentBoss?.id, playerUid: profile?.uid, cdEnd: cooldownEnd };
@@ -46,7 +45,6 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                 if (snap.exists()) {
                     const data = snap.data();
                     
-                    // ПЕРЕВІРЯЄМО, ЧИ ГРАВЕЦЬ У КУЛДАУНІ
                     if (data.cooldownUntil && new Date(data.cooldownUntil) > new Date()) {
                         setCooldownEnd(data.cooldownUntil);
                         setHp(0);
@@ -81,7 +79,7 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
             const distance = new Date(cooldownEnd).getTime() - new Date().getTime();
             if (distance <= 0) {
                 setCooldownEnd(null);
-                setHp(currentBoss?.maxHp || 1000); // Воскрешаємо боса!
+                setHp(currentBoss?.maxHp || 1000); 
             } else {
                 const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
@@ -95,38 +93,39 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
         return () => clearInterval(interval);
     }, [cooldownEnd, currentBoss]);
 
-    // АВТОЗБЕРЕЖЕННЯ 1: При перемиканні вкладок
+    // НАДІЙНЕ АВТОЗБЕРЕЖЕННЯ (ФІКС ВІДКАТУ БАГУ)
     useEffect(() => {
-        return () => {
-            const { hp: savedHp, tempCoins: savedCoins, bossId, playerUid, cdEnd } = stateRef.current;
-            if (playerUid && isLoadedRef.current && !cdEnd) { 
+        if (!profile || !currentBoss) return;
+
+        // Зберігаємо кожну секунду в фоні, НЕ скидаючи таймер від кліків
+        const saveInterval = setInterval(() => {
+            const { hp: currentHp, tempCoins: currentCoins, bossId, playerUid, cdEnd } = stateRef.current;
+            if (isLoadedRef.current && !cdEnd) {
                 const farmRef = doc(db, "artifacts", appId, "users", playerUid, "farmState", "main");
                 setDoc(farmRef, { 
                     bossId, 
-                    currentHp: savedHp, 
-                    pendingCoins: savedCoins,
+                    currentHp, 
+                    pendingCoins: currentCoins,
                     lastUpdated: new Date().toISOString() 
-                }, { merge: true }).catch(console.error);
+                }, { merge: true }).catch(() => {});
+            }
+        }, 1000);
+
+        // Фінальне збереження при натисканні на іншу вкладку меню
+        return () => {
+            clearInterval(saveInterval);
+            const { hp: finalHp, tempCoins: finalCoins, bossId: finalBossId, playerUid: finalUid, cdEnd: finalCdEnd } = stateRef.current;
+            if (finalUid && isLoadedRef.current && !finalCdEnd) { 
+                const farmRef = doc(db, "artifacts", appId, "users", finalUid, "farmState", "main");
+                setDoc(farmRef, { 
+                    bossId: finalBossId, 
+                    currentHp: finalHp, 
+                    pendingCoins: finalCoins,
+                    lastUpdated: new Date().toISOString() 
+                }, { merge: true }).catch(() => {});
             }
         };
-    }, [db, appId]);
-
-    // АВТОЗБЕРЕЖЕННЯ 2: Кожні 1.5 секунди (під час бою)
-    useEffect(() => {
-        if (!isLoadedRef.current || hp <= 0 || !profile || isLoading || cooldownEnd) return;
-        
-        const timer = setTimeout(() => {
-            const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-            setDoc(farmRef, { 
-                bossId: currentBoss?.id, 
-                currentHp: hp, 
-                pendingCoins: tempCoins,
-                lastUpdated: new Date().toISOString() 
-            }, { merge: true }).catch(console.error);
-        }, 1500);
-
-        return () => clearTimeout(timer);
-    }, [hp, tempCoins, profile, currentBoss?.id, db, appId, isLoading, cooldownEnd]);
+    }, [db, appId, profile, currentBoss]); // Залежності змінені: більше не залежить від hp, щоб не скидати інтервал
 
     // УДАР ПО БОСУ
     const handleHit = () => {
@@ -164,13 +163,12 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
             // Очищаємо "Мішок"
             const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
             if (isLevelUp) {
-                // ЗАПУСКАЄМО ТАЙМЕР КУЛДАУНУ
                 const cdHours = currentBoss?.cooldownHours || 4;
                 const cdUntil = new Date(Date.now() + cdHours * 60 * 60 * 1000).toISOString();
                 
                 await setDoc(farmRef, { bossId: null, currentHp: null, pendingCoins: 0, cooldownUntil: cdUntil }, { merge: true });
                 setTempCoins(0);
-                setCooldownEnd(cdUntil); // Одразу покажемо екран таймера
+                setCooldownEnd(cdUntil);
                 showToast(`Боса подолано! Рівень підвищено до ${playerLevel + 1}!`, "success");
             } else {
                 await setDoc(farmRef, { bossId: currentBoss.id, currentHp: hp, pendingCoins: 0, lastUpdated: new Date().toISOString() }, { merge: true });
@@ -209,8 +207,8 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
             <div className="flex justify-between items-end mb-4 px-2">
                 <div>
                     <div className="text-red-500 font-black tracking-widest uppercase text-sm mb-1 flex items-center gap-2">
-    Ваш рівень: {playerLevel} <span className="text-neutral-700">|</span> Бос {currentBoss?.level} рівня
-</div>
+                        Ваш рівень: {playerLevel} <span className="text-neutral-700">|</span> Бос {currentBoss?.level} рівня
+                    </div>
                     <h2 className="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-lg">
                         <Swords className="text-red-500" /> {bossCard.name}
                     </h2>
