@@ -513,6 +513,40 @@ export default function App() {
     }
   }, [user, profile?.uniqueCardsCount, dbInventory.length]);
 
+  // АВТОМАТИЧНЕ ОЧИЩЕННЯ ВІТРИН ВІД ПРОДАНИХ КАРТОК
+  useEffect(() => {
+    if (!user || !showcases || showcases.length === 0) return;
+
+    showcases.forEach(showcase => {
+        if (!showcase.cardIds || showcase.cardIds.length === 0) return;
+
+        let isChanged = false;
+        const validCardIds = [];
+        const inventoryTracker = {};
+
+        // Робимо зліпок інвентарю (скільки штук кожної картки є)
+        dbInventory.forEach(item => {
+            inventoryTracker[item.id] = item.amount;
+        });
+
+        // Проходимо по картках у вітрині
+        showcase.cardIds.forEach(cardId => {
+            if (inventoryTracker[cardId] && inventoryTracker[cardId] > 0) {
+                validCardIds.push(cardId);
+                inventoryTracker[cardId] -= 1; // Резервуємо 1 шт. для відображення
+            } else {
+                isChanged = true; // Картки не вистачає (продана або виставлена на ринок)
+            }
+        });
+
+        // Якщо знайдено нестачу - оновлюємо вітрину в базі
+        if (isChanged) {
+            const showcaseRef = doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcase.id);
+            updateDoc(showcaseRef, { cardIds: validCardIds }).catch(console.error);
+        }
+    });
+  }, [dbInventory, showcases, user]);
+
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const email = e.target.email.value.trim();
