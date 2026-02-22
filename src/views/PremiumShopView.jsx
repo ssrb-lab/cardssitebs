@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Gem, CheckCircle2, Edit2, Coins, Star, Eye, Trash2 } from "lucide-react";
 import { doc, updateDoc, increment, collection, getDocs, writeBatch } from "firebase/firestore";
 import { formatDate } from "../utils/helpers";
@@ -6,15 +6,18 @@ import { formatDate } from "../utils/helpers";
 export default function PremiumShopView({ profile, cardStats, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
     
     const [newNickname, setNewNickname] = useState("");
+    
+    // БРОНЬОВАНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ
+    const actionLock = useRef(false);
 
     const buyPremium = async () => {
-        if (isProcessing) return;
+        if (actionLock.current || isProcessing) return;
         if (profile.coins < premiumPrice) return showToast("Недостатньо монет для покупки Преміум-акаунту!");
 
+        actionLock.current = true;
         setIsProcessing(true);
         try {
             const now = new Date();
-            // Якщо вже є преміум, додаємо дні до поточного терміну, якщо ні - від сьогодні
             const currentExp = isPremiumActive ? new Date(profile.premiumUntil) : now;
             currentExp.setDate(currentExp.getDate() + premiumDurationDays);
             
@@ -31,20 +34,22 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
             console.error(e);
             showToast("Помилка під час покупки преміуму.");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
 
     const handleNicknameChange = async (e) => {
         e.preventDefault();
-        if (isProcessing) return;
+        if (actionLock.current || isProcessing) return;
+        
         const nn = newNickname.trim();
         if (!nn) return showToast("Введіть новий нікнейм!");
         if (profile.coins < 100000) return showToast("Недостатньо монет!");
         
+        actionLock.current = true;
         setIsProcessing(true);
         try {
-            // Перевірка на унікальність
             const profilesSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
             let exists = false;
             profilesSnap.forEach(d => {
@@ -53,7 +58,6 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
             
             if (exists) {
                 showToast("Цей нікнейм вже зайнятий іншим гравцем!", "error");
-                setIsProcessing(false);
                 return;
             }
             
@@ -70,15 +74,17 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
             console.error(err);
             showToast("Помилка зміни нікнейму.");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
 
     const buyItem = async (item) => {
-        if (isProcessing) return;
+        if (actionLock.current || isProcessing) return;
         if (!isPremiumActive) return showToast("Цей товар доступний лише для власників Преміум-акаунту!");
         if (profile.coins < item.price) return showToast("Недостатньо монет!");
 
+        actionLock.current = true;
         setIsProcessing(true);
         try {
             const batch = writeBatch(db);
@@ -97,6 +103,7 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
             console.error(e);
             showToast("Помилка під час покупки товару.");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
@@ -110,7 +117,6 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
                 <p className="text-neutral-400">Ексклюзивні пропозиції для елітних лордів.</p>
             </div>
 
-            {/* БЛОК КУПІВЛІ ПРЕМІУМУ */}
             <div className="bg-gradient-to-br from-neutral-900 to-purple-950/30 border-2 border-fuchsia-500/30 rounded-3xl p-6 sm:p-10 text-center max-w-2xl mx-auto shadow-[0_0_40px_rgba(217,70,239,0.15)] mb-12 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-fuchsia-600"></div>
                 <Gem size={60} className="mx-auto text-fuchsia-400 mb-6 drop-shadow-[0_0_20px_rgba(217,70,239,0.5)] animate-pulse" />
@@ -153,7 +159,6 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
                 </button>
             </div>
 
-            {/* БЛОК ЗМІНИ НІКНЕЙМУ */}
             <div className="bg-gradient-to-br from-neutral-900 to-blue-950/30 border-2 border-blue-500/30 rounded-3xl p-6 sm:p-10 text-center max-w-2xl mx-auto shadow-[0_0_40px_rgba(59,130,246,0.15)] mb-12 relative overflow-hidden">
                 <Edit2 size={48} className="mx-auto text-blue-400 mb-4 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
                 <h3 className="text-2xl font-black text-white mb-2">Зміна Нікнейму</h3>
@@ -167,7 +172,6 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
                 </form>
             </div>
 
-            {/* ТОВАРИ ПРЕМІУМ МАГАЗИНУ */}
             {premiumShopItems && premiumShopItems.length > 0 && (
                 <div>
                     <h3 className="text-2xl font-black text-white text-center mb-8 uppercase tracking-widest flex items-center justify-center gap-2">
@@ -175,7 +179,6 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
                         {premiumShopItems.map((item, idx) => {
-                            // Якщо це картка, дістаємо її дані
                             let cDef = null;
                             if (item.type === "card") {
                                 cDef = cardsCatalog.find(c => c.id === item.itemId);

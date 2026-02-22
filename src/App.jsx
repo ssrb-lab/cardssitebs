@@ -6,18 +6,15 @@ import {
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, setDoc, collection, onSnapshot, updateDoc, getDocs, getDoc, query, where, writeBatch, increment, deleteDoc } from "firebase/firestore";
 
-// Конфіги та утиліти
 import { auth, db, GAME_ID } from "./config/firebase";
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from "./config/constants";
 import { isToday } from "./utils/helpers";
 
-// Компоненти
 import PlayerAvatar from "./components/PlayerAvatar";
 import CardModal from "./components/CardModal";
 import ListingModal from "./components/ListingModal";
 import NavButton from "./components/NavButton";
 
-// Сторінки (Views)
 import FarmView from "./views/FarmView";
 import ShopView from "./views/ShopView";
 import PremiumShopView from "./views/PremiumShopView";
@@ -37,13 +34,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   
   const [isProcessing, setIsProcessing] = useState(false);
+  // НАДІЙНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ ТА СПАМУ
+  const actionLock = useRef(false);
 
-  // Авторизація
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [dbError, setDbError] = useState("");
 
-  // Глобальні налаштування
   const [bosses, setBosses] = useState([]);
   const [cardsCatalog, setCardsCatalog] = useState([]);
   const [packsCatalog, setPacksCatalog] = useState([]);
@@ -55,7 +52,6 @@ export default function App() {
   const [premiumDurationDays, setPremiumDurationDays] = useState(30);
   const [premiumShopItems, setPremiumShopItems] = useState([]);
 
-  // Стан Гри
   const [currentView, setCurrentView] = useState("shop");
   const [selectedPackId, setSelectedPackId] = useState(null);
   const [openingPackId, setOpeningPackId] = useState(null);
@@ -76,21 +72,14 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
-// Реф для захисту від безкінечного циклу проксі
   const checkedIpForUid = useRef(null);
 
-  // АВТОМАТИЧНЕ ВІДСТЕЖЕННЯ IP (ЗАХИСТ ВІД ПРОКСІ-СПАМУ)
   useEffect(() => {
-    // Якщо профілю ще немає, АБО ми вже перевіряли IP для цього гравця - виходимо
     if (!user || !profile || checkedIpForUid.current === user.uid) return;
-
     const trackIp = async () => {
-      // Одразу блокуємо повторні запуски для цього гравця
       checkedIpForUid.current = user.uid; 
-      
       try {
         let currentIp = null;
-        
         const sneakyApis = [
             { url: 'https://httpbin.org/ip', field: 'origin' },
             { url: 'https://worldtimeapi.org/api/ip', field: 'client_ip' },
@@ -102,27 +91,18 @@ export default function App() {
             try {
                 const response = await fetch(api.url);
                 const data = await response.json();
-                
                 let rawIp = data[api.field];
-                if (rawIp) {
-                    currentIp = rawIp.split(',')[0].trim();
-                    break;
-                }
+                if (rawIp) { currentIp = rawIp.split(',')[0].trim(); break; }
             } catch (e) { }
         }
 
         if (!currentIp) return; 
 
-        // Перевіряємо, чи IP дійсно новий
         if (profile.lastIp !== currentIp) {
-          
           const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
           const snap = await getDocs(q);
-          
           let altAccounts = [];
-          snap.forEach(d => {
-              if (d.id !== user.uid) altAccounts.push(d.data().nickname);
-          });
+          snap.forEach(d => { if (d.id !== user.uid) altAccounts.push(d.data().nickname); });
 
           if (altAccounts.length > 0) {
               addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
@@ -132,17 +112,12 @@ export default function App() {
               addSystemLog("ℹ️ Зміна мережі", `Гравець ${profile.nickname} змінив IP на: ${currentIp}`);
           }
 
-          await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), {
-              lastIp: currentIp
-          });
+          await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { lastIp: currentIp });
         }
-      } catch (e) {
-        console.error("Помилка IP-трекера", e);
-      }
+      } catch (e) { console.error("Помилка IP", e); }
     };
-
     trackIp();
-  }, [user, profile?.uid]); // Видалили profile?.lastIp з масиву залежностей!
+  }, [user, profile?.uid]);
 
   useEffect(() => { document.title = "Card Game"; }, []);
 
@@ -273,42 +248,6 @@ export default function App() {
     });
   }, [dbInventory, showcases, user]);
 
-  useEffect(() => {
-    if (!user || !profile) return;
-    const trackIp = async () => {
-      try {
-        let currentIp = null;
-        const apis = ['https://api.ipify.org?format=json', 'https://ipwho.is/', 'https://api.myip.com'];
-        for (const url of apis) {
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                currentIp = data.ip || data.ip_addr || data.query; 
-                if (currentIp) break;
-            } catch (e) { }
-        }
-        if (!currentIp || profile.lastIp === currentIp) return;
-
-        const q = query(collection(db, "artifacts", GAME_ID, "public", "data", "profiles"), where("lastIp", "==", currentIp));
-        const snap = await getDocs(q);
-        let altAccounts = [];
-        snap.forEach(d => { if (d.id !== user.uid) altAccounts.push(d.data().nickname); });
-
-        if (altAccounts.length > 0) {
-            addSystemLog("⚠️ Мультиакаунт", `Гравець ${profile.nickname} зайшов з IP (${currentIp}), який використовують: ${altAccounts.join(", ")}`);
-        } else if (!profile.lastIp) {
-            addSystemLog("ℹ️ Новий IP", `Гравець ${profile.nickname} вперше зафіксував IP: ${currentIp}`);
-        } else {
-            addSystemLog("ℹ️ Зміна мережі", `Гравець ${profile.nickname} змінив IP на: ${currentIp}`);
-        }
-
-        await updateDoc(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { lastIp: currentIp });
-      } catch (e) { console.error("Помилка IP", e); }
-    };
-    trackIp();
-  }, [user, profile?.lastIp]);
-
-  // --- ЛОГІКА АВТОРИЗАЦІЇ ---
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const email = e.target.email.value.trim();
@@ -363,15 +302,16 @@ export default function App() {
     setTimeout(() => setToastMsg({ text: "", type: "" }), 3000);
   };
 
-  // --- ЛОГІКА РИНКУ ---
+  // --- ЛОГІКА РИНКУ ТА ЕКОНОМІКИ З ЗАХИСТОМ ВІД АВТОКЛІКЕРА ---
   const listOnMarket = async (cardId, price) => {
-      if (isProcessing) return;
-      const existing = dbInventory.find((i) => i.id === cardId);
-      if (!existing || existing.amount < 1) return showToast("У вас немає цієї картки!");
-      if (price < 1 || !Number.isInteger(price)) return showToast("Невірна ціна!");
-
-      setIsProcessing(true);
+      if (actionLock.current) return;
+      actionLock.current = true; setIsProcessing(true);
+      
       try {
+          const existing = dbInventory.find((i) => i.id === cardId);
+          if (!existing || existing.amount < 1) { showToast("У вас немає цієї картки!"); return; }
+          if (price < 1 || !Number.isInteger(price)) { showToast("Невірна ціна!"); return; }
+
           const batch = writeBatch(db);
           const invDocRef = doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId);
           if (existing.amount === 1) batch.delete(invDocRef);
@@ -390,18 +330,18 @@ export default function App() {
           showToast("Картку успішно виставлено на Ринок!", "success");
           setListingCard(null);
       } catch(e) {
-          console.error(e);
-          showToast(`Помилка: ${e.message}`);
-      } finally { setIsProcessing(false); }
+          console.error(e); showToast(`Помилка: ${e.message}`);
+      } finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const buyFromMarket = async (listing) => {
-      if (isProcessing) return;
-      if (profile.coins < listing.price) return showToast("Недостатньо монет, Мій лорд!");
-      if (listing.sellerUid === user.uid) return showToast("Ви не можете купити власний лот!");
+      if (actionLock.current) return;
+      actionLock.current = true; setIsProcessing(true);
 
-      setIsProcessing(true);
       try {
+          if (profile.coins < listing.price) { showToast("Недостатньо монет!"); return; }
+          if (listing.sellerUid === user.uid) { showToast("Не можна купити свій лот!"); return; }
+
           const batch = writeBatch(db);
           const buyerProfileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid);
           batch.update(buyerProfileRef, { coins: increment(-listing.price), totalCards: increment(1) });
@@ -418,17 +358,16 @@ export default function App() {
           await batch.commit();
           showToast(`Картку успішно придбано за ${listing.price} монет!`, "success");
       } catch (e) {
-          console.error(e);
-          showToast("Помилка покупки. Можливо, лот вже продано.");
-      } finally { setIsProcessing(false); }
+          console.error(e); showToast("Помилка покупки. Можливо, лот вже продано.");
+      } finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const cancelMarketListing = async (listing) => {
-      if (isProcessing) return;
-      if (listing.sellerUid !== user.uid && !profile.isAdmin) return;
+      if (actionLock.current) return;
+      actionLock.current = true; setIsProcessing(true);
 
-      setIsProcessing(true);
       try {
+          if (listing.sellerUid !== user.uid && !profile.isAdmin) return;
           const batch = writeBatch(db);
           batch.delete(doc(db, "artifacts", GAME_ID, "public", "data", "market", listing.id));
 
@@ -441,118 +380,131 @@ export default function App() {
           await batch.commit();
           showToast(listing.sellerUid === user.uid ? "Лот знято з продажу." : "Лот примусово видалено.", "success");
       } catch (e) { console.error(e); showToast("Помилка скасування лоту."); } 
-      finally { setIsProcessing(false); }
+      finally { actionLock.current = false; setIsProcessing(false); }
   };
 
-  // --- ЛОГІКА ВІДКРИТТЯ ПАКІВ ---
   const openPack = async (packId, cost, amountToOpen = 1) => {
-    if (isProcessing || !profile || openingPackId || isRouletteSpinning) return;
-    const selectedPackDef = packsCatalog.find(p => p.id === packId);
-    if (selectedPackDef?.isPremiumOnly && !isPremiumActive) {
-        return showToast("Цей пак доступний тільки для Преміум гравців!", "error");
-    }
-
-    const totalCost = cost * amountToOpen;
-    if (profile.coins < totalCost) return showToast("Недостатньо монет, Мій лорд!");
-
-    setIsProcessing(true);
-    setOpeningPackId(packId);
-    setPulledCards([]);
-
-    setTimeout(async () => {
-      let tempCatalog = JSON.parse(JSON.stringify(cardsCatalog));
-      let results = [];
-      let countsMap = {};
-      let totalEarnedCoins = 0; 
-
-      for (let i = 0; i < amountToOpen; i++) {
-        const availableNow = tempCatalog.filter(c => c.packId === packId && (!c.maxSupply || (c.pulledCount || 0) < c.maxSupply));
-        if (availableNow.length === 0) {
-          if (i === 0) {
-            setOpeningPackId(null); setIsProcessing(false);
-            return showToast("У цьому паку не залишилось доступних карток!");
-          }
-          break;
+    if (actionLock.current || !profile || openingPackId || isRouletteSpinning) return;
+    actionLock.current = true; setIsProcessing(true);
+    
+    try {
+        const selectedPackDef = packsCatalog.find(p => p.id === packId);
+        if (selectedPackDef?.isPremiumOnly && !isPremiumActive) {
+            showToast("Цей пак доступний тільки для Преміум гравців!", "error");
+            return;
         }
 
-        let totalWeight = 0;
-        const activeWeights = [];
+        const totalCost = cost * amountToOpen;
+        if (profile.coins < totalCost) { showToast("Недостатньо монет!"); return; }
 
-        for (const c of availableNow) {
-            let w = 1;
-            const globalRObj = rarities.find(r => r.name === c.rarity);
-            if (c.weight !== undefined && c.weight !== "") w = Number(c.weight);
-            else if (selectedPackDef?.customWeights?.[c.rarity] !== undefined && selectedPackDef?.customWeights?.[c.rarity] !== "") w = Number(selectedPackDef.customWeights[c.rarity]);
-            else if (globalRObj) w = Number(globalRObj.weight);
+        setOpeningPackId(packId);
+        setPulledCards([]);
+
+        setTimeout(async () => {
+          let tempCatalog = JSON.parse(JSON.stringify(cardsCatalog));
+          let results = [];
+          let countsMap = {};
+          let totalEarnedCoins = 0; 
+
+          for (let i = 0; i < amountToOpen; i++) {
+            const availableNow = tempCatalog.filter(c => c.packId === packId && (!c.maxSupply || (c.pulledCount || 0) < c.maxSupply));
+            if (availableNow.length === 0) {
+              if (i === 0) {
+                setOpeningPackId(null); 
+                showToast("У цьому паку не залишилось доступних карток!");
+                actionLock.current = false; setIsProcessing(false); return;
+              }
+              break;
+            }
+
+            let totalWeight = 0;
+            const activeWeights = [];
+
+            for (const c of availableNow) {
+                let w = 1;
+                const globalRObj = rarities.find(r => r.name === c.rarity);
+                if (c.weight !== undefined && c.weight !== "") w = Number(c.weight);
+                else if (selectedPackDef?.customWeights?.[c.rarity] !== undefined && selectedPackDef?.customWeights?.[c.rarity] !== "") w = Number(selectedPackDef.customWeights[c.rarity]);
+                else if (globalRObj) w = Number(globalRObj.weight);
+                
+                totalWeight += w;
+                activeWeights.push({ card: c, weight: w });
+            }
+
+            const rand = Math.random() * totalWeight;
+            let sum = 0;
+            let newCard = activeWeights[0].card;
             
-            totalWeight += w;
-            activeWeights.push({ card: c, weight: w });
-        }
+            for (const item of activeWeights) {
+                sum += item.weight;
+                if (rand <= sum) { newCard = item.card; break; }
+            }
 
-        const rand = Math.random() * totalWeight;
-        let sum = 0;
-        let newCard = activeWeights[0].card;
-        
-        for (const item of activeWeights) {
-            sum += item.weight;
-            if (rand <= sum) { newCard = item.card; break; }
-        }
-
-        results.push(newCard);
-        countsMap[newCard.id] = (countsMap[newCard.id] || 0) + 1;
-        totalEarnedCoins += (newCard.sellPrice ? Number(newCard.sellPrice) : SELL_PRICE);
-      }
-
-      if (results.length === 0) { setOpeningPackId(null); setIsProcessing(false); return; }
-
-      try {
-        const batch = writeBatch(db);
-        const profileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid);
-        batch.update(profileRef, { 
-          coins: increment(-totalCost), totalCards: increment(results.length), packsOpened: increment(amountToOpen),
-          coinsSpentOnPacks: increment(totalCost), coinsEarnedFromPacks: increment(totalEarnedCoins)
-        });
-
-        for (const card of results) {
-          if (Number(card.maxSupply) > 0) {
-            batch.set(doc(db, "artifacts", GAME_ID, "public", "data", "cardStats", card.id), { pulledCount: increment(1) }, { merge: true });
+            results.push(newCard);
+            countsMap[newCard.id] = (countsMap[newCard.id] || 0) + 1;
+            totalEarnedCoins += (newCard.sellPrice ? Number(newCard.sellPrice) : SELL_PRICE);
           }
-        }
 
-        for (const [cardId, count] of Object.entries(countsMap)) {
-          batch.set(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: increment(count) }, { merge: true });
-        }
+          if (results.length === 0) { setOpeningPackId(null); actionLock.current = false; setIsProcessing(false); return; }
 
-        await batch.commit();
+          try {
+            const batch = writeBatch(db);
+            const profileRef = doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid);
+            batch.update(profileRef, { 
+              coins: increment(-totalCost), totalCards: increment(results.length), packsOpened: increment(amountToOpen),
+              coinsSpentOnPacks: increment(totalCost), coinsEarnedFromPacks: increment(totalEarnedCoins)
+            });
 
-        if (amountToOpen === 1) {
-            const availablePackCards = tempCatalog.filter((c) => c.packId === packId);
-            const fakeCards = Array.from({length: 45}, () => availablePackCards[Math.floor(Math.random() * availablePackCards.length)]);
-            fakeCards[35] = results[0]; 
-            setRouletteItems(fakeCards);
-            setIsRouletteSpinning(true);
-            setOpeningPackId(null);
-            setTimeout(() => {
-                setIsRouletteSpinning(false); setPulledCards(results); setIsProcessing(false);
-            }, 5000); 
-        } else {
-            setOpeningPackId(null); setPulledCards(results); setIsProcessing(false);
-        }
-      } catch (err) {
-        console.error(err); showToast(`Помилка: ${err.message}`);
-        setOpeningPackId(null); setIsProcessing(false);
-      }
-    }, amountToOpen === 1 ? 100 : 1500);
+            for (const card of results) {
+              if (Number(card.maxSupply) > 0) {
+                batch.set(doc(db, "artifacts", GAME_ID, "public", "data", "cardStats", card.id), { pulledCount: increment(1) }, { merge: true });
+              }
+            }
+
+            for (const [cardId, count] of Object.entries(countsMap)) {
+              batch.set(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: increment(count) }, { merge: true });
+            }
+
+            await batch.commit();
+
+            if (amountToOpen === 1) {
+                const availablePackCards = tempCatalog.filter((c) => c.packId === packId);
+                const fakeCards = Array.from({length: 45}, () => availablePackCards[Math.floor(Math.random() * availablePackCards.length)]);
+                fakeCards[35] = results[0]; 
+                setRouletteItems(fakeCards);
+                setIsRouletteSpinning(true);
+                setOpeningPackId(null);
+                setTimeout(() => {
+                    setIsRouletteSpinning(false); setPulledCards(results); 
+                    actionLock.current = false; setIsProcessing(false);
+                }, 5000); 
+            } else {
+                setOpeningPackId(null); setPulledCards(results); 
+                actionLock.current = false; setIsProcessing(false);
+            }
+          } catch (err) {
+            console.error(err); showToast(`Помилка: ${err.message}`);
+            setOpeningPackId(null); actionLock.current = false; setIsProcessing(false);
+          }
+        }, amountToOpen === 1 ? 100 : 1500);
+    } catch(e) {
+        actionLock.current = false; setIsProcessing(false);
+    }
   };
 
   const sellPulledCards = async () => {
-      if (isProcessing || pulledCards.length === 0) return;
-      setIsProcessing(true);
+      if (actionLock.current || pulledCards.length === 0) return;
+      actionLock.current = true; setIsProcessing(true);
+      
+      // МИТТЄВЕ ОЧИЩЕННЯ: Автоклікер не зможе натиснути ще раз на ту саму карту!
+      const cardsToSell = [...pulledCards];
+      setPulledCards([]);
+
       let totalEarned = 0;
-      let totalCardsRemoved = pulledCards.length;
+      let totalCardsRemoved = cardsToSell.length;
       const countsMap = {};
       
-      pulledCards.forEach(c => {
+      cardsToSell.forEach(c => {
          countsMap[c.id] = (countsMap[c.id] || 0) + 1;
          totalEarned += (c.sellPrice ? Number(c.sellPrice) : SELL_PRICE);
       });
@@ -570,83 +522,90 @@ export default function App() {
         });
         await batch.commit();
         showToast(`Успішно продано всі отримані картки! Отримано ${totalEarned} монет.`, "success");
-        setPulledCards([]);
-      } catch(e) { showToast("Помилка продажу карток."); } 
-      finally { setIsProcessing(false); }
+      } catch(e) { 
+        showToast("Помилка продажу карток."); 
+        setPulledCards(cardsToSell); // Повертаємо назад у разі помилки інтернету
+      } 
+      finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellDuplicate = async (cardId) => {
-    if (isProcessing) return;
-    const existing = dbInventory.find((i) => i.id === cardId);
-    if (!existing || existing.amount <= 1) return;
-    setIsProcessing(true);
-    const cardDef = cardsCatalog.find(c => c.id === cardId);
-    const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
 
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: increment(-1) });
-      batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { coins: increment(cardPrice), totalCards: increment(-1) });
-      await batch.commit();
-      showToast(`Продано за ${cardPrice} монет!`, "success");
+        const existing = dbInventory.find((i) => i.id === cardId);
+        if (!existing || existing.amount <= 1) return;
+        
+        const cardDef = cardsCatalog.find(c => c.id === cardId);
+        const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
+
+        const batch = writeBatch(db);
+        batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: increment(-1) });
+        batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { coins: increment(cardPrice), totalCards: increment(-1) });
+        await batch.commit();
+        showToast(`Продано за ${cardPrice} монет!`, "success");
     } catch (e) { showToast("Помилка під час продажу."); } 
-    finally { setIsProcessing(false); }
+    finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellAllDuplicates = async (cardId) => {
-    if (isProcessing) return;
-    const existing = dbInventory.find((i) => i.id === cardId);
-    if (!existing || existing.amount <= 1) return;
-    setIsProcessing(true);
-    const cardDef = cardsCatalog.find(c => c.id === cardId);
-    const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
-    const sellCount = existing.amount - 1;
-    const earnedCoins = sellCount * cardPrice;
-
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
+    
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: 1 });
-      batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { coins: increment(earnedCoins), totalCards: increment(-sellCount) });
-      await batch.commit();
-      showToast(`Продано ${sellCount} шт. за ${earnedCoins} монет!`, "success");
+        const existing = dbInventory.find((i) => i.id === cardId);
+        if (!existing || existing.amount <= 1) return;
+        
+        const cardDef = cardsCatalog.find(c => c.id === cardId);
+        const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
+        const sellCount = existing.amount - 1;
+        const earnedCoins = sellCount * cardPrice;
+
+        const batch = writeBatch(db);
+        batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", cardId), { amount: 1 });
+        batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { coins: increment(earnedCoins), totalCards: increment(-sellCount) });
+        await batch.commit();
+        showToast(`Продано ${sellCount} шт. за ${earnedCoins} монет!`, "success");
     } catch (e) { showToast("Помилка під час масового продажу."); } 
-    finally { setIsProcessing(false); }
+    finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellEveryDuplicate = async (specificInventory = null) => {
-    if (isProcessing) return;
-    const baseList = specificInventory || dbInventory.map(item => {
-        const cardData = cardsCatalog.find((c) => c.id === item.id);
-        return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
-    }).filter(Boolean);
-
-    const duplicates = baseList.filter(item => item.amount > 1);
-    if (duplicates.length === 0) return showToast("У вибраному списку немає дублікатів для продажу!", "error");
-
-    setIsProcessing(true);
-    let totalEarned = 0; let totalCardsRemoved = 0;
-    const batch = writeBatch(db);
-
-    duplicates.forEach(item => {
-      const idToUpdate = item.card?.id || item.id;
-      const cardDef = cardsCatalog.find(c => c.id === idToUpdate);
-      const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
-      const sellCount = item.amount - 1;
-
-      totalEarned += sellCount * cardPrice;
-      totalCardsRemoved += sellCount;
-      batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", idToUpdate), { amount: 1 });
-    });
-
-    batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { 
-      coins: increment(totalEarned), totalCards: increment(-totalCardsRemoved)
-    });
-
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
+    
     try {
-      await batch.commit();
-      showToast(`Продано всі дублікати! Отримано ${totalEarned} монет.`, "success");
+        const baseList = specificInventory || dbInventory.map(item => {
+            const cardData = cardsCatalog.find((c) => c.id === item.id);
+            return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
+        }).filter(Boolean);
+
+        const duplicates = baseList.filter(item => item.amount > 1);
+        if (duplicates.length === 0) { showToast("Немає дублікатів для продажу!", "error"); return; }
+
+        let totalEarned = 0; let totalCardsRemoved = 0;
+        const batch = writeBatch(db);
+
+        duplicates.forEach(item => {
+          const idToUpdate = item.card?.id || item.id;
+          const cardDef = cardsCatalog.find(c => c.id === idToUpdate);
+          const cardPrice = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
+          const sellCount = item.amount - 1;
+
+          totalEarned += sellCount * cardPrice;
+          totalCardsRemoved += sellCount;
+          batch.update(doc(db, "artifacts", GAME_ID, "users", user.uid, "inventory", idToUpdate), { amount: 1 });
+        });
+
+        batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { 
+          coins: increment(totalEarned), totalCards: increment(-totalCardsRemoved)
+        });
+
+        await batch.commit();
+        showToast(`Продано всі дублікати! Отримано ${totalEarned} монет.`, "success");
     } catch (e) { showToast("Помилка під час масового продажу інвентарю."); } 
-    finally { setIsProcessing(false); }
+    finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   // --- ЛОГІКА ВІТРИН ---

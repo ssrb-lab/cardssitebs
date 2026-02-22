@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { doc, updateDoc, increment, getDoc, collection, writeBatch } from "firebase/firestore";
 import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords } from "lucide-react";
 import { formatDate, getCardStyle } from "../utils/helpers";
@@ -8,6 +8,9 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
     const [avatarInput, setAvatarInput] = useState("");
     const [promoInput, setPromoInput] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+    
+    // БРОНЬОВАНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ
+    const actionLock = useRef(false);
     
     const mainShowcase = showcases?.find(s => s.id === profile?.mainShowcaseId);
     
@@ -24,9 +27,28 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
     }
 
     const claimDaily = async () => {
-        if (isProcessing || !canClaimDaily) return;
+        if (actionLock.current || isProcessing || !canClaimDaily) return;
+        
+        actionLock.current = true;
         setIsProcessing(true);
         try {
+            let serverDate = new Date();
+            try {
+                const timeRes = await fetch("https://worldtimeapi.org/api/timezone/Etc/UTC");
+                if (timeRes.ok) {
+                    const timeData = await timeRes.json();
+                    serverDate = new Date(timeData.utc_datetime);
+                }
+            } catch (e) { /* Fallback */ }
+
+            if (profile.lastDailyClaim) {
+                const last = new Date(profile.lastDailyClaim);
+                if (last.getDate() === serverDate.getDate() && last.getMonth() === serverDate.getMonth() && last.getFullYear() === serverDate.getFullYear()) {
+                    showToast("Ви вже забирали нагороду сьогодні.", "error");
+                    return;
+                }
+            }
+
             const streak = profile.dailyStreak || 0;
             const rewardsArr = isPremiumActive ? premiumDailyRewards : dailyRewards;
             const dayIndex = streak % rewardsArr.length;
@@ -35,7 +57,7 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
             const newStreak = streak + 1;
             await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", user.uid), {
                 coins: increment(reward),
-                lastDailyClaim: new Date().toISOString(),
+                lastDailyClaim: serverDate.toISOString(),
                 dailyStreak: newStreak
             });
             showToast(`Мій лорд, Ви отримали щоденну нагороду: ${reward} монет!`, "success");
@@ -43,13 +65,16 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
             console.error(e);
             showToast("Помилка отримання нагороди");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
 
     const handleAvatarUpdate = async (e) => {
         e.preventDefault();
-        if (isProcessing) return;
+        if (actionLock.current || isProcessing) return;
+        
+        actionLock.current = true;
         setIsProcessing(true);
         try {
             await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", user.uid), {
@@ -61,21 +86,24 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
             console.error(e);
             showToast("Помилка оновлення аватару");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
 
     const redeemPromo = async (e) => {
         e.preventDefault();
-        if (isProcessing || !promoInput.trim()) return;
+        if (actionLock.current || isProcessing || !promoInput.trim()) return;
+        
+        actionLock.current = true;
         setIsProcessing(true);
         const codeId = promoInput.trim().toUpperCase();
+        
         try {
             const promoRef = doc(db, "artifacts", appId, "public", "data", "promoCodes", codeId);
             const promoSnap = await getDoc(promoRef);
             if (!promoSnap.exists()) {
                 showToast("Промокод не знайдено!", "error");
-                setIsProcessing(false);
                 return;
             }
             const promoData = promoSnap.data();
@@ -85,13 +113,11 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
             const userUsesCount = userUseDoc.exists() ? userUseDoc.data().count : 0;
 
             if (promoData.maxGlobalUses > 0 && promoData.currentGlobalUses >= promoData.maxGlobalUses) {
-                showToast("Ліміт використання промокоду на сервері вичерпано!", "error");
-                setIsProcessing(false);
+                showToast("Ліміт використання промокоду вичерпано!", "error");
                 return;
             }
             if (promoData.maxUserUses > 0 && userUsesCount >= promoData.maxUserUses) {
                 showToast("Ви вже використали цей промокод максимальну кількість разів!", "error");
-                setIsProcessing(false);
                 return;
             }
 
@@ -102,12 +128,13 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
                 coins: increment(promoData.reward)
             });
             await batch.commit();
-            showToast(`Промокод успішно застосовано! Отримано: ${promoData.reward} монет`, "success");
+            showToast(`Промокод застосовано! Отримано: ${promoData.reward} монет`, "success");
             setPromoInput("");
         } catch (e) {
             console.error(e);
             showToast("Помилка застосування промокоду");
         } finally {
+            actionLock.current = false;
             setIsProcessing(false);
         }
     };
@@ -195,7 +222,6 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                {/* Щоденна нагорода */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
                     <div className="absolute -right-6 -bottom-6 opacity-5 group-hover:opacity-10 transition-opacity">
                         <Gift size={120} />
@@ -215,7 +241,6 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
                     </button>
                 </div>
 
-                {/* Промокоди */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
                     <div className="absolute -right-6 -bottom-6 opacity-5 group-hover:opacity-10 transition-opacity">
                         <Ticket size={120} />
@@ -236,7 +261,6 @@ export default function ProfileView({ profile, user, db, appId, handleLogout, sh
                     </form>
                 </div>
 
-                {/* Налаштування профілю */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group md:col-span-2">
                     <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Settings className="text-blue-500" /> Налаштування</h3>
                     <div className="flex flex-col sm:flex-row gap-6 mt-4">
