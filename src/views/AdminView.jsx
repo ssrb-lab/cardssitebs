@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Users, Layers, LayoutGrid, Ticket, Settings, ScrollText, Bug, Edit2, 
   Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
-  Eye, CheckCircle2, CalendarDays, Gift // <-- Додано пропущені іконки!
+  Eye, CheckCircle2, CalendarDays, Gift, Zap // <-- ДОДАНО ZAP (БЛИСКАВКА)
 } from "lucide-react";
 import { collection, onSnapshot, updateDoc, doc, deleteDoc, writeBatch, getDocs, query, where, increment, setDoc } from "firebase/firestore";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
@@ -329,6 +329,24 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
     } catch (e) {
       console.error(e);
       showToast("Помилка встановлення балансу.", "error");
+    }
+  };
+
+  // --- НОВА ФУНКЦІЯ: СКИНУТИ КД ГРАВЦЮ ---
+  const resetPlayerCooldown = async (targetUid, targetNickname) => {
+    if (!window.confirm(`Мій лорд, ви точно хочете скинути таймер боса для гравця ${targetNickname}?`)) return;
+    
+    try {
+        const farmRef = doc(db, "artifacts", appId, "users", targetUid, "farmState", "main");
+        await setDoc(farmRef, { 
+            cooldownUntil: null 
+        }, { merge: true });
+        
+        showToast(`Кулдаун гравця ${targetNickname} успішно скинуто!`, "success");
+        if (addSystemLog) addSystemLog("Адмін", `Скинуто КД боса для гравця ${targetNickname}`);
+    } catch (e) {
+        console.error(e);
+        showToast("Помилка скидання КД гравцю.", "error");
     }
   };
 
@@ -779,9 +797,15 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
                         <label className="text-xs text-neutral-400 font-bold mb-1 block">Рівень Босів (Фарм):</label>
                         <input type="number" min="1" value={adminSetFarmLevel} onChange={(e) => setAdminSetFarmLevel(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-red-500" />
                     </div>
-                    <button onClick={setPlayerFarmLevel} className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg w-full transition-colors h-10">
-                        Встановити рівень
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={setPlayerFarmLevel} className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg flex-1 transition-colors h-10">
+                            Встановити рівень
+                        </button>
+                        {/* КНОПКА СКИНУТИ КД (В ДЕТАЛЬНОМУ ПРОФІЛІ) */}
+                        <button onClick={() => resetPlayerCooldown(viewingUser.uid, viewingUser.nickname)} className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg transition-colors h-10" title="Скинути таймер боса">
+                            <Zap size={20} className="mx-auto" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
@@ -881,6 +905,11 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
                                 {u.isAdmin ? "- Адмінку" : "+ Адмінку"}
                              </button>
                           )}
+
+                          {/* КНОПКА СКИНУТИ КД (У СПИСКУ ГРАВЦІВ) */}
+                          <button onClick={() => resetPlayerCooldown(u.uid, u.nickname)} className="p-2 bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900 rounded-lg transition-colors" title="Скинути таймер арени">
+                            <Zap size={18} />
+                          </button>
 
                           <button onClick={() => handleInspectUser(u.uid)} className="p-2 bg-blue-900/40 text-blue-400 hover:bg-blue-900 rounded-lg transition-colors" title="Управління гравцем (Інвентар)">
                             <Eye size={18} />
