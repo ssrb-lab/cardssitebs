@@ -647,6 +647,40 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
         return wA - wB; 
     });
     
+    // --- ДОДАТИ ЦЮ ФУНКЦІЮ ПЕРЕД return ( ---
+  const calculateDropChance = (targetCard, packInfo) => {
+    if (!packInfo) return "0%";
+
+    // Знаходимо всі картки, що належать до цього ж паку
+    const cardsInThisPack = cardsCatalog.filter(c => c.packId === packInfo.id);
+    if (cardsInThisPack.length === 0) return "0%";
+
+    let totalWeight = 0;
+    let targetWeight = 0;
+
+    // Розраховуємо загальну вагу паку за тими ж правилами, що й при відкритті
+    for (const c of cardsInThisPack) {
+        let w = 1;
+        const globalRObj = rarities.find(r => r.name === c.rarity);
+        
+        // 1. Індивідуальна вага картки
+        if (c.weight !== undefined && c.weight !== "") w = Number(c.weight);
+        // 2. Або кастомна вага рідкості в цьому паку
+        else if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== "") w = Number(packInfo.customWeights[c.rarity]);
+        // 3. Або глобальна базова вага рідкості
+        else if (globalRObj) w = Number(globalRObj.weight);
+        
+        totalWeight += w;
+        if (c.id === targetCard.id) targetWeight = w;
+    }
+
+    if (totalWeight === 0) return "0%";
+    
+    // Розраховуємо відсоток
+    const chance = (targetWeight / totalWeight) * 100;
+    return chance < 0.01 ? "<0.01%" : chance.toFixed(2) + "%";
+  };
+
   const filteredAdminUsers = allUsers.filter(u => u.nickname?.toLowerCase().includes(adminUserSearchTerm.toLowerCase()));
 
   return (
@@ -1365,8 +1399,13 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
               const style = getCardStyle(card.rarity, rarities);
               const effectClass = card.effect ? `effect-${card.effect}` : '';
               
-              return (
+              // РОЗРАХОВУЄМО ШАНС ДЛЯ КОЖНОЇ КАРТКИ
+              const dropChance = calculateDropChance(card, packInfo);
+              
+return (
                 <div key={card.id} className={`bg-neutral-900 rounded-xl overflow-hidden border-2 ${style.border} group relative flex flex-col`}>
+                  
+                  {/* ВЕРХНЯ ЧАСТИНА (Картинка та кнопки) */}
                   <div className={`aspect-[2/3] w-full relative shrink-0 ${effectClass}`}>
                     <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
                     {card.maxSupply > 0 && (
@@ -1383,15 +1422,40 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
                       </button>
                     </div>
                   </div>
+                  
+                  {/* НИЖНЯ ЧАСТИНА (Текст, відсотки, ціна, ефект) */}
                   <div className="p-2 text-center flex flex-col items-center flex-1 justify-between">
                     <div className="w-full">
-                        <div className={`text-[10px] font-black uppercase ${style.text}`}>{card.rarity}</div>
+                        {/* 1. Рідкість та Шанс */}
+                        <div className={`text-[10px] font-black uppercase ${style.text} flex justify-between px-1 mb-0.5`}>
+                            <span>{card.rarity}</span>
+                            <span className="text-white bg-black/40 px-1 rounded" title="Шанс випадіння з паку">
+                                {dropChance}
+                            </span>
+                        </div>
+                        
+                        {/* 2. Назва картки */}
                         <div className="font-bold text-xs truncate mb-1 text-white w-full">{card.name}</div>
+                        
+                        {/* 3. Ціна та Ефект */}
+                        <div className="flex justify-between items-center w-full px-1 mb-1">
+                            <span className="text-[10px] text-green-400 font-bold flex items-center gap-0.5" title="Ціна продажу">
+                                {card.sellPrice || 15} <Coins size={10} />
+                            </span>
+                            {card.effect && (
+                                <span className="text-[8px] text-purple-400 bg-purple-900/40 px-1 rounded border border-purple-800/50 uppercase tracking-wider" title="Візуальний ефект">
+                                    {card.effect}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* 4. Назва паку */}
                         <div className="text-[9px] text-neutral-500 truncate bg-neutral-950 rounded py-0.5 px-1 inline-block w-full">
-                        {packInfo ? packInfo.name : "Без паку!"}
+                            {packInfo ? packInfo.name : "Без паку!"}
                         </div>
                     </div>
                   </div>
+
                 </div>
               );
             })}
