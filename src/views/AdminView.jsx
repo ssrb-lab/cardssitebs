@@ -72,7 +72,7 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
       return () => unsub();
     }
     
-    if (activeTab === "promos" && currentProfile.isSuperAdmin) {
+    if (activeTab === "promos" && currentProfile.isAdmin) {
       const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "promoCodes"), (snap) => {
           const pList = [];
           snap.forEach(d => pList.push({ id: d.id, ...d.data() }));
@@ -81,7 +81,7 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
       return () => unsub();
     }
 
-    if (activeTab === "logs" && currentProfile.isSuperAdmin) {
+    if (activeTab === "logs" && currentProfile.isAdmin) {
       const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "adminLogs"), (snap) => {
           const lList = [];
           snap.forEach(d => lList.push({ id: d.id, ...d.data() }));
