@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  uid                  String   @id @default(uuid())
+  nickname             String   @unique
+  email                String   @unique
+  passwordHash         String
+  coins                Int      @default(200)
+  totalCards           Int      @default(0)
+  uniqueCardsCount     Int      @default(0)
+  packsOpened          Int      @default(0)
+  coinsSpentOnPacks    Int      @default(0)
+  coinsEarnedFromPacks Int      @default(0)
+  lastDailyClaim       DateTime?
+  dailyStreak          Int      @default(0)
+  createdAt            DateTime @default(now())
+  isAdmin              Boolean  @default(false)
+  isSuperAdmin         Boolean  @default(false)
+  isBanned             Boolean  @default(false)
+  banReason            String?
+  banUntil             DateTime?
+  isPremium            Boolean  @default(false)
+  premiumUntil         DateTime?
+  avatarUrl            String?  @db.Text
+  mainShowcaseId       String?
+  lastIp               String?
+  autoSoundEnabled     Boolean  @default(true)
+  farmLevel            Int      @default(1)
+
+  inventory      InventoryItem[]
+  marketListings MarketListing[]
+  showcases      Showcase[]
+  farmState      FarmState?
+}
+
+model CardCatalog {
+  id          String   @id @default(uuid())
+  packId      String
+  name        String
+  rarity      String
+  image       String   @db.Text
+  maxSupply   Int      @default(0)
+  pulledCount Int      @default(0)
+  sellPrice   Int      @default(15)
+  effect      String?
+  dropAnim    String?
+  soundUrl    String?  @db.Text
+  soundVolume Float    @default(0.5)
+  weight      Float?
+
+  inventoryItems InventoryItem[]
+  marketListings MarketListing[]
+}
+
+model PackCatalog {
+  id            String  @id @default(uuid())
+  name          String
+  category      String  @default("Базові")
+  cost          Int     @default(50)
+  image         String  @db.Text
+  isHidden      Boolean @default(false)
+  isPremiumOnly Boolean @default(false)
+  customWeights Json?   
+}
+
+model InventoryItem {
+  id     String @id @default(uuid())
+  amount Int    @default(1)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [uid], onDelete: Cascade)
+  
+  cardId String
+  card   CardCatalog @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+}
+
+model MarketListing {
+  id        String   @id @default(uuid())
+  price     Int
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  soldAt    DateTime?
+
+  sellerId  String
+  seller    User     @relation(fields: [sellerId], references: [uid], onDelete: Cascade)
+  
+  cardId    String
+  card      CardCatalog @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model Showcase {
+  id        String   @id @default(uuid())
+  name      String
+  cardIds   Json
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [uid], onDelete: Cascade)
+}
+
+model FarmState {
+  id            String    @id @default(uuid())
+  bossId        String?
+  currentHp     Int?
+  cooldownUntil DateTime?
+  lastUpdated   DateTime  @default(now())
+
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [uid], onDelete: Cascade)
+}
+
+model GameSettings {
+  id   String @id @default("main")
+  data Json   @default("{}")
+}
+
+model PromoCode {
+  code              String @id
+  reward            Int
+  maxGlobalUses     Int
+  maxUserUses       Int
+  currentGlobalUses Int    @default(0)
+  usedBy            Json   @default("[]")
+}

@@ -1,106 +1,49 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull } from "lucide-react";
-import { doc, getDoc, setDoc, increment, runTransaction } from "firebase/firestore";
-import { getGlobalTime } from "../utils/helpers";
+import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken } from "../config/api";
 
-// 🏆 ГЛОБАЛЬНИЙ КЕШ
-let globalFarmCache = {
-    uid: null,
-    bossId: null,
-    hp: null,
-    cooldownEnd: null,
-    isLoaded: false
-};
-
-export default function FarmView({ profile, db, appId, cardsCatalog, showToast, bosses }) {
+export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
     const playerLevel = profile?.farmLevel || 1;
 
     const sortedBosses = [...(bosses || [])].sort((a, b) => a.level - b.level);
     const maxBossLevel = sortedBosses.length > 0 ? sortedBosses[sortedBosses.length - 1].level : 1;
 
     let currentBoss = sortedBosses.find(b => b.level === playerLevel);
-    if (!currentBoss && sortedBosses.length > 0) {
-        currentBoss = sortedBosses[sortedBosses.length - 1]; 
-    }
+    if (!currentBoss && sortedBosses.length > 0) currentBoss = sortedBosses[sortedBosses.length - 1]; 
 
     let bossCard = currentBoss ? cardsCatalog.find(c => c.id === currentBoss.cardId) : null;
     if (!bossCard && cardsCatalog && cardsCatalog.length > 0) bossCard = cardsCatalog[0];
 
-    const isCacheValid = globalFarmCache.isLoaded && globalFarmCache.uid === profile?.uid && globalFarmCache.bossId === currentBoss?.id;
-
-    const [hp, setHp] = useState(isCacheValid && globalFarmCache.hp !== null ? globalFarmCache.hp : (currentBoss?.maxHp || 1000));
-    const [cooldownEnd, setCooldownEnd] = useState(isCacheValid ? globalFarmCache.cooldownEnd : null);
+    const [hp, setHp] = useState(currentBoss?.maxHp || 1000);
+    const [cooldownEnd, setCooldownEnd] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isLoading, setIsLoading] = useState(!isCacheValid);
+    const [isLoading, setIsLoading] = useState(true);
     const [isHit, setIsHit] = useState(false);
     const [timeLeft, setTimeLeft] = useState("");
     
     const actionLock = useRef(false);
-    const saveTimerRef = useRef(null);
-    const hpRef = useRef(hp);
+    const accumulatedDamage = useRef(0);
 
+    // Завантаження стану з MySQL
     useEffect(() => {
-        hpRef.current = hp;
-        globalFarmCache.hp = hp;
-    }, [hp]);
-
-    useEffect(() => {
-        if (isCacheValid) {
-            setIsLoading(false);
-            return;
-        }
-        
-        const fetchFarmState = async () => {
+        const loadState = async () => {
             if (!profile || !currentBoss) return setIsLoading(false);
-            setIsLoading(true);
-
             try {
-                const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-                const snap = await getDoc(farmRef);
-                
-                if (snap.exists()) {
-                    const data = snap.data();
-                    if (data.cooldownUntil && new Date(data.cooldownUntil) > new Date()) {
-                        setCooldownEnd(data.cooldownUntil);
-                        setHp(0);
-                        globalFarmCache.cooldownEnd = data.cooldownUntil;
-                        globalFarmCache.hp = 0;
-                        localStorage.removeItem(`farm_${profile.uid}_${currentBoss.id}`);
-                    } else {
-                        setCooldownEnd(null);
-                        globalFarmCache.cooldownEnd = null;
-                        
-                        let dbHp = currentBoss.maxHp;
-                        if (data.bossId === currentBoss.id && data.currentHp !== undefined && data.currentHp !== null) {
-                            dbHp = data.currentHp;
-                        }
-                        
-                        const localHpRaw = localStorage.getItem(`farm_${profile.uid}_${currentBoss.id}`);
-                        if (localHpRaw !== null) {
-                            const localHp = parseInt(localHpRaw, 10);
-                            if (!isNaN(localHp) && localHp < dbHp && localHp >= 0) {
-                                dbHp = localHp; 
-                                setDoc(farmRef, { bossId: currentBoss.id, currentHp: dbHp, lastUpdated: new Date().toISOString() }, { merge: true }).catch(()=>{});
-                            }
-                        }
-
-                        setHp(dbHp);
-                        globalFarmCache.hp = dbHp;
-                    }
+                const data = await fetchFarmState(getToken());
+                if (data.cooldownUntil && new Date(data.cooldownUntil) > new Date()) {
+                    setCooldownEnd(data.cooldownUntil);
+                    setHp(0);
                 } else {
-                    setHp(currentBoss.maxHp);
-                    globalFarmCache.hp = currentBoss.maxHp;
+                    setCooldownEnd(null);
+                    setHp(data.bossId === currentBoss.id && data.currentHp !== undefined ? data.currentHp : currentBoss.maxHp);
                 }
-            } catch (e) { console.error(e); }
-            
-            globalFarmCache.bossId = currentBoss.id;
-            globalFarmCache.uid = profile.uid;
-            globalFarmCache.isLoaded = true;
+            } catch (e) { console.error("Помилка завантаження стану боса"); }
             setIsLoading(false);
         };
-        fetchFarmState();
-    }, [currentBoss?.id, playerLevel, profile?.uid, appId, db, isCacheValid]);
+        loadState();
+    }, [currentBoss?.id, profile?.uid]);
 
+    // Таймер кулдауну
     useEffect(() => {
         if (!cooldownEnd) return;
         const updateTimer = () => {
@@ -108,8 +51,6 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
             if (distance <= 0) {
                 setCooldownEnd(null);
                 setHp(currentBoss?.maxHp || 1000);
-                globalFarmCache.cooldownEnd = null;
-                globalFarmCache.hp = currentBoss?.maxHp || 1000;
             } else {
                 const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
@@ -122,152 +63,84 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
         return () => clearInterval(interval);
     }, [cooldownEnd, currentBoss?.maxHp]);
 
+    // Фонова синхронізація накопиченого урону раз на секунду
     useEffect(() => {
-        return () => {
-            if (saveTimerRef.current) {
-                clearTimeout(saveTimerRef.current);
-                if (hpRef.current > 0 && hpRef.current < (currentBoss?.maxHp || 1000) && profile && currentBoss) {
-                    const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-                    setDoc(farmRef, { bossId: currentBoss.id, currentHp: hpRef.current, lastUpdated: new Date().toISOString() }, { merge: true }).catch(() => {});
+        const syncTimer = setInterval(async () => {
+            if (accumulatedDamage.current > 0 && currentBoss && hp >= 0) {
+                const dmgToSync = accumulatedDamage.current;
+                accumulatedDamage.current = 0; // Очищаємо локальний лічильник
+                try {
+                    await syncFarmHitRequest(getToken(), currentBoss.id, dmgToSync, currentBoss.maxHp);
+                } catch(e) {
+                    accumulatedDamage.current += dmgToSync; // Якщо помилка - повертаємо урон в чергу
                 }
             }
-        };
-    }, [db, appId, profile, currentBoss]);
+        }, 1000);
+        return () => clearInterval(syncTimer);
+    }, [currentBoss, hp]);
 
     // --- ПАНЕЛЬ АДМІНІСТРАТОРА ---
-    
-    // 1. Миттєве вбивство
-    const adminInstaKill = () => {
+    const adminInstaKill = async () => {
         if (!profile?.isAdmin || hp <= 0 || isProcessing) return;
-        setHp(0);
-        globalFarmCache.hp = 0;
-        localStorage.setItem(`farm_${profile.uid}_${currentBoss.id}`, 0);
+        setHp(0); accumulatedDamage.current = 0;
+        await syncFarmHitRequest(getToken(), currentBoss.id, currentBoss.maxHp, currentBoss.maxHp);
         showToast("АДМІН: Боса миттєво знищено!", "success");
     };
 
-    // 2. Миттєве скидання власного КД
     const adminResetCD = async () => {
         if (!profile?.isAdmin || !cooldownEnd || isProcessing) return;
         setIsProcessing(true);
         try {
-            const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-            await setDoc(farmRef, { 
-                cooldownUntil: null, 
-                currentHp: currentBoss.maxHp, 
-                lastUpdated: new Date().toISOString() 
-            }, { merge: true });
-            
-            setCooldownEnd(null);
-            globalFarmCache.cooldownEnd = null;
-            setHp(currentBoss.maxHp);
-            globalFarmCache.hp = currentBoss.maxHp;
+            await adminResetCdRequest(getToken(), profile.uid, currentBoss.maxHp);
+            setCooldownEnd(null); setHp(currentBoss.maxHp); accumulatedDamage.current = 0;
             showToast("АДМІН: Кулдаун скинуто!", "success");
-        } catch (e) {
-            showToast("Помилка скидання КД.", "error");
-        } finally {
-            setIsProcessing(false);
-        }
+        } catch (e) { showToast("Помилка скидання КД.", "error"); } 
+        finally { setIsProcessing(false); }
     };
     // ----------------------------
 
     const handleHit = () => {
         if (hp <= 0 || cooldownEnd || isProcessing || actionLock.current) return; 
-        
-        setIsHit(true);
-        setTimeout(() => setIsHit(false), 100);
+        setIsHit(true); setTimeout(() => setIsHit(false), 100);
 
         const dmg = currentBoss?.damagePerClick || 10;
-        const newHp = Math.max(0, hp - dmg);
-        
-        setHp(newHp);
-        globalFarmCache.hp = newHp;
-        localStorage.setItem(`farm_${profile.uid}_${currentBoss.id}`, newHp);
+        setHp(prev => Math.max(0, prev - dmg));
+        accumulatedDamage.current += dmg; // Накопичуємо урон для фонової відправки
 
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = setTimeout(() => {
-            if (newHp > 0) {
-                const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-                setDoc(farmRef, { bossId: currentBoss.id, currentHp: newHp, lastUpdated: new Date().toISOString() }, { merge: true }).catch(() => {});
-            }
-        }, 1000); 
-
-        if (newHp === 0) {
+        if (hp - dmg <= 0) {
             showToast(`БОСА ЗНИЩЕНО! Заберіть свій скарб!`, "success");
         }
     };
 
-    // 🛡️ АБСОЛЮТНО БЕЗПЕЧНА ТРАНЗАКЦІЯ З СЕРВЕРНИМ ЧАСОМ
     const claimRewards = async () => {
         if (actionLock.current || hp > 0 || isProcessing || !profile) return;
-        
-        actionLock.current = true;
-        setIsProcessing(true);
-
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-
-// ⏱️ 1. ОТРИМУЄМО РЕАЛЬНИЙ ЧАС ІЗ НЕЗАЛЕЖНОГО СЕРВЕРА
-        let trueNow = await getGlobalTime();
+        actionLock.current = true; setIsProcessing(true);
 
         try {
-            await runTransaction(db, async (t) => {
-                const farmRef = doc(db, "artifacts", appId, "users", profile.uid, "farmState", "main");
-                const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", profile.uid);
+            // Примусово синхронізуємо залишки урону перед отриманням
+            if (accumulatedDamage.current > 0) {
+                await syncFarmHitRequest(getToken(), currentBoss.id, accumulatedDamage.current, currentBoss.maxHp);
+                accumulatedDamage.current = 0;
+            }
 
-                const farmSnap = await t.get(farmRef);
-                const farmData = farmSnap.exists() ? farmSnap.data() : {};
+            const maxHitsAllowed = Math.ceil(currentBoss.maxHp / (currentBoss.damagePerClick || 10));
+            const totalReward = (maxHitsAllowed * (currentBoss.rewardPerClick || 2)) + (currentBoss.killBonus || 0);
+            const isLevelUp = playerLevel < maxBossLevel;
+            const cdHours = currentBoss.cooldownHours || 4;
 
-                // 2. ПЕРЕВІРКА КУЛДАУНУ ЗА РЕАЛЬНИМ ЧАСОМ (trueNow)
-                if (farmData.cooldownUntil && new Date(farmData.cooldownUntil) > trueNow) {
-                    throw new Error("Нагороду вже забрано!");
-                }
-
-                const maxHitsAllowed = Math.ceil(currentBoss.maxHp / (currentBoss.damagePerClick || 10));
-                const totalReward = (maxHitsAllowed * (currentBoss.rewardPerClick || 2)) + (currentBoss.killBonus || 0);
-
-                const isLevelUp = playerLevel < maxBossLevel;
-                t.update(profileRef, {
-                    coins: increment(totalReward),
-                    farmLevel: isLevelUp ? increment(1) : playerLevel
-                });
-
-                const cdHours = currentBoss.cooldownHours || 4;
-                // 3. РОЗРАХОВУЄМО НАСТУПНИЙ КУЛДАУН ТЕЖ ВІД РЕАЛЬНОГО ЧАСУ
-                const cdUntil = new Date(trueNow.getTime() + cdHours * 60 * 60 * 1000).toISOString();
-
-                t.set(farmRef, {
-                    bossId: currentBoss.id,
-                    currentHp: currentBoss.maxHp, 
-                    cooldownUntil: cdUntil,
-                    lastUpdated: trueNow.toISOString()
-                }, { merge: true });
-
-                return { totalReward, isLevelUp, cdUntil };
-            }).then((result) => {
-                setCooldownEnd(result.cdUntil);
-                globalFarmCache.cooldownEnd = result.cdUntil;
-                globalFarmCache.hp = 0;
-                localStorage.removeItem(`farm_${profile.uid}_${currentBoss.id}`);
-
-                if (result.isLevelUp) {
-                    showToast(`Чудово! Рівень підвищено. Отримано: ${result.totalReward} монет!`, "success");
-                } else {
-                    showToast(`Скарб забрано! Отримано: ${result.totalReward} монет!`, "success");
-                }
-            });
+            const data = await claimFarmRewardRequest(getToken(), currentBoss.id, totalReward, isLevelUp, cdHours, currentBoss.maxHp);
+            
+            if (setProfile) setProfile(data.profile); // Оновлюємо монети гравця на екрані
+            setCooldownEnd(data.cdUntil);
+            setHp(0);
+            
+            if (isLevelUp) showToast(`Чудово! Рівень підвищено. Отримано: ${totalReward} монет!`, "success");
+            else showToast(`Скарб забрано! Отримано: ${totalReward} монет!`, "success");
 
         } catch (error) { 
-            console.error("Transaction Error:", error);
-            showToast("Ви вже забрали цей скарб або кулдаун ще не минув!", "error"); 
-            if (error.message === "Нагороду вже забрано!") {
-                const cdHours = currentBoss.cooldownHours || 4;
-                const cdTime = new Date(trueNow.getTime() + cdHours * 60 * 60 * 1000).toISOString();
-                setCooldownEnd(cdTime);
-                globalFarmCache.cooldownEnd = cdTime;
-                localStorage.removeItem(`farm_${profile.uid}_${currentBoss.id}`);
-            }
+            showToast(error.message || "Помилка отримання нагороди!", "error"); 
         } finally {
-            actionLock.current = false; 
-            setIsProcessing(false);
+            actionLock.current = false; setIsProcessing(false);
         }
     };
 
@@ -287,7 +160,6 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                     </div>
                     <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mt-4">Час до появи</p>
                     
-                    {/* КНОПКА СКИНУТИ КД (ТІЛЬКИ АДМІН) */}
                     {profile?.isAdmin && (
                         <button onClick={adminResetCD} disabled={isProcessing} className="mt-8 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/50 font-bold py-3 px-6 rounded-xl text-sm mx-auto flex items-center gap-2 transition-colors">
                             <Zap size={16} /> [АДМІН] Скинути кулдаун
@@ -347,13 +219,8 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                 </div>
 
                 <div className="relative">
-                    {/* КНОПКА МИТТЄВОГО ВБИВСТВА (ТІЛЬКИ АДМІН) */}
                     {profile?.isAdmin && hp > 0 && (
-                        <button 
-                            onClick={adminInstaKill} 
-                            disabled={isProcessing}
-                            className="absolute -top-4 -right-4 bg-red-600 text-white font-black text-[10px] px-3 py-2 rounded-xl border-2 border-red-900 shadow-[0_0_20px_rgba(220,38,38,0.8)] z-20 flex items-center gap-1 hover:bg-red-500 hover:scale-110 transition-transform"
-                        >
+                        <button onClick={adminInstaKill} disabled={isProcessing} className="absolute -top-4 -right-4 bg-red-600 text-white font-black text-[10px] px-3 py-2 rounded-xl border-2 border-red-900 shadow-[0_0_20px_rgba(220,38,38,0.8)] z-20 flex items-center gap-1 hover:bg-red-500 hover:scale-110 transition-transform">
                             <Skull size={14} /> ВБИТИ
                         </button>
                     )}
@@ -379,9 +246,7 @@ export default function FarmView({ profile, db, appId, cardsCatalog, showToast, 
                 </div>
 
                 <p className="text-neutral-500 text-sm mt-10 font-bold uppercase tracking-widest animate-pulse text-center">
-                    {hp > 0 
-                        ? "Добийте боса, щоб відкрити його скарбницю!" 
-                        : "Скарб розблоковано! Заберіть нагороду."}
+                    {hp > 0 ? "Добийте боса, щоб відкрити його скарбницю!" : "Скарб розблоковано! Заберіть нагороду."}
                 </p>
             </div>
         </div>

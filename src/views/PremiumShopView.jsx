@@ -1,43 +1,30 @@
 import React, { useState, useRef } from "react";
 import { Gem, CheckCircle2, Edit2, Coins, Star, Eye, Trash2 } from "lucide-react";
 import { doc, updateDoc, increment, collection, getDocs, writeBatch } from "firebase/firestore";
+import { buyPremiumRequest, getToken } from "../config/api";
 import { formatDate } from "../utils/helpers";
 
-export default function PremiumShopView({ profile, cardStats, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
+export default function PremiumShopView({ profile, setProfile, cardStats, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
     
     const [newNickname, setNewNickname] = useState("");
     
     // БРОНЬОВАНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ
     const actionLock = useRef(false);
 
-    const buyPremium = async () => {
-        if (actionLock.current || isProcessing) return;
-        if (profile.coins < premiumPrice) return showToast("Недостатньо монет для покупки Преміум-акаунту!");
-
-        actionLock.current = true;
-        setIsProcessing(true);
-        try {
-            const now = new Date();
-            const currentExp = isPremiumActive ? new Date(profile.premiumUntil) : now;
-            currentExp.setDate(currentExp.getDate() + premiumDurationDays);
-            
-            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-            await updateDoc(profileRef, {
-                coins: increment(-premiumPrice),
-                isPremium: true,
-                premiumUntil: currentExp.toISOString()
-            });
-
-            showToast(`Ви успішно придбали Преміум-акаунт на ${premiumDurationDays} днів!`, "success");
-            addSystemLog("Магазин", `Гравець ${profile.nickname} купив Преміум за ${premiumPrice} монет.`);
-        } catch (e) {
-            console.error(e);
-            showToast("Помилка під час покупки преміуму.");
-        } finally {
-            actionLock.current = false;
-            setIsProcessing(false);
-        }
-    };
+    const handleBuyPremium = async () => {
+      if (isProcessing) return;
+      setIsProcessing(true);
+      try {
+          const data = await buyPremiumRequest(getToken());
+          setProfile(data.profile); // Оновлюємо профіль, монети знімуться миттєво
+          showToast("Преміум успішно придбано!", "success");
+          if (addSystemLog) addSystemLog("Магазин", `Гравець ${profile.nickname} придбав Преміум`);
+      } catch (e) {
+          showToast(e.message || "Помилка покупки.");
+      } finally {
+          setIsProcessing(false);
+      }
+  };
 
     const handleNicknameChange = async (e) => {
         e.preventDefault();
@@ -148,7 +135,7 @@ export default function PremiumShopView({ profile, cardStats, user, db, appId, p
                 ) : null}
 
                 <button 
-                    onClick={buyPremium} 
+                    onClick={handleBuyPremium} 
                     disabled={isProcessing}
                     className="w-full sm:w-auto bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black text-lg py-4 px-12 rounded-2xl shadow-xl transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mx-auto"
                 >

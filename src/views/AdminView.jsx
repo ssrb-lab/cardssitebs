@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react";
+import { collection, onSnapshot, doc, writeBatch } from "firebase/firestore";
 import { 
   Users, Layers, LayoutGrid, Ticket, Settings, ScrollText, Bug, Edit2, 
   Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
   Eye, CheckCircle2, CalendarDays, Gift, Zap // <-- ДОДАНО ZAP (БЛИСКАВКА)
 } from "lucide-react";
-import { collection, onSnapshot, updateDoc, doc, deleteDoc, writeBatch, getDocs, query, where, increment, setDoc } from "firebase/firestore";
+import { fetchPromosRequest, savePromoRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest } from "../config/api";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
 
-export default function AdminView({ db, appId, currentProfile, cardsCatalog, packsCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView, bosses, setBosses }) {
+export default function AdminView({ db, appId, currentProfile, setProfile, reloadSettings, cardsCatalog, packsCatalog, setCardsCatalog, setPacksCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView, bosses, setBosses }) {
   const [activeTab, setActiveTab] = useState("users");
+  const [newBoss, setNewBoss] = useState({ id: "", level: "", cardId: "", maxHp: "", damagePerClick: "", rewardPerClick: "", killBonus: "", cooldownHours: "" });
   const [allUsers, setAllUsers] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [adminSetFarmLevel, setAdminSetFarmLevel] = useState("");
@@ -55,6 +57,15 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
   const [durationDaysForm, setDurationDaysForm] = useState(premiumDurationDays !== undefined ? premiumDurationDays : 30);
   const [shopItemForm, setShopItemForm] = useState({ type: "card", itemId: "", price: 500, description: "" });
 
+  const getFullSettings = () => ({
+      bosses: bosses || [],
+      dailyRewards: rewardsForm || [],
+      premiumDailyRewards: premiumRewardsForm || [],
+      premiumPrice: Number(priceForm),
+      premiumDurationDays: Number(durationDaysForm),
+      premiumShopItems: premiumShopItems || []
+  });
+
   useEffect(() => {
     setRewardsForm(dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
     setPremiumRewardsForm(premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
@@ -62,23 +73,26 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
     setDurationDaysForm(premiumDurationDays !== undefined ? premiumDurationDays : 30);
   }, [dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays]);
 
+  const loadUsers = async () => {
+      try {
+          const users = await fetchAdminUsers(getToken());
+          setAllUsers(users || []);
+      } catch (e) { console.error("Помилка завантаження гравців"); }
+  };
+
   useEffect(() => {
     if (activeTab === "users") {
-      const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "profiles"), (snap) => {
-        const uList = [];
-        snap.forEach((d) => uList.push(d.data()));
-        setAllUsers(uList);
-      });
-      return () => unsub();
+        loadUsers();
     }
     
     if (activeTab === "promos" && currentProfile.isAdmin) {
-      const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "promoCodes"), (snap) => {
-          const pList = [];
-          snap.forEach(d => pList.push({ id: d.id, ...d.data() }));
-          setAllPromos(pList);
-      });
-      return () => unsub();
+        const loadPromos = async () => {
+            try {
+                const data = await fetchPromosRequest(getToken());
+                setAllPromos(data || []);
+            } catch (e) { console.error(e); }
+        };
+        loadPromos();
     }
 
     if (activeTab === "logs" && currentProfile.isAdmin) {
@@ -93,458 +107,275 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
   }, [activeTab, db, appId, currentProfile]);
 
   const syncAllProfiles = async () => {
-    if (!confirm("Це може зайняти певний час. Продовжити?")) return;
-    setIsSyncing(true);
-    showToast("Синхронізація розпочата...", "success");
-
-    try {
-        const usersSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
-        const batch = writeBatch(db);
-        let operations = 0;
-        
-        for (const userDoc of usersSnap.docs) {
-            const uid = userDoc.id;
-            const invSnap = await getDocs(collection(db, "artifacts", appId, "users", uid, "inventory"));
-            
-            let totalCardsCount = 0;
-            invSnap.forEach(d => { totalCardsCount += (d.data().amount || 0); });
-            const uniqueCardsCount = invSnap.size;
-            
-            batch.update(userDoc.ref, { 
-                uniqueCardsCount: uniqueCardsCount,
-                totalCards: totalCardsCount
-            });
-            operations++;
-            
-            if (operations >= 450) {
-                await batch.commit();
-                operations = 0;
-            }
-        }
-        
-        if (operations > 0) {
-            await batch.commit();
-        }
-        
-        showToast("Синхронізацію успішно завершено!", "success");
-        addSystemLog("Адмін", "Масова синхронізація профілів завершена.");
-    } catch (e) {
-        console.error(e);
-        showToast("Сталася помилка під час синхронізації.", "error");
-    }
-    setIsSyncing(false);
+      showToast("Тепер MySQL автоматично рахує картки. Синхронізація не потрібна!", "success");
   };
 
   const handleDeleteUser = async (userToDelete) => {
     if (userToDelete.isSuperAdmin) return showToast("Не можна видалити Супер Адміністратора!", "error");
-    if (userToDelete.isAdmin && !currentProfile.isSuperAdmin) return showToast("У вас немає прав видаляти інших адміністраторів!", "error");
-    
     if (!confirm(`Мій лорд, Ви впевнені, що хочете БЕЗПОВОРОТНО видалити гравця ${userToDelete.nickname}?`)) return;
-    
     try {
-      await deleteDoc(doc(db, "artifacts", appId, "public", "data", "profiles", userToDelete.uid));
+      await adminUserActionRequest(getToken(), 'delete', userToDelete.uid);
       showToast(`Гравця ${userToDelete.nickname} видалено.`, "success");
-      addSystemLog("Адмін", `Видалено акаунт гравця: ${userToDelete.nickname} (${userToDelete.uid})`);
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка під час видалення гравця");
-    }
+      addSystemLog("Адмін", `Видалено акаунт: ${userToDelete.nickname}`);
+      loadUsers();
+    } catch (e) { showToast("Помилка під час видалення."); }
   };
 
   const handleInspectUser = async (uid) => {
     setLoadingUserInv(true);
     const u = allUsers.find(x => x.uid === uid);
     setViewingUser(u);
-    if(u) {
-        setAdminSetCoinsAmount(u.coins || 0);
-        setAdminNewNickname(u.nickname || "");
-        setAdminSetFarmLevel(u.farmLevel || 1);
-    }
+    if(u) { setAdminSetCoinsAmount(u.coins || 0); setAdminNewNickname(u.nickname || ""); setAdminSetFarmLevel(u.farmLevel || 1); }
     try {
-      const invRef = collection(db, "artifacts", appId, "users", uid, "inventory");
-      const snap = await getDocs(invRef);
-      const items = [];
-      snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-      setUserInventory(items);
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка доступу до інвентарю.");
-    }
+      const items = await fetchAdminUserInventory(getToken(), uid);
+      setUserInventory(items || []);
+    } catch (e) { showToast("Помилка доступу до інвентарю."); }
     setLoadingUserInv(false);
   };
 
   const submitBan = async (e) => {
       e.preventDefault();
       if (!banModalUser) return;
-      
       let banUntil = null;
       if (banDurationUnit !== "perm") {
           const val = parseInt(banDurationValue, 10);
-          if (isNaN(val) || val <= 0) return showToast("Введіть коректний час бану!", "error");
-          
-          let multiplier = 1;
-          if (banDurationUnit === 'm') multiplier = 60 * 1000;
-          if (banDurationUnit === 'h') multiplier = 60 * 60 * 1000;
-          if (banDurationUnit === 'd') multiplier = 24 * 60 * 60 * 1000;
-          
+          let multiplier = banDurationUnit === 'm' ? 60000 : (banDurationUnit === 'h' ? 3600000 : 86400000);
           banUntil = new Date(Date.now() + val * multiplier).toISOString();
       }
-
       try {
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", banModalUser.uid), {
-              isBanned: true,
-              banReason: banReason || "Порушення правил",
-              banUntil: banUntil
-          });
-          showToast(`Гравця ${banModalUser.nickname} заблоковано.`, "success");
-          addSystemLog("Адмін", `БАН: Гравець ${banModalUser.nickname}. Причина: ${banReason}. Термін: ${banUntil ? banUntil : 'Назавжди'}`);
-          setBanModalUser(null);
-          setBanReason("");
-          setBanDurationValue("");
-      } catch (e) {
-          console.error(e);
-          showToast("Помилка під час блокування.", "error");
-      }
+          await adminUserActionRequest(getToken(), 'ban', banModalUser.uid, { reason: banReason, until: banUntil });
+          showToast(`Гравця заблоковано.`, "success");
+          setBanModalUser(null); loadUsers();
+      } catch (e) { showToast("Помилка блокування.", "error"); }
   };
 
   const handleUnban = async (uid) => {
       try {
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", uid), {
-              isBanned: false,
-              banReason: null,
-              banUntil: null
-          });
-          showToast("Гравця успішно розблоковано.", "success");
-          const targetUser = allUsers.find(u => u.uid === uid);
-          addSystemLog("Адмін", `РОЗБАН: Гравець ${targetUser?.nickname || uid}`);
-      } catch (e) {
-          console.error(e);
-          showToast("Помилка під час розблокування.", "error");
-      }
+          await adminUserActionRequest(getToken(), 'unban', uid);
+          showToast("Розблоковано.", "success"); loadUsers();
+      } catch (e) { showToast("Помилка розблокування.", "error"); }
   };
 
   const toggleAdminStatus = async (userObj) => {
       if (!currentProfile.isSuperAdmin) return;
       try {
-          const newStatus = !userObj.isAdmin;
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", userObj.uid), {
-              isAdmin: newStatus
-          });
-          showToast(`Права адміна ${newStatus ? 'надано' : 'забрано'}.`, "success");
-          addSystemLog("Адмін", `Зміна прав: ${userObj.nickname} тепер ${newStatus ? 'Адмін' : 'Гравець'}`);
-      } catch(e) {
-          console.error(e);
-          showToast("Помилка зміни прав.", "error");
-      }
+          await adminUserActionRequest(getToken(), 'toggleAdmin', userObj.uid);
+          showToast("Статус змінено.", "success"); loadUsers();
+      } catch(e) { showToast("Помилка зміни прав.", "error"); }
   };
 
   const changeUserNickname = async () => {
       if (!adminNewNickname.trim() || adminNewNickname.trim() === viewingUser.nickname) return;
       try {
-          const profilesSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
-          let exists = false;
-          profilesSnap.forEach(d => {
-              if (d.data().nickname?.toLowerCase() === adminNewNickname.trim().toLowerCase() && d.id !== viewingUser.uid) exists = true;
-          });
-          
-          if (exists) return showToast("Цей нікнейм вже зайнятий іншим гравцем!", "error");
-
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid), {
-              nickname: adminNewNickname.trim()
-          });
-          showToast("Нікнейм успішно змінено!", "success");
-          addSystemLog("Адмін", `Змінено нікнейм гравцю з ${viewingUser.nickname} на ${adminNewNickname.trim()}`);
-          setViewingUser(prev => ({...prev, nickname: adminNewNickname.trim()}));
-      } catch (e) {
-          console.error(e);
-          showToast("Помилка зміни нікнейму.", "error");
-      }
+          const data = await adminUserActionRequest(getToken(), 'nickname', viewingUser.uid, { nickname: adminNewNickname.trim() });
+          showToast("Нікнейм змінено!", "success");
+          setViewingUser(data.profile); loadUsers();
+      } catch (e) { showToast(e.message || "Помилка зміни.", "error"); }
   };
 
   const giveCoinsToSelf = async (amount) => {
     try {
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", currentProfile.uid);
-      await updateDoc(profileRef, { coins: increment(amount) });
-      showToast(`Видано собі ${amount} монет!`, "success");
-      addSystemLog("Адмін", `Видано собі ${amount} монет.`);
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка нарахування собі.", "error");
-    }
-  };
-
-  const giveCardToUser = async () => {
-    if (!adminAddCardId || adminAddCardAmount < 1) return;
-    try {
-      const batch = writeBatch(db);
-      const invRef = doc(db, "artifacts", appId, "users", viewingUser.uid, "inventory", adminAddCardId);
-      batch.set(invRef, { amount: increment(adminAddCardAmount) }, { merge: true });
-
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid);
-      batch.update(profileRef, { totalCards: increment(adminAddCardAmount) });
-
-      await batch.commit();
-      
-      const cDef = cardsCatalog.find(c => c.id === adminAddCardId);
-      showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, "success");
-      addSystemLog("Адмін", `Видано ${adminAddCardAmount} шт. картки '${cDef?.name}' гравцю ${viewingUser.nickname}`);
-      
-      setAdminAddCardAmount(1);
-      handleInspectUser(viewingUser.uid); 
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка нарахування картки.", "error");
-    }
+      const data = await adminUserActionRequest(getToken(), 'coins', currentProfile.uid, { amount, exact: false });
+      setProfile(data.profile); // <--- Ось ця магія миттєво оновить баланс у верхньому меню!
+      showToast(`Видано собі ${amount} монет!`, "success"); 
+      loadUsers();
+    } catch (e) { showToast("Помилка нарахування.", "error"); }
   };
 
   const giveCoinsToUser = async () => {
-    if (!adminAddCoinsAmount || adminAddCoinsAmount === 0) return;
+    if (!adminAddCoinsAmount) return;
     try {
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid);
-      await updateDoc(profileRef, { coins: increment(adminAddCoinsAmount) });
-      
-      const actionText = adminAddCoinsAmount > 0 ? "нараховано" : "віднято";
-      showToast(`Успішно ${actionText} ${Math.abs(adminAddCoinsAmount)} монет.`, "success");
-      addSystemLog("Адмін", `${actionText} ${Math.abs(adminAddCoinsAmount)} монет гравцю ${viewingUser.nickname}`);
-      
-      setViewingUser(prev => ({...prev, coins: prev.coins + adminAddCoinsAmount}));
-      setAdminSetCoinsAmount(prev => prev + adminAddCoinsAmount);
-      setAdminAddCoinsAmount(100);
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка нарахування монет.", "error");
-    }
+      const data = await adminUserActionRequest(getToken(), 'coins', viewingUser.uid, { amount: adminAddCoinsAmount, exact: false });
+      if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
+      showToast("Баланс змінено.", "success");
+      setViewingUser(data.profile); setAdminAddCoinsAmount(100); loadUsers();
+    } catch (e) { showToast("Помилка монет.", "error"); }
   };
 
   const setExactCoinsToUser = async () => {
-    if (adminSetCoinsAmount === "" || isNaN(adminSetCoinsAmount) || adminSetCoinsAmount < 0) return;
+    if (adminSetCoinsAmount === "" || isNaN(adminSetCoinsAmount)) return;
     try {
-      const val = parseInt(adminSetCoinsAmount, 10);
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid);
-      await updateDoc(profileRef, { coins: val });
-      
-      showToast(`Баланс змінено на рівно ${val} монет.`, "success");
-      addSystemLog("Адмін", `Встановлено точний баланс ${val} монет гравцю ${viewingUser.nickname}`);
-      setViewingUser(prev => ({...prev, coins: val}));
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка встановлення балансу.", "error");
-    }
+      const data = await adminUserActionRequest(getToken(), 'coins', viewingUser.uid, { amount: parseInt(adminSetCoinsAmount), exact: true });
+      if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
+      showToast("Точний баланс встановлено.", "success");
+      setViewingUser(data.profile); loadUsers();
+    } catch (e) { showToast("Помилка балансу.", "error"); }
   };
 
-  // --- НОВА ФУНКЦІЯ: СКИНУТИ КД ГРАВЦЮ ---
   const resetPlayerCooldown = async (targetUid, targetNickname) => {
     if (!window.confirm(`Мій лорд, ви точно хочете скинути таймер боса для гравця ${targetNickname}?`)) return;
-    
     try {
-        const farmRef = doc(db, "artifacts", appId, "users", targetUid, "farmState", "main");
-        await setDoc(farmRef, { 
-            cooldownUntil: null 
-        }, { merge: true });
-        
-        showToast(`Кулдаун гравця ${targetNickname} успішно скинуто!`, "success");
-        if (addSystemLog) addSystemLog("Адмін", `Скинуто КД боса для гравця ${targetNickname}`);
-    } catch (e) {
-        console.error(e);
-        showToast("Помилка скидання КД гравцю.", "error");
-    }
+        await adminResetCdRequest(getToken(), targetUid, 1000); 
+        showToast("Кулдаун скинуто!", "success");
+    } catch (e) { showToast("Помилка скидання КД.", "error"); }
   };
 
   const setPlayerFarmLevel = async () => {
     const val = parseInt(adminSetFarmLevel, 10);
     if (isNaN(val) || val < 1) return;
     try {
-        const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid);
-        await updateDoc(profileRef, { farmLevel: val });
-        
-        const farmRef = doc(db, "artifacts", appId, "users", viewingUser.uid, "farmState", "main");
-        await setDoc(farmRef, { bossId: null, currentHp: null, pendingCoins: 0, cooldownUntil: null }, { merge: true });
+        const data = await adminUserActionRequest(getToken(), 'farmLevel', viewingUser.uid, { level: val });
+        showToast("Рівень Фарму змінено!", "success");
+        setViewingUser(data.profile); loadUsers();
+    } catch (e) { showToast("Помилка встановлення рівня.", "error"); }
+  };
 
-        showToast(`Рівень Фарму змінено на ${val}`, "success");
-        addSystemLog("Адмін", `Встановлено рівень фарму ${val} гравцю ${viewingUser.nickname}`);
-        setViewingUser(prev => ({...prev, farmLevel: val}));
-    } catch (e) {
-        console.error(e);
-        showToast("Помилка встановлення рівня.", "error");
-    }
+  const giveCardToUser = async () => {
+    if (!adminAddCardId || adminAddCardAmount < 1) return;
+    try {
+      await adminUserActionRequest(getToken(), 'giveCard', viewingUser.uid, { cardId: adminAddCardId, amount: adminAddCardAmount });
+      showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, "success");
+      handleInspectUser(viewingUser.uid); loadUsers();
+    } catch (e) { showToast("Помилка картки.", "error"); }
   };
 
   const removeCardFromUser = async (cardId, currentAmount) => {
     if (!confirm("Відібрати 1 таку картку в гравця?")) return;
     try {
-      const batch = writeBatch(db);
-      const invRef = doc(db, "artifacts", appId, "users", viewingUser.uid, "inventory", cardId);
-      
-      if (currentAmount <= 1) {
-        batch.delete(invRef);
-      } else {
-        batch.update(invRef, { amount: increment(-1) });
-      }
-
-      const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", viewingUser.uid);
-      batch.update(profileRef, { totalCards: increment(-1) });
-
-      await batch.commit();
+      await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, { cardId, amount: 1 });
       showToast("Картку вилучено.", "success");
-      const cDef = cardsCatalog.find(c => c.id === cardId);
-      addSystemLog("Адмін", `Вилучено 1 шт. картки '${cDef?.name}' у гравця ${viewingUser.nickname}`);
-      handleInspectUser(viewingUser.uid);
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка під час вилучення.", "error");
-    }
-  };
-
-  const [newBoss, setNewBoss] = useState({
-        id: null, level: (bosses?.length || 0) + 1, cardId: cardsCatalog?.[0]?.id || "", maxHp: 1000, damagePerClick: 10, rewardPerClick: 2, killBonus: 500, cooldownHours: 4
-  });
-
-  const resetBossForm = () => setNewBoss({
-        id: null, level: (bosses?.length || 0) + 1, cardId: cardsCatalog?.[0]?.id || "", maxHp: 1000, damagePerClick: 10, rewardPerClick: 2, killBonus: 500, cooldownHours: 4
-  });
-
-  const handleAddBoss = async (e) => {
-      e.preventDefault();
-      if (!newBoss.cardId) return showToast("Виберіть картку!", "error");
-      const bossData = {
-          id: newBoss.id || `boss_${Date.now()}`,
-          level: Number(newBoss.level), cardId: newBoss.cardId, maxHp: Number(newBoss.maxHp),
-          damagePerClick: Number(newBoss.damagePerClick), rewardPerClick: Number(newBoss.rewardPerClick),
-          killBonus: Number(newBoss.killBonus), cooldownHours: Number(newBoss.cooldownHours)
-      };
-
-      let updatedBosses;
-      if (newBoss.id) {
-          updatedBosses = bosses.map(b => b.id === newBoss.id ? bossData : b).sort((a, b) => a.level - b.level);
-      } else {
-          updatedBosses = [...(bosses || []), bossData].sort((a, b) => a.level - b.level);
-      }
-
-      try {
-          setIsSyncing(true);
-          const settingsRef = doc(db, "artifacts", appId, "public", "data", "gameSettings", "main");
-          await updateDoc(settingsRef, { bosses: updatedBosses });
-          setBosses(updatedBosses);
-          showToast(newBoss.id ? "Боса оновлено!" : `Боса ${bossData.level} рівня додано!`, "success");
-          resetBossForm();
-      } catch (error) {
-          console.error(error);
-          showToast("Помилка збереження боса", "error");
-      }
-      setIsSyncing(false);
-  };
-
-  const handleDeleteBoss = async (bossId) => {
-      if (!confirm("Ви впевнені, що хочете видалити цього боса?")) return;
-      const updatedBosses = bosses.filter(b => b.id !== bossId);
-      try {
-          setIsSyncing(true);
-          const settingsRef = doc(db, "artifacts", appId, "public", "data", "gameSettings", "main");
-          await updateDoc(settingsRef, { bosses: updatedBosses });
-          setBosses(updatedBosses);
-          showToast("Боса успішно видалено", "success");
-      } catch (error) {
-          console.error(error);
-          showToast("Помилка видалення", "error");
-      }
-      setIsSyncing(false);
+      handleInspectUser(viewingUser.uid); loadUsers();
+    } catch (e) { showToast("Помилка вилучення.", "error"); }
   };
 
   const handlePremiumAction = async (e, action) => {
       e.preventDefault();
       if (!premiumModalUser) return;
       try {
-          if (action === "revoke") {
-              await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", premiumModalUser.uid), {
-                  isPremium: false, premiumUntil: null
-              });
-              showToast(`Преміум забрано у гравця ${premiumModalUser.nickname}`, "success");
-              addSystemLog("Адмін", `Забрано Преміум у гравця ${premiumModalUser.nickname}`);
-          } else {
-              const days = Number(premiumGiveDays);
-              if (days <= 0) return showToast("Кількість днів має бути більше 0", "error");
-              let currentExp = new Date();
-              if (premiumModalUser.isPremium && premiumModalUser.premiumUntil) {
-                  const existingExp = new Date(premiumModalUser.premiumUntil);
-                  if (!isNaN(existingExp) && existingExp > currentExp) currentExp = existingExp;
-              }
-              currentExp.setDate(currentExp.getDate() + days);
+          await adminUserActionRequest(getToken(), 'premium', premiumModalUser.uid, { revoke: action === "revoke", days: Number(premiumGiveDays) });
+          showToast(action === "revoke" ? "Преміум забрано" : "Преміум видано!", "success");
+          setPremiumModalUser(null); loadUsers();
+      } catch (err) { showToast("Помилка преміуму.", "error"); }
+  };
 
-              await updateDoc(doc(db, "artifacts", appId, "public", "data", "profiles", premiumModalUser.uid), {
-                  isPremium: true, premiumUntil: currentExp.toISOString()
-              });
-              showToast(`Преміум (${days} днів) видано гравцю ${premiumModalUser.nickname}!`, "success");
-              addSystemLog("Адмін", `Видано Преміум на ${days} днів гравцю ${premiumModalUser.nickname}`);
-          }
-          setPremiumModalUser(null);
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка операції з преміумом.", "error");
-      }
+  const resetBossForm = () => {
+      setNewBoss({ id: "", level: "", cardId: "", maxHp: "", damagePerClick: "", rewardPerClick: "", killBonus: "", cooldownHours: "" });
+  };
+
+  const handleAddBoss = async (e) => {
+      e.preventDefault();
+      if (!newBoss.cardId) return showToast("Виберіть картку!", "error");
+      const bossData = { 
+          id: newBoss.id || `boss_${Date.now()}`, 
+          level: Number(newBoss.level), 
+          cardId: newBoss.cardId, 
+          maxHp: Number(newBoss.maxHp), 
+          damagePerClick: Number(newBoss.damagePerClick), 
+          rewardPerClick: Number(newBoss.rewardPerClick), 
+          killBonus: Number(newBoss.killBonus), 
+          cooldownHours: Number(newBoss.cooldownHours) 
+      };
+      
+      let updatedBosses = newBoss.id ? bosses.map(b => b.id === newBoss.id ? bossData : b).sort((a, b) => a.level - b.level) : [...(bosses || []), bossData].sort((a, b) => a.level - b.level);
+
+      try {
+          setIsSyncing(true);
+          const newSettings = getFullSettings();
+          newSettings.bosses = updatedBosses;
+          await saveSettingsRequest(getToken(), newSettings);
+          await reloadSettings();
+          showToast(newBoss.id ? "Боса оновлено!" : `Боса ${bossData.level} рівня додано!`, "success");
+          resetBossForm();
+      } catch (error) { showToast("Помилка збереження боса", "error"); }
+      finally { setIsSyncing(false); }
+  };
+
+  const handleDeleteBoss = async (bossId) => {
+      if (!confirm("Ви впевнені, що хочете видалити цього боса?")) return;
+      try {
+          setIsSyncing(true);
+          const updatedBosses = bosses.filter(b => b.id !== bossId);
+          const newSettings = getFullSettings();
+          newSettings.bosses = updatedBosses;
+          await saveSettingsRequest(getToken(), newSettings);
+          await reloadSettings();
+          showToast("Боса успішно видалено", "success");
+      } catch (error) { showToast("Помилка видалення", "error"); }
+      finally { setIsSyncing(false); }
   };
 
   const savePack = async (e) => {
     e.preventDefault();
-    let updatedPacks = [...packsCatalog];
-    if (editingPack) {
-      updatedPacks = updatedPacks.map((p) => p.id === editingPack.id ? { ...packForm, id: editingPack.id, cost: Number(packForm.cost), isHidden: !!packForm.isHidden, isPremiumOnly: !!packForm.isPremiumOnly, category: packForm.category || "Базові" } : p);
-    } else {
-      updatedPacks.push({ ...packForm, id: "p" + Date.now(), cost: Number(packForm.cost), isHidden: !!packForm.isHidden, isPremiumOnly: !!packForm.isPremiumOnly, category: packForm.category || "Базові" });
+    const newPackData = {
+        ...packForm, 
+        id: editingPack ? editingPack.id : "p" + Date.now(), 
+        cost: Number(packForm.cost), 
+        isHidden: !!packForm.isHidden, 
+        isPremiumOnly: !!packForm.isPremiumOnly, 
+        category: packForm.category || "Базові" 
+    };
+
+    try {
+        const savedPack = await savePackToDb(getToken(), newPackData);
+        let updatedPacks = [...packsCatalog];
+        if (editingPack) updatedPacks = updatedPacks.map((p) => p.id === savedPack.id ? savedPack : p);
+        else updatedPacks.push(savedPack);
+        
+        setPacksCatalog(updatedPacks);
+        addSystemLog("Адмін", `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
+        setEditingPack(null);
+        setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+        showToast("Пак збережено в MySQL!", "success");
+    } catch (error) {
+        showToast("Помилка збереження паку", "error");
     }
-    await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { packs: updatedPacks });
-    addSystemLog("Адмін", `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
-    setEditingPack(null);
-    setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
-    showToast("Паки оновлено!", "success");
   };
 
   const deletePack = async (packId) => {
     if (!confirm("Видалити цей пак?")) return;
-    const pDef = packsCatalog.find(p => p.id === packId);
-    const updated = packsCatalog.filter((p) => p.id !== packId);
-    await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { packs: updated });
-    addSystemLog("Адмін", `Видалено пак: ${pDef?.name}`);
-    showToast("Пак видалено!", "success");
+    try {
+        await deletePackFromDb(getToken(), packId);
+        const pDef = packsCatalog.find(p => p.id === packId);
+        setPacksCatalog(packsCatalog.filter((p) => p.id !== packId));
+        addSystemLog("Адмін", `Видалено пак: ${pDef?.name}`);
+        showToast("Пак видалено з MySQL!", "success");
+    } catch (error) {
+        showToast("Помилка видалення", "error");
+    }
   };
 
   const saveCard = async (e) => {
     e.preventDefault();
-    let updatedCatalog = [...cardsCatalog];
-    
     const newCardData = {
         id: editingCard ? editingCard.id : "c" + Date.now(),
         packId: cardForm.packId, name: cardForm.name, rarity: cardForm.rarity, image: cardForm.image,
         maxSupply: cardForm.maxSupply ? Number(cardForm.maxSupply) : 0,
-        weight: cardForm.weight ? Number(cardForm.weight) : "",
+        weight: cardForm.weight ? Number(cardForm.weight) : null,
         sellPrice: cardForm.sellPrice ? Number(cardForm.sellPrice) : SELL_PRICE,
         effect: cardForm.effect || "", 
-        dropAnim: cardForm.dropAnim || "", /* <-- ДОДАНО ОСЬ ЦЕ */
+        dropAnim: cardForm.dropAnim || "",
         soundUrl: cardForm.soundUrl || "",
         soundVolume: cardForm.soundVolume !== undefined ? Number(cardForm.soundVolume) : 0.5,
         pulledCount: editingCard ? (editingCard.pulledCount || 0) : 0
     };
 
-    if (editingCard) {
-      updatedCatalog = updatedCatalog.map((c) => c.id === editingCard.id ? newCardData : c);
-    } else {
-      updatedCatalog.push(newCardData);
+    try {
+        const savedCard = await saveCardToDb(getToken(), newCardData);
+        let updatedCatalog = [...cardsCatalog];
+        if (editingCard) updatedCatalog = updatedCatalog.map((c) => c.id === savedCard.id ? savedCard : c);
+        else updatedCatalog.push(savedCard);
+        
+        setCardsCatalog(updatedCatalog);
+        addSystemLog("Адмін", `${editingCard ? 'Оновлено' : 'Створено'} картку: ${cardForm.name}`);
+        setEditingCard(null);
+        setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "",maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5 });
+        showToast("Картку збережено в MySQL!", "success");
+    } catch (error) {
+        showToast("Помилка збереження картки", "error");
     }
-    
-    await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { cards: updatedCatalog });
-    addSystemLog("Адмін", `${editingCard ? 'Оновлено' : 'Створено'} картку: ${cardForm.name}`);
-    
-    setEditingCard(null);
-    setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "",maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5 });
-    showToast("Каталог оновлено!", "success");
   };
 
   const deleteCard = async (cardId) => {
     if (!confirm("Видалити цю картку?")) return;
-    const cDef = cardsCatalog.find(c => c.id === cardId);
-    const updated = cardsCatalog.filter((c) => c.id !== cardId);
-    await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { cards: updated });
-    addSystemLog("Адмін", `Видалено картку: ${cDef?.name}`);
-    showToast("Картку видалено!", "success");
+    try {
+        await deleteCardFromDb(getToken(), cardId);
+        const cDef = cardsCatalog.find(c => c.id === cardId);
+        setCardsCatalog(cardsCatalog.filter((c) => c.id !== cardId));
+        addSystemLog("Адмін", `Видалено картку: ${cDef?.name}`);
+        showToast("Картку видалено з MySQL!", "success");
+    } catch (error) {
+        showToast("Помилка видалення", "error");
+    }
   };
 
   const savePromo = async (e) => {
@@ -552,72 +383,57 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
       const codeId = promoForm.code.trim().toUpperCase();
       if (!codeId) return;
       try {
-          await setDoc(doc(db, "artifacts", appId, "public", "data", "promoCodes", codeId), {
-              code: codeId, reward: Number(promoForm.reward), maxGlobalUses: Number(promoForm.maxGlobalUses),
-              maxUserUses: Number(promoForm.maxUserUses), currentGlobalUses: 0, version: Date.now()
-          });
+          await savePromoRequest(getToken(), { ...promoForm, code: codeId });
           showToast("Промокод створено!", "success");
-          addSystemLog("Адмін", `Створено промокод: ${codeId} (нагорода ${promoForm.reward})`);
           setPromoForm({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка створення промокоду", "error");
-      }
+          const data = await fetchPromosRequest(getToken());
+          setAllPromos(data || []);
+      } catch (err) { showToast("Помилка створення промокоду", "error"); }
   };
 
   const deletePromo = async (codeId) => {
       if (!confirm("Видалити промокод?")) return;
       try {
-          await deleteDoc(doc(db, "artifacts", appId, "public", "data", "promoCodes", codeId));
-          addSystemLog("Адмін", `Видалено промокод: ${codeId}`);
+          await deletePromoRequest(getToken(), codeId);
           showToast("Промокод видалено.", "success");
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка видалення.", "error");
-      }
+          setAllPromos(allPromos.filter(p => p.code !== codeId));
+      } catch (err) { showToast("Помилка видалення.", "error"); }
   };
 
   const saveSettings = async (e) => {
       e.preventDefault();
       try {
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { 
-              dailyRewards: rewardsForm, premiumDailyRewards: premiumRewardsForm,
-              premiumPrice: Number(priceForm), premiumDurationDays: Number(durationDaysForm)
-          });
-          addSystemLog("Адмін", "Оновлено налаштування гри (Нагороди / Ціна Преміуму / Термін).");
+          const newSettings = getFullSettings();
+          await saveSettingsRequest(getToken(), newSettings);
+          await reloadSettings();
+          addSystemLog("Адмін", "Оновлено налаштування гри.");
           showToast("Налаштування оновлено!", "success");
-      } catch (err) {
-          console.error(err);
-          showToast("Помилка оновлення налаштувань.", "error");
-      }
+      } catch (err) { showToast("Помилка оновлення налаштувань.", "error"); }
   };
 
   const addPremiumShopItem = async (e) => {
       e.preventDefault();
       try {
           const newItem = { id: "si_" + Date.now(), type: shopItemForm.type, itemId: shopItemForm.itemId, price: Number(shopItemForm.price), description: shopItemForm.description };
-          const updatedItems = [...premiumShopItems, newItem];
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { premiumShopItems: updatedItems });
-          addSystemLog("Адмін", `Додано товар у Преміум Магазин.`);
+          const newSettings = getFullSettings();
+          newSettings.premiumShopItems = [...premiumShopItems, newItem];
+          await saveSettingsRequest(getToken(), newSettings);
+          await reloadSettings();
           showToast("Товар додано!", "success");
           setShopItemForm({ type: "card", itemId: "", price: 500, description: "" });
-      } catch(err) {
-          console.error(err);
-          showToast("Помилка додавання товару.", "error");
-      }
+      } catch(err) { showToast("Помилка додавання товару.", "error"); }
   };
 
   const deletePremiumShopItem = async (itemId) => {
       if (!confirm("Видалити товар з магазину?")) return;
       try {
-          const updated = premiumShopItems.filter(i => i.id !== itemId);
-          await updateDoc(doc(db, "artifacts", appId, "public", "data", "gameSettings", "main"), { premiumShopItems: updated });
+          const newSettings = getFullSettings();
+          newSettings.premiumShopItems = premiumShopItems.filter(i => i.id !== itemId);
+          await saveSettingsRequest(getToken(), newSettings);
+          await reloadSettings();
           showToast("Товар видалено.", "success");
-      } catch(err) {
-          console.error(err);
-          showToast("Помилка видалення.", "error");
-      }
-  }
+      } catch(err) { showToast("Помилка видалення.", "error"); }
+  };
 
   const clearAdminLogs = async () => {
     if (!confirm("Очистити всі системні логи? Це безповоротно!")) return;
@@ -1050,6 +866,7 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
                     <div>
                         <label className="block text-xs text-neutral-500 uppercase font-bold mb-1">Картка (Обмеження: Звичайна-Рідкісна)</label>
                         <select required value={newBoss.cardId} onChange={e => setNewBoss({...newBoss, cardId: e.target.value})} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500">
+                            <option value="" disabled>Оберіть картку...</option>
                             {cardsCatalog.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </div>
@@ -1354,16 +1171,13 @@ export default function AdminView({ db, appId, currentProfile, cardsCatalog, pac
                   <input type="number" step="0.01" placeholder="Індивід. Шанс (Вага)" value={cardForm.weight} onChange={(e) => setCardForm({ ...cardForm, weight: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" title="Якщо заповнено - ігнорує глобальний шанс рідкості" />
                   <input type="number" placeholder="Ціна продажу (замовч. 15)" value={cardForm.sellPrice} onChange={(e) => setCardForm({ ...cardForm, sellPrice: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white text-green-400" title="Скільки монет отримає гравець за дублікат" />
                   
-                  <select value={cardForm.effect} onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-purple-400 font-bold">
-                    {EFFECT_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
-                  </select>
                   
-                  <select value={cardForm.effect} onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-purple-400 font-bold">
-                    {EFFECT_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
-                  </select>
-
                   <select value={cardForm.dropAnim || ""} onChange={(e) => setCardForm({ ...cardForm, dropAnim: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-yellow-500 font-bold" title="Анімація появи після відкриття паку">
                     {DROP_ANIMATIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
+                  </select>
+
+                  <select value={cardForm.effect} onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-purple-400 font-bold">
+                    {EFFECT_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
                   </select>
 
                   <input type="text" placeholder="URL Картинки" value={cardForm.image} onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-4" required />

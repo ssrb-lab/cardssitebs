@@ -1,28 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { Trophy, LayoutGrid, Coins, ArrowLeft, Ban, Swords, Loader2 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
 import PlayerAvatar from "../components/PlayerAvatar";
+import { fetchLeaderboard } from "../config/api";
 
-export default function RatingView({ db, appId, currentUid, setViewingPlayerProfile }) {
+export default function RatingView({ currentUid, setViewingPlayerProfile }) {
   const [allProfiles, setAllProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [ratingSort, setRatingSort] = useState("cards");
 
   useEffect(() => {
-    const fetchAllProfiles = async () => {
+    const loadLeaderboard = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
-        const list = [];
-        querySnapshot.forEach((doc) => list.push(doc.data()));
-        setAllProfiles(list);
+        const data = await fetchLeaderboard();
+        setAllProfiles(data || []);
       } catch (e) {
         console.error("Помилка завантаження бази гравців", e);
       }
       setLoading(false);
     };
-    fetchAllProfiles();
-  }, [db, appId]);
+    loadLeaderboard();
+  }, []);
 
   const sortedProfiles = [...allProfiles].sort((a, b) => {
       if (ratingSort === "coins") return (b.coins || 0) - (a.coins || 0);
@@ -63,7 +61,7 @@ export default function RatingView({ db, appId, currentUid, setViewingPlayerProf
       </div>
 
       <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-xl">
-        {filteredLeaders.map((leader, index) => {
+        {filteredLeaders.map((leader) => {
           const realRank = sortedProfiles.findIndex(p => p.uid === leader.uid) + 1;
 
           return (
