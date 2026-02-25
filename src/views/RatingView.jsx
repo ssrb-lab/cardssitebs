@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Trophy, LayoutGrid, Coins, ArrowLeft, Ban, Swords, Loader2 } from "lucide-react";
+import { Trophy, LayoutGrid, Coins, ArrowLeft, Ban, Swords, Loader2, Gem } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { fetchLeaderboard } from "../config/api";
 
@@ -85,6 +85,12 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
                 <div className="min-w-0">
                   <div className="font-bold text-white flex items-center gap-2 text-base sm:text-lg truncate">
                     {leader.nickname} 
+                    
+                    {/* ДОДАЄМО ФІОЛЕТОВИЙ ДІАМАНТ ДЛЯ АДМІНІВ */}
+                    {(leader.isAdmin || leader.isSuperAdmin) && (
+                        <Gem size={16} className="text-purple-500 fill-purple-500 shrink-0" title="Адміністратор" />
+                    )}
+
                     <span className="bg-red-900/40 text-red-400 text-xs px-2 py-0.5 rounded-lg border border-red-800 flex items-center gap-1 shrink-0" title={`Рівень мисливця: ${leader.farmLevel || 1}`}>
                         <Swords size={12} /> {leader.farmLevel || 1}
                     </span>

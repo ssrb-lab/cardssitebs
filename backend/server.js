@@ -765,6 +765,8 @@ app.get('/api/game/leaderboard', async (req, res) => {
         farmLevel: true,
         isBanned: true,
         avatarUrl: true,
+        isAdmin: true,       // <-- ДОДАНО
+        isSuperAdmin: true,  // <-- ДОДАНО
         // Рахуємо кількість унікальних записів в інвентарі гравця
         _count: {
           select: { inventory: true }
@@ -780,7 +782,9 @@ app.get('/api/game/leaderboard', async (req, res) => {
       farmLevel: user.farmLevel,
       isBanned: user.isBanned,
       avatarUrl: user.avatarUrl,
-      uniqueCardsCount: user._count.inventory // Передаємо підраховану кількість
+      isAdmin: user.isAdmin,             // <-- ДОДАНО
+      isSuperAdmin: user.isSuperAdmin,   // <-- ДОДАНО
+      uniqueCardsCount: user._count.inventory 
     }));
 
     res.json(formattedUsers);
