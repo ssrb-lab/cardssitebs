@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
 import { Gem, CheckCircle2, Edit2, Coins, Star, Eye, Trash2 } from "lucide-react";
-import { doc, updateDoc, increment, collection, getDocs, writeBatch } from "firebase/firestore";
-import { buyPremiumRequest, getToken } from "../config/api";
+import { buyPremiumRequest, getToken, changeNicknameRequest, buyPremiumItemRequest } from "../config/api";
 import { formatDate } from "../utils/helpers";
 
 export default function PremiumShopView({ profile, setProfile, cardStats, user, db, appId, premiumPrice, premiumDurationDays, premiumShopItems, showToast, isProcessing, setIsProcessing, addSystemLog, isPremiumActive, cardsCatalog, rarities, setViewingCard }) {
@@ -32,34 +31,18 @@ export default function PremiumShopView({ profile, setProfile, cardStats, user, 
         
         const nn = newNickname.trim();
         if (!nn) return showToast("Введіть новий нікнейм!");
-        if (profile.coins < 100000) return showToast("Недостатньо монет!");
         
         actionLock.current = true;
         setIsProcessing(true);
         try {
-            const profilesSnap = await getDocs(collection(db, "artifacts", appId, "public", "data", "profiles"));
-            let exists = false;
-            profilesSnap.forEach(d => {
-                if (d.data().nickname?.toLowerCase() === nn.toLowerCase()) exists = true;
-            });
-            
-            if (exists) {
-                showToast("Цей нікнейм вже зайнятий іншим гравцем!", "error");
-                return;
-            }
-            
-            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-            await updateDoc(profileRef, {
-                nickname: nn,
-                coins: increment(-100000)
-            });
-            
+            const data = await changeNicknameRequest(getToken(), nn);
+            setProfile(data.profile);
             showToast("Мій лорд, ваш нікнейм успішно змінено!", "success");
-            addSystemLog("Магазин", `Гравець змінив нікнейм на ${nn} за 100000 монет.`);
+            if (addSystemLog) addSystemLog("Магазин", `Гравець змінив нікнейм на ${nn} за 100000 монет.`);
             setNewNickname("");
         } catch (err) {
             console.error(err);
-            showToast("Помилка зміни нікнейму.");
+            showToast(err.message || "Помилка зміни нікнейму.");
         } finally {
             actionLock.current = false;
             setIsProcessing(false);
@@ -68,27 +51,16 @@ export default function PremiumShopView({ profile, setProfile, cardStats, user, 
 
     const buyItem = async (item) => {
         if (actionLock.current || isProcessing) return;
-        if (!isPremiumActive) return showToast("Цей товар доступний лише для власників Преміум-акаунту!");
-        if (profile.coins < item.price) return showToast("Недостатньо монет!");
-
         actionLock.current = true;
         setIsProcessing(true);
         try {
-            const batch = writeBatch(db);
-            const profileRef = doc(db, "artifacts", appId, "public", "data", "profiles", user.uid);
-
-            if (item.type === "card") {
-                const invRef = doc(db, "artifacts", appId, "users", user.uid, "inventory", item.itemId);
-                batch.set(invRef, { amount: increment(1) }, { merge: true });
-                batch.update(profileRef, { coins: increment(-item.price), totalCards: increment(1) });
-            }
-
-            await batch.commit();
-            showToast(`Ви успішно придбали ${item.name}!`, "success");
-            addSystemLog("Магазин", `Гравець ${profile.nickname} купив ексклюзив ${item.name} за ${item.price} монет.`);
+            const data = await buyPremiumItemRequest(getToken(), item);
+            setProfile(data.profile);
+            showToast(`Ви успішно придбали ${item.name || "товар"}!`, "success");
+            if (addSystemLog) addSystemLog("Магазин", `Гравець ${profile.nickname} купив ексклюзив за ${item.price} монет.`);
         } catch (e) {
             console.error(e);
-            showToast("Помилка під час покупки товару.");
+            showToast(e.message || "Помилка під час покупки товару.");
         } finally {
             actionLock.current = false;
             setIsProcessing(false);

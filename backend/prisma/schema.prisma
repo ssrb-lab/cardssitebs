@@ -131,3 +131,12 @@ model PromoCode {
   currentGlobalUses Int    @default(0)
   usedBy            Json   @default("[]")
 }
+
+model AdminLog {
+  id           String   @id @default(uuid())
+  type         String
+  details      String   @db.Text
+  userUid      String
+  userNickname String
+  timestamp    DateTime @default(now())
+}

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Loader2, Volume2 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
 import { formatDate, getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { Swords } from "lucide-react";
@@ -31,16 +30,14 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
         }).filter(Boolean);
         setPlayerInventory(inv);
 
-        if (profileData.mainShowcaseId) {
-            const showcasesSnap = await getDocs(collection(db, "artifacts", appId, "users", targetUid, "showcases"));
-            let showcaseFound = null;
-            showcasesSnap.forEach(doc => {
-                if (doc.id === profileData.mainShowcaseId) showcaseFound = { id: doc.id, ...doc.data() };
-            });
+        if (profileData.mainShowcaseId && profileData.showcases) {
+            const showcaseFound = profileData.showcases.find(s => s.id === profileData.mainShowcaseId);
             if (showcaseFound) {
                 const showcaseCards = [];
                 const tempInv = JSON.parse(JSON.stringify(inv));
-                for (const cid of showcaseFound.cardIds) {
+                const cardIdsArray = typeof showcaseFound.cardIds === 'string' ? JSON.parse(showcaseFound.cardIds) : showcaseFound.cardIds;
+                
+                for (const cid of (cardIdsArray || [])) {
                     const invItem = tempInv.find(i => i.card.id === cid);
                     if (invItem && invItem.amount > 0) {
                         showcaseCards.push(invItem.card);

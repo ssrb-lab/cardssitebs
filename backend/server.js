@@ -140,7 +140,8 @@ app.get('/api/profile', authenticate, async (req, res) => {
       where: { uid: req.user.uid },
       include: {
         inventory: { include: { card: true } },
-        farmState: true
+        farmState: true,
+        showcases: true
       }
     });
     
@@ -156,7 +157,7 @@ app.get('/api/profile/public/:uid', async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
             where: { uid: req.params.uid },
-            select: { uid: true, nickname: true, avatarUrl: true, coins: true, uniqueCardsCount: true, packsOpened: true, farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true }
+            select: { uid: true, nickname: true, showcases: true, avatarUrl: true, coins: true, uniqueCardsCount: true, packsOpened: true, farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true }
         });
         if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
         res.json(user);
@@ -718,6 +719,55 @@ app.get('/api/game/leaderboard', async (req, res) => {
 // ПРЕМІУМ ТА ВІТРИНИ (ПРОФІЛЬ)
 // ----------------------------------------
 
+// Створення вітрини
+app.post('/api/profile/showcases', authenticate, async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Введіть назву вітрини." });
+  
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { showcases: true } });
+    if (user.showcases.length >= 5 && !user.isSuperAdmin) {
+        return res.status(400).json({ error: "Досягнуто ліміт вітрин (5 шт)." });
+    }
+    const showcase = await prisma.showcase.create({
+        data: { name, cardIds: [], userId: req.user.uid }
+    });
+    res.json({ success: true, showcase });
+  } catch (error) { res.status(500).json({ error: "Помилка створення вітрини." }); }
+});
+
+// Видалення вітрини
+app.delete('/api/profile/showcases/:id', authenticate, async (req, res) => {
+  try {
+    const showcase = await prisma.showcase.findUnique({ where: { id: req.params.id } });
+    if (!showcase || showcase.userId !== req.user.uid) return res.status(403).json({ error: "Доступ заборонено." });
+    
+    await prisma.showcase.delete({ where: { id: req.params.id } });
+    
+    // Якщо видалили головну вітрину - знімаємо її з профілю
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (user.mainShowcaseId === req.params.id) {
+        await prisma.user.update({ where: { uid: req.user.uid }, data: { mainShowcaseId: null } });
+    }
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: "Помилка видалення вітрини." }); }
+});
+
+// Збереження карток у вітрині
+app.put('/api/profile/showcases/:id/cards', authenticate, async (req, res) => {
+  const { cardIds } = req.body;
+  try {
+    const showcase = await prisma.showcase.findUnique({ where: { id: req.params.id } });
+    if (!showcase || showcase.userId !== req.user.uid) return res.status(403).json({ error: "Доступ заборонено." });
+
+    const updated = await prisma.showcase.update({
+        where: { id: req.params.id },
+        data: { cardIds }
+    });
+    res.json({ success: true, showcase: updated });
+  } catch (error) { res.status(500).json({ error: "Помилка збереження карток." }); }
+});
+
 // Купівля преміуму
 app.post('/api/game/buy-premium', authenticate, async (req, res) => {
     try {
@@ -877,6 +927,81 @@ app.post('/api/profile/update-avatar', authenticate, async (req, res) => {
 
 // Запуск сервера
 const PORT = process.env.PORT || 5000;
+
+// Зміна нікнейму (Преміум магазин)
+app.post('/api/profile/change-nickname', authenticate, async (req, res) => {
+    const { newNickname } = req.body;
+    if (!newNickname) return res.status(400).json({ error: "Введіть нікнейм!" });
+    try {
+        const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+        if (user.coins < 100000) return res.status(400).json({ error: "Недостатньо монет!" });
+
+        const exists = await prisma.user.findFirst({ where: { nickname: newNickname } });
+        if (exists) return res.status(400).json({ error: "Цей нікнейм вже зайнятий!" });
+
+        const updated = await prisma.user.update({
+            where: { uid: req.user.uid },
+            data: { nickname: newNickname, coins: { decrement: 100000 } }
+        });
+        res.json({ success: true, profile: updated });
+    } catch (e) { res.status(500).json({ error: "Помилка сервера." }); }
+});
+
+// Покупка преміум-товару
+app.post('/api/game/premium-shop/buy', authenticate, async (req, res) => {
+    const { item } = req.body;
+    try {
+        const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+        if (!user.isPremium || new Date(user.premiumUntil) < new Date()) {
+            return res.status(403).json({ error: "Тільки для Преміум гравців!" });
+        }
+        if (user.coins < item.price) return res.status(400).json({ error: "Недостатньо монет!" });
+
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { uid: user.uid },
+                data: { coins: { decrement: item.price }, totalCards: { increment: 1 } }
+            });
+            if (item.type === 'card') {
+                await tx.inventoryItem.upsert({
+                    where: { userId_cardId: { userId: user.uid, cardId: item.itemId } },
+                    update: { amount: { increment: 1 } },
+                    create: { userId: user.uid, cardId: item.itemId, amount: 1 }
+                });
+            }
+        });
+
+        const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
+        res.json({ success: true, profile: updatedUser });
+    } catch (e) { res.status(500).json({ error: "Помилка покупки." }); }
+});
+
+// Системні Логи Адмінки
+app.post('/api/admin/logs', authenticate, async (req, res) => {
+    const { type, details } = req.body;
+    try {
+        const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+        await prisma.adminLog.create({
+            data: { type, details, userUid: user.uid, userNickname: user.nickname }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Помилка логування." }); }
+});
+
+app.get('/api/admin/logs', authenticate, checkAdmin, async (req, res) => {
+    try {
+        const logs = await prisma.adminLog.findMany({ orderBy: { timestamp: 'desc' }, take: 100 });
+        res.json(logs);
+    } catch (e) { res.status(500).json({ error: "Помилка отримання логів." }); }
+});
+
+app.delete('/api/admin/logs', authenticate, checkAdmin, async (req, res) => {
+    try {
+        await prisma.adminLog.deleteMany({});
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Помилка очищення логів." }); }
+});
+
 app.listen(PORT, () => {
   console.log(`Бекенд успішно запущено на порту ${PORT}, Мій лорд.`);
 });

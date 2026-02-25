@@ -309,3 +309,68 @@ export const changePasswordRequest = async (token, oldPassword, newPassword) => 
     if (!res.ok) throw new Error(data.error || 'Помилка зміни пароля');
     return data;
 };
+
+export const createShowcaseRequest = async (token, name) => {
+    const res = await fetch(`${API_URL}/profile/showcases`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const deleteShowcaseRequest = async (token, showcaseId) => {
+    const res = await fetch(`${API_URL}/profile/showcases/${showcaseId}`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const saveShowcaseCardsRequest = async (token, showcaseId, cardIds) => {
+    const res = await fetch(`${API_URL}/profile/showcases/${showcaseId}/cards`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ cardIds })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const changeNicknameRequest = async (token, newNickname) => {
+    const res = await fetch(`${API_URL}/profile/change-nickname`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ newNickname })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const buyPremiumItemRequest = async (token, item) => {
+    const res = await fetch(`${API_URL}/game/premium-shop/buy`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ item })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const createAdminLogRequest = async (token, type, details) => {
+    await fetch(`${API_URL}/admin/logs`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ type, details })
+    });
+};
+
+export const fetchAdminLogsRequest = async (token) => {
+    const res = await fetch(`${API_URL}/admin/logs`, { headers: { 'Authorization': `Bearer ${token}` } });
+    return res.json();
+};
+
+export const clearAdminLogsRequest = async (token) => {
+    await fetch(`${API_URL}/admin/logs`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+};

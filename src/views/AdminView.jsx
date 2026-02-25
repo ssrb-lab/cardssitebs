@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { collection, onSnapshot, doc, writeBatch } from "firebase/firestore";
 import { 
   Users, Layers, LayoutGrid, Ticket, Settings, ScrollText, Bug, Edit2, 
   Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
   Eye, CheckCircle2, CalendarDays, Gift, Zap // <-- ДОДАНО ZAP (БЛИСКАВКА)
 } from "lucide-react";
-import { fetchPromosRequest, savePromoRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest } from "../config/api";
+import { fetchPromosRequest, savePromoRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest } from "../config/api";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
@@ -96,13 +95,13 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
     }
 
     if (activeTab === "logs" && currentProfile.isAdmin) {
-      const unsub = onSnapshot(collection(db, "artifacts", appId, "public", "data", "adminLogs"), (snap) => {
-          const lList = [];
-          snap.forEach(d => lList.push({ id: d.id, ...d.data() }));
-          lList.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-          setAdminLogs(lList);
-      });
-      return () => unsub();
+      const loadLogs = async () => {
+          try {
+              const data = await fetchAdminLogsRequest(getToken());
+              setAdminLogs(data || []);
+          } catch(e) { console.error(e); }
+      };
+      loadLogs();
     }
   }, [activeTab, db, appId, currentProfile]);
 
@@ -438,12 +437,8 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
   const clearAdminLogs = async () => {
     if (!confirm("Очистити всі системні логи? Це безповоротно!")) return;
     try {
-        const batch = writeBatch(db);
-        adminLogs.forEach(log => {
-            const ref = doc(db, "artifacts", appId, "public", "data", "adminLogs", log.id);
-            batch.delete(ref);
-        });
-        await batch.commit();
+        await clearAdminLogsRequest(getToken());
+        setAdminLogs([]);
         showToast("Логи успішно очищено!", "success");
     } catch(e) {
         console.error(e);

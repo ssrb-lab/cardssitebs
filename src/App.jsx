@@ -3,17 +3,11 @@ import {
   Coins, PackageOpen, LayoutGrid, AlertCircle, Loader2, Mail, User,
   CheckCircle2, Shield, KeyRound, Trophy, Store, Hexagon, Gem, Swords, Gift, Volume2, VolumeX
 } from "lucide-react";
-//import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-//import { doc, setDoc, collection, onSnapshot, updateDoc, getDocs, getDoc, query, where, writeBatch, increment, deleteDoc } from "firebase/firestore";
 
-import { loginUser, registerUser, googleLoginRequest, setToken, removeToken, setMainShowcaseRequest, fetchCatalog, openPackRequest, getToken, sellCardsRequest, fetchMarket, listCardRequest, buyCardRequest, cancelListingRequest, fetchSettings } from "./config/api";
-import { doc, setDoc, collection, onSnapshot, updateDoc, getDocs, getDoc, query, where, writeBatch, increment, deleteDoc } from "firebase/firestore";
-
+import { loginUser, createAdminLogRequest, registerUser, googleLoginRequest, setToken, removeToken, setMainShowcaseRequest, fetchCatalog, openPackRequest, getToken, sellCardsRequest, fetchMarket, listCardRequest, buyCardRequest, cancelListingRequest, fetchSettings, createShowcaseRequest, deleteShowcaseRequest, saveShowcaseCardsRequest } from "./config/api";
 import { GoogleLogin } from '@react-oauth/google';
-import { getGlobalTime } from "./utils/helpers";
-import { auth, db, GAME_ID } from "./config/firebase";
+import { getGlobalTime, isToday } from "./utils/helpers";
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from "./config/constants";
-import { isToday } from "./utils/helpers";
 
 import PlayerAvatar from "./components/PlayerAvatar";
 import CardModal from "./components/CardModal";
@@ -39,7 +33,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   const [isProcessing, setIsProcessing] = useState(false);
-  // НАДІЙНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ ТА СПАМУ
   const actionLock = useRef(false);
 
   const [needsRegistration, setNeedsRegistration] = useState(false);
@@ -77,16 +70,13 @@ export default function App() {
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
-  const checkedIpForUid = useRef(null);
-
   useEffect(() => { document.title = "Card Game"; }, []);
 
   const addSystemLog = async (type, details) => {
     try {
-      const logRef = doc(db, "artifacts", GAME_ID, "public", "data", "adminLogs", "log_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5));
-      await setDoc(logRef, { type, details, userUid: user?.uid || "Система", userNickname: profile?.nickname || "Гість", timestamp: new Date().toISOString() });
+        await createAdminLogRequest(getToken(), type, details);
     } catch (e) { console.error("Помилка логування:", e); }
-  };
+};
 
   useEffect(() => {
     let timeout;
@@ -100,7 +90,6 @@ export default function App() {
   }, [loading, profile, needsRegistration, user]);
 
   useEffect(() => {
-    // Створюємо асинхронну функцію всередині
     const initAuth = async () => {
       const token = localStorage.getItem('token');
 
@@ -120,9 +109,11 @@ export default function App() {
           const userData = await res.json();
           setUser({ uid: userData.uid, email: userData.email });
           setProfile(userData);
-          // Додаємо інвентар з MySQL:
           if (userData.inventory) {
             setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+          }
+          if (userData.showcases) {
+            setShowcases(userData.showcases);
           }
           setNeedsRegistration(false);
         } else {
@@ -138,7 +129,6 @@ export default function App() {
       setLoading(false);
     };
 
-    // Запускаємо її
     initAuth();
   }, []);
 
@@ -161,42 +151,23 @@ export default function App() {
         setCardsCatalog(cards || []);
         setPacksCatalog(packs || []);
 
+        // Генеруємо статистику з MySQL бази
+        if (cards && cards.length > 0) {
+            const stats = {};
+            cards.forEach(c => { stats[c.id] = c.pulledCount || 0; });
+            setCardStats(stats);
+        }
+
         const marketData = await fetchMarket();
         setMarketListings(marketData || []);
 
-        await reloadSettings(); // <--- ДОДАЄМО СЮДИ
+        await reloadSettings();
       } catch (err) {
         console.error("Помилка завантаження даних MySQL", err);
       }
     };
     loadMySqlData();
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-
-
-    const statsRef = collection(db, "artifacts", GAME_ID, "public", "data", "cardStats");
-    const unsubCardStats = onSnapshot(statsRef, (snapshot) => {
-      const stats = {};
-      snapshot.forEach((doc) => { stats[doc.id] = doc.data().pulledCount || 0; });
-      setCardStats(stats);
-    });
-
-
-
-
-    const showcasesRef = collection(db, "artifacts", GAME_ID, "users", user.uid, "showcases");
-    const unsubShowcases = onSnapshot(showcasesRef, (snapshot) => {
-      const list = [];
-      snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-      setShowcases(list);
-    });
-
-    return () => { unsubShowcases(); unsubCardStats(); };
-  }, [user]);
-
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -208,18 +179,14 @@ export default function App() {
       if (authMode === "register") {
         const nickname = e.target.nickname.value.trim();
         if (!nickname) throw new Error("Введіть нікнейм!");
-
-        // Виклик нашого нового API для реєстрації
         const data = await registerUser(nickname, email, password);
         setToken(data.token);
-        setUser({ uid: data.user.uid, email: data.user.email }); // Тимчасовий стейт
+        setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
-
       } else {
-        // Виклик нашого нового API для входу
         const data = await loginUser(email, password);
         setToken(data.token);
-        setUser({ uid: data.user.uid, email: data.user.email }); // Тимчасовий стейт
+        setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
       }
       setNeedsRegistration(false);
@@ -228,22 +195,18 @@ export default function App() {
     }
     setLoading(false);
   };
+
   const toggleAutoSound = async () => {
     if (!user || actionLock.current) return;
     const newValue = profile?.autoSoundEnabled === false ? true : false;
-
-    // Просто оновлюємо стан у грі без Firebase
     setProfile(prev => ({ ...prev, autoSoundEnabled: newValue }));
     showToast(newValue ? "Автозвук увімкнено" : "Автозвук вимкнено", "success");
   };
 
-
   const handleLogout = async () => {
     setLoading(true);
-    localStorage.removeItem('token'); // Видаляємо токен
-    try { await signOut(auth); } catch (e) { }
-
-    setUser(null); // <--- ЗМІНЕНО ТУТ
+    localStorage.removeItem('token');
+    setUser(null);
     setProfile(null);
     setDbInventory([]);
     setShowcases([]);
@@ -258,8 +221,6 @@ export default function App() {
     setTimeout(() => setToastMsg({ text: "", type: "" }), 3000);
   };
 
-  // --- ЛОГІКА РИНКУ ТА ЕКОНОМІКИ З ЗАХИСТОМ ВІД АВТОКЛІКЕРА ---
-  // --- НОВИЙ РИНОК MySQL ---
   const reloadMarket = async () => {
     try {
       const marketData = await fetchMarket();
@@ -301,7 +262,7 @@ export default function App() {
     actionLock.current = true; setIsProcessing(true);
     try {
       const data = await cancelListingRequest(getToken(), listing.id);
-      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); // Оновлюємо профіль, якщо це наш лот
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
       showToast(listing.sellerUid === user.uid ? "Лот знято з продажу." : "Лот примусово видалено.", "success");
       await reloadMarket();
@@ -322,7 +283,6 @@ export default function App() {
       setPulledCards([]);
 
       try {
-        // Звертаємось до нашого MySQL бекенду
         const data = await openPackRequest(getToken(), packId, amountToOpen);
         const results = data.pulledCards;
 
@@ -337,21 +297,15 @@ export default function App() {
           setTimeout(() => {
             setIsRouletteSpinning(false);
             setPulledCards(results);
-
-            // Оновлюємо стейти після анімації
             setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
             setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-
             actionLock.current = false; setIsProcessing(false);
           }, 5000);
         } else {
           setOpeningPackId(null);
           setPulledCards(results);
-
-          // Оновлюємо стейти миттєво
           setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
           setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-
           actionLock.current = false; setIsProcessing(false);
         }
       } catch (err) {
@@ -444,38 +398,38 @@ export default function App() {
     if (!name.trim()) return showToast("Введіть назву вітрини!");
     if (showcases.length >= 5 && !profile.isSuperAdmin) return showToast("Досягнуто ліміт вітрин (5 шт).");
     try {
-      await setDoc(doc(collection(db, "artifacts", GAME_ID, "users", user.uid, "showcases")), {
-        name: name.trim(), cardIds: [], createdAt: new Date().toISOString()
-      });
+      const data = await createShowcaseRequest(getToken(), name.trim());
+      setShowcases(prev => [...prev, data.showcase]);
       showToast("Вітрину успішно створено!", "success");
-    } catch (e) { showToast("Помилка створення вітрини."); }
+    } catch (e) { showToast(e.message || "Помилка створення вітрини."); }
   };
 
   const deleteShowcase = async (showcaseId) => {
     if (!confirm("Видалити цю вітрину? Картки залишаться у вашому інвентарі.")) return;
     try {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId));
+      await deleteShowcaseRequest(getToken(), showcaseId);
+      setShowcases(prev => prev.filter(s => s.id !== showcaseId));
       if (profile.mainShowcaseId === showcaseId) {
-        batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { mainShowcaseId: null });
+        setProfile(prev => ({ ...prev, mainShowcaseId: null }));
       }
-      await batch.commit();
       showToast("Вітрину видалено.", "success");
-    } catch (e) { showToast("Помилка видалення."); }
+    } catch (e) { showToast(e.message || "Помилка видалення."); }
   };
 
   const setMainShowcase = async (showcaseId) => {
     try {
       const data = await setMainShowcaseRequest(getToken(), showcaseId);
-      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); // Оновлюємо профіль з бекенду
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); 
       showToast(showcaseId ? "Головну вітрину оновлено!" : "Головну вітрину знято.", "success");
     } catch (e) { showToast("Помилка оновлення вітрини."); }
   };
 
   const saveShowcaseCards = async (showcaseId, newCardIds) => {
     try {
-      await updateDoc(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId), { cardIds: newCardIds });
-    } catch (e) { showToast("Помилка збереження карток у вітрині."); }
+      await saveShowcaseCardsRequest(getToken(), showcaseId, newCardIds);
+      setShowcases(prev => prev.map(s => s.id === showcaseId ? { ...s, cardIds: newCardIds } : s));
+      showToast("Картки збережено!", "success");
+    } catch (e) { showToast(e.message || "Помилка збереження карток у вітрині."); }
   };
 
   // --- ЕКРАНИ ---
@@ -574,7 +528,6 @@ export default function App() {
                 <button onClick={() => setCurrentView("profile")} className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl border border-orange-500/30"><Gift size={20} /></button>
               )}
 
-              {/* ОСЬ ТУТ ДОДАНА НОВА КНОПКА ЗВУКУ */}
               <button onClick={toggleAutoSound} className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors" title={profile?.autoSoundEnabled !== false ? "Вимкнути автозвук карток" : "Увімкнути автозвук карток"}>
                 {profile?.autoSoundEnabled !== false ? <Volume2 size={20} /> : <VolumeX size={20} />}
               </button>
@@ -598,15 +551,15 @@ export default function App() {
       )}
 
       <main className="max-w-5xl mx-auto p-4 mt-4">
-        {currentView === "farm" && <FarmView profile={profile} setProfile={setProfile} db={db} appId={GAME_ID} cardsCatalog={cardsCatalog} showToast={showToast} bosses={bosses} rarities={rarities} />}
+        {currentView === "farm" && <FarmView profile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} showToast={showToast} bosses={bosses} rarities={rarities} />}
         {currentView === "shop" && <ShopView profile={profile} cardStats={cardStats} packs={packsCatalog} cardsCatalog={cardsCatalog} rarities={rarities} openPack={openPack} openingPackId={openingPackId} isRouletteSpinning={isRouletteSpinning} rouletteItems={rouletteItems} pulledCards={pulledCards} setPulledCards={setPulledCards} sellPulledCards={sellPulledCards} selectedPackId={selectedPackId} setSelectedPackId={setSelectedPackId} setViewingCard={setViewingCard} isPremiumActive={isPremiumActive} isAdmin={profile?.isAdmin} isProcessing={isProcessing} />}
-        {currentView === "premium" && <PremiumShopView profile={profile} setProfile={setProfile} user={user} db={db} appId={GAME_ID} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} showToast={showToast} isProcessing={isProcessing} setIsProcessing={setIsProcessing} addSystemLog={addSystemLog} isPremiumActive={isPremiumActive} cardsCatalog={cardsCatalog} setViewingCard={setViewingCard} rarities={rarities} cardStats={cardStats} />}
+        {currentView === "premium" && <PremiumShopView profile={profile} setProfile={setProfile} user={user} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} showToast={showToast} isProcessing={isProcessing} setIsProcessing={setIsProcessing} addSystemLog={addSystemLog} isPremiumActive={isPremiumActive} cardsCatalog={cardsCatalog} setViewingCard={setViewingCard} rarities={rarities} cardStats={cardStats} />}
         {currentView === "inventory" && <InventoryView inventory={fullInventory} rarities={rarities} catalogTotal={cardsCatalog.length} setViewingCard={setViewingCard} setListingCard={setListingCard} packsCatalog={packsCatalog} showcases={showcases} profile={profile} cardsCatalog={cardsCatalog} cardStats={cardStats} sellDuplicate={sellDuplicate} sellAllDuplicates={sellAllDuplicates} sellEveryDuplicate={sellEveryDuplicate} sellPrice={SELL_PRICE} createShowcase={createShowcase} deleteShowcase={deleteShowcase} setMainShowcase={setMainShowcase} saveShowcaseCards={saveShowcaseCards} />}
         {currentView === "market" && <MarketView marketListings={marketListings} cardsCatalog={cardsCatalog} rarities={rarities} currentUserUid={user.uid} setViewingCard={setViewingCard} isAdmin={profile?.isAdmin} buyFromMarket={buyFromMarket} cancelMarketListing={cancelMarketListing} />}
-        {currentView === "profile" && <ProfileView profile={profile} setProfile={setProfile} user={user} db={db} appId={GAME_ID} handleLogout={handleLogout} showToast={showToast} inventoryCount={fullInventory.length} canClaimDaily={canClaimDaily} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} isPremiumActive={isPremiumActive} showcases={showcases} cardsCatalog={cardsCatalog} rarities={rarities} fullInventory={fullInventory} setViewingCard={setViewingCard} cardStats={cardStats} />}
-        {currentView === "rating" && <RatingView db={db} appId={GAME_ID} currentUid={user.uid} setViewingPlayerProfile={(uid) => { setViewingPlayerProfile(uid); setCurrentView("publicProfile"); }} />}
-        {currentView === "publicProfile" && viewingPlayerProfile && <PublicProfileView db={db} appId={GAME_ID} targetUid={viewingPlayerProfile} goBack={() => setCurrentView("rating")} cardsCatalog={cardsCatalog} rarities={rarities} setViewingCard={setViewingCard} packsCatalog={packsCatalog} cardStats={cardStats} />}
-        {currentView === "admin" && profile?.isAdmin && <AdminView db={db} appId={GAME_ID} reloadSettings={reloadSettings} currentProfile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} packsCatalog={packsCatalog} setCardsCatalog={setCardsCatalog} setPacksCatalog={setPacksCatalog} rarities={rarities} showToast={showToast} addSystemLog={addSystemLog} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} setViewingPlayerProfile={setViewingPlayerProfile} setCurrentView={setCurrentView} bosses={bosses} setBosses={setBosses} />}
+        {currentView === "profile" && <ProfileView profile={profile} setProfile={setProfile} user={user} handleLogout={handleLogout} showToast={showToast} inventoryCount={fullInventory.length} canClaimDaily={canClaimDaily} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} isPremiumActive={isPremiumActive} showcases={showcases} cardsCatalog={cardsCatalog} rarities={rarities} fullInventory={fullInventory} setViewingCard={setViewingCard} cardStats={cardStats} />}
+        {currentView === "rating" && <RatingView currentUid={user.uid} setViewingPlayerProfile={(uid) => { setViewingPlayerProfile(uid); setCurrentView("publicProfile"); }} />}
+        {currentView === "publicProfile" && viewingPlayerProfile && <PublicProfileView targetUid={viewingPlayerProfile} goBack={() => setCurrentView("rating")} cardsCatalog={cardsCatalog} rarities={rarities} setViewingCard={setViewingCard} packsCatalog={packsCatalog} cardStats={cardStats} />}
+        {currentView === "admin" && profile?.isAdmin && <AdminView reloadSettings={reloadSettings} currentProfile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} packsCatalog={packsCatalog} setCardsCatalog={setCardsCatalog} setPacksCatalog={setPacksCatalog} rarities={rarities} showToast={showToast} addSystemLog={addSystemLog} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} setViewingPlayerProfile={setViewingPlayerProfile} setCurrentView={setCurrentView} bosses={bosses} setBosses={setBosses} />}
       </main>
 
       {viewingCard && <CardModal viewingCard={viewingCard} setViewingCard={setViewingCard} rarities={rarities} />}
