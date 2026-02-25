@@ -9,6 +9,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { getGlobalTime, isToday } from "./utils/helpers";
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from "./config/constants";
 
+import logo1 from "./assets/logo1.png";
 import PlayerAvatar from "./components/PlayerAvatar";
 import CardModal from "./components/CardModal";
 import ListingModal from "./components/ListingModal";
@@ -557,7 +558,7 @@ export default function App() {
       <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer" onClick={() => setCurrentView("shop")}>
-            <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl"><Hexagon className="text-white w-5 h-5" /></div>
+            <img src={logo1} alt="Card Game Logo" className="w-10 h-10 object-contain rounded-xl" />
             <span className="hidden sm:block">Card Game</span>
           </div>
 
