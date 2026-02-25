@@ -104,6 +104,36 @@ app.post('/api/auth/login', async (req, res) => {
 // ПРОФІЛЬ ГРАВЦЯ
 // ----------------------------------------
 
+app.post('/api/profile/change-password', authenticate, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: "Введіть всі поля." });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: "Користувача не знайдено." });
+
+    // Перевірка старого пароля
+    const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isValid) return res.status(401).json({ error: "Неправильний старий пароль." });
+
+    // Хешування та збереження нового пароля
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: { passwordHash: newPasswordHash }
+    });
+
+    res.json({ success: true, message: "Пароль успішно змінено!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера при зміні пароля." });
+  }
+});
+
 app.get('/api/profile', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({

@@ -295,3 +295,17 @@ export const fetchPublicProfileRequest = async (uid) => {
     if (!res.ok) throw new Error(data.error);
     return data;
 };
+
+export const changePasswordRequest = async (token, oldPassword, newPassword) => {
+    const res = await fetch(`${API_URL}/profile/change-password`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ oldPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Помилка зміни пароля');
+    return data;
+};

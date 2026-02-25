@@ -2,11 +2,13 @@ import React, { useState, useRef } from "react";
 import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
-import { claimDailyRequest, usePromoRequest, updateAvatarRequest, getToken } from "../config/api";
+import { claimDailyRequest, usePromoRequest, updateAvatarRequest, getToken, changePasswordRequest } from "../config/api";
 
 export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats }) {
     const [avatarInput, setAvatarInput] = useState("");
     const [promoInput, setPromoInput] = useState("");
+    const [oldPassword, setOldPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const actionLock = useRef(false);
     
@@ -61,6 +63,21 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             setPromoInput("");
         } catch (e) { showToast(e.message || "Помилка промокоду", "error"); } 
         finally { actionLock.current = false; setIsProcessing(false); }
+    };
+
+    const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (actionLock.current || isProcessing || !oldPassword.trim() || !newPassword.trim()) return;
+    actionLock.current = true; setIsProcessing(true);
+    try {
+        await changePasswordRequest(getToken(), oldPassword, newPassword);
+        showToast("Мій лорд, пароль успішно змінено!", "success");
+        setOldPassword("");
+        setNewPassword("");
+    } catch (e) { 
+        showToast(e.message || "Помилка зміни пароля", "error"); 
+    } 
+    finally { actionLock.current = false; setIsProcessing(false); }
     };
 
     return (
@@ -151,28 +168,59 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             <div className="max-w-4xl mx-auto">
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
                     <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Settings className="text-blue-500" /> Налаштування</h3>
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <label className="block text-sm font-bold text-neutral-400 mb-2">URL Аватарки (Необов'язково)</label>
-                            <form onSubmit={handleAvatarUpdate} className="flex gap-2 relative z-10">
-                                <input 
-                                    type="text" 
-                                    value={avatarInput} 
-                                    onChange={(e) => setAvatarInput(e.target.value)} 
-                                    placeholder="https://..." 
-                                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm" 
-                                />
-                                <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm">
-                                    Зберегти
-                                </button>
-                            </form>
-                        </div>
-                        <div className="flex-1 flex items-end">
-                            <button onClick={handleLogout} className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 border border-red-900/50">
-                                <LogOut size={18} /> Вийти з акаунту
-                            </button>
-                        </div>
-                    </div>
+                    <div className="flex flex-col gap-6">
+    <div className="flex flex-col md:flex-row gap-4">
+        {/* Форма аватарки */}
+        <div className="flex-1">
+            <label className="block text-sm font-bold text-neutral-400 mb-2">URL Аватарки (Необов'язково)</label>
+            <form onSubmit={handleAvatarUpdate} className="flex gap-2 relative z-10">
+                <input 
+                    type="text" 
+                    value={avatarInput} 
+                    onChange={(e) => setAvatarInput(e.target.value)} 
+                    placeholder="https://..." 
+                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm" 
+                />
+                <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm">
+                    Зберегти
+                </button>
+            </form>
+        </div>
+
+        {/* Форма зміни пароля */}
+        <div className="flex-1">
+            <label className="block text-sm font-bold text-neutral-400 mb-2">Зміна пароля</label>
+            <form onSubmit={handleChangePassword} className="flex flex-col gap-2 relative z-10">
+                <input 
+                    type="password" 
+                    value={oldPassword} 
+                    onChange={(e) => setOldPassword(e.target.value)} 
+                    placeholder="Старий пароль" 
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 text-white focus:border-blue-500 outline-none text-sm" 
+                />
+                <div className="flex gap-2">
+                    <input 
+                        type="password" 
+                        value={newPassword} 
+                        onChange={(e) => setNewPassword(e.target.value)} 
+                        placeholder="Новий пароль" 
+                        className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 text-white focus:border-blue-500 outline-none text-sm" 
+                    />
+                    <button type="submit" disabled={isProcessing || !oldPassword || !newPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm whitespace-nowrap">
+                        Оновити
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {/* Кнопка виходу */}
+    <div className="flex justify-end mt-2">
+        <button onClick={handleLogout} className="w-full md:w-auto bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 border border-red-900/50">
+            <LogOut size={18} /> Вийти з акаунту
+        </button>
+    </div>
+</div>
                 </div>
             </div>
         </div>
