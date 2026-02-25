@@ -53,10 +53,10 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
           onMouseEnter={handleMouseEnter}
           onTouchMove={(e) => handleMouseMove(e.touches[0])}
           onTouchEnd={handleMouseLeave}
+          style={tiltStyle}
         >
             <div 
-                className={`w-full aspect-[2/3] rounded-3xl border-4 overflow-hidden ${style.border} ${effectClass} relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)]`}
-                style={tiltStyle}
+                className={`w-full aspect-[2/3] rounded-3xl border-4 overflow-hidden ${style.border} ${effectClass} relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)]`}              
             >
               <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
               

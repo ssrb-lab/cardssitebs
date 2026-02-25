@@ -222,16 +222,27 @@ app.get('/api/profile/public/:uid', async (req, res) => {
       where: { uid: req.params.uid },
       select: { 
                 uid: true, nickname: true, avatarUrl: true, coins: true, 
-                totalCards: true, // <-- ДОДАНО
-                uniqueCardsCount: true, packsOpened: true, 
-                coinsSpentOnPacks: true, // <-- ДОДАНО
-                coinsEarnedFromPacks: true, // <-- ДОДАНО
-                farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true 
+                totalCards: true, 
+                packsOpened: true, 
+                coinsSpentOnPacks: true, 
+                coinsEarnedFromPacks: true, 
+                farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
+                _count: { select: { inventory: true } } // Динамічно рахуємо унікальні картки
             }
     });
+    
     if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
-    res.json(user);
-  } catch (error) { res.status(500).json({ error: "Помилка завантаження профілю." }); }
+    
+    // Форматуємо результат для фронтенду
+    const formattedUser = {
+        ...user,
+        uniqueCardsCount: user._count.inventory
+    };
+    
+    res.json(formattedUser);
+  } catch (error) { 
+    res.status(500).json({ error: "Помилка завантаження профілю." }); 
+  }
 });
 
 // ----------------------------------------
