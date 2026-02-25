@@ -34,6 +34,7 @@ export default function App() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const actionLock = useRef(false);
+  const lastCheckRef = useRef(null);
 
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [authMode, setAuthMode] = useState("login");
@@ -50,7 +51,15 @@ export default function App() {
   const [premiumDurationDays, setPremiumDurationDays] = useState(30);
   const [premiumShopItems, setPremiumShopItems] = useState([]);
 
-  const [currentView, setCurrentView] = useState("shop");
+  const [currentView, setCurrentView] = useState(() => {
+    // Намагаємось отримати збережену вкладку, якщо її немає — за замовчуванням "shop"
+    return localStorage.getItem("lastActiveView") || "shop";
+  });
+
+  // Додаємо useEffect, який буде зберігати вкладку в localStorage щоразу, коли вона змінюється
+  useEffect(() => {
+    localStorage.setItem("lastActiveView", currentView);
+  }, [currentView]);
   const [selectedPackId, setSelectedPackId] = useState(null);
   const [openingPackId, setOpeningPackId] = useState(null);
   const [isRouletteSpinning, setIsRouletteSpinning] = useState(false);
@@ -74,9 +83,9 @@ export default function App() {
 
   const addSystemLog = async (type, details) => {
     try {
-        await createAdminLogRequest(getToken(), type, details);
+      await createAdminLogRequest(getToken(), type, details);
     } catch (e) { console.error("Помилка логування:", e); }
-};
+  };
 
   useEffect(() => {
     let timeout;
@@ -153,9 +162,9 @@ export default function App() {
 
         // Генеруємо статистику з MySQL бази
         if (cards && cards.length > 0) {
-            const stats = {};
-            cards.forEach(c => { stats[c.id] = c.pulledCount || 0; });
-            setCardStats(stats);
+          const stats = {};
+          cards.forEach(c => { stats[c.id] = c.pulledCount || 0; });
+          setCardStats(stats);
         }
 
         const marketData = await fetchMarket();
@@ -168,6 +177,47 @@ export default function App() {
     };
     loadMySqlData();
   }, []);
+
+  // --- ФОНОВА ПЕРЕВІРКА ПРОДАЖІВ НА РИНКУ ---
+  useEffect(() => {
+    if (!user || !profile || needsRegistration) return;
+
+    const checkMarketNotifications = async () => {
+      try {
+        const res = await fetch(`https://cardgameapp.space/api/game/market/notifications?lastCheck=${lastCheckRef.current}`, {
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          if (data.serverTime) {
+            lastCheckRef.current = data.serverTime;
+          }
+
+          if (data.sales && data.sales.length > 0) {
+            data.sales.forEach(sale => {
+              showToast(`Гравець купив вашу картку "${sale.card?.name || 'Невідомо'}" за ${sale.price} монет!`, "success");
+            });
+
+            if (data.profile) {
+              setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+              if (data.profile.inventory) {
+                setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Помилка фонового опитування:", e);
+      }
+    };
+
+    const interval = setInterval(checkMarketNotifications, 10000);
+    checkMarketNotifications();
+
+    return () => clearInterval(interval);
+  }, [user, profile, needsRegistration]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -419,7 +469,7 @@ export default function App() {
   const setMainShowcase = async (showcaseId) => {
     try {
       const data = await setMainShowcaseRequest(getToken(), showcaseId);
-      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); 
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       showToast(showcaseId ? "Головну вітрину оновлено!" : "Головну вітрину знято.", "success");
     } catch (e) { showToast("Помилка оновлення вітрини."); }
   };
@@ -555,7 +605,7 @@ export default function App() {
         {currentView === "shop" && <ShopView profile={profile} cardStats={cardStats} packs={packsCatalog} cardsCatalog={cardsCatalog} rarities={rarities} openPack={openPack} openingPackId={openingPackId} isRouletteSpinning={isRouletteSpinning} rouletteItems={rouletteItems} pulledCards={pulledCards} setPulledCards={setPulledCards} sellPulledCards={sellPulledCards} selectedPackId={selectedPackId} setSelectedPackId={setSelectedPackId} setViewingCard={setViewingCard} isPremiumActive={isPremiumActive} isAdmin={profile?.isAdmin} isProcessing={isProcessing} />}
         {currentView === "premium" && <PremiumShopView profile={profile} setProfile={setProfile} user={user} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} showToast={showToast} isProcessing={isProcessing} setIsProcessing={setIsProcessing} addSystemLog={addSystemLog} isPremiumActive={isPremiumActive} cardsCatalog={cardsCatalog} setViewingCard={setViewingCard} rarities={rarities} cardStats={cardStats} />}
         {currentView === "inventory" && <InventoryView inventory={fullInventory} rarities={rarities} catalogTotal={cardsCatalog.length} setViewingCard={setViewingCard} setListingCard={setListingCard} packsCatalog={packsCatalog} showcases={showcases} profile={profile} cardsCatalog={cardsCatalog} cardStats={cardStats} sellDuplicate={sellDuplicate} sellAllDuplicates={sellAllDuplicates} sellEveryDuplicate={sellEveryDuplicate} sellPrice={SELL_PRICE} createShowcase={createShowcase} deleteShowcase={deleteShowcase} setMainShowcase={setMainShowcase} saveShowcaseCards={saveShowcaseCards} />}
-        {currentView === "market" && <MarketView marketListings={marketListings} cardsCatalog={cardsCatalog} rarities={rarities} currentUserUid={user.uid} setViewingCard={setViewingCard} isAdmin={profile?.isAdmin} buyFromMarket={buyFromMarket} cancelMarketListing={cancelMarketListing} />}
+        {currentView === "market" && <MarketView marketListings={marketListings} cardsCatalog={cardsCatalog} rarities={rarities} currentUserUid={user.uid} setViewingCard={setViewingCard} isAdmin={profile?.isAdmin} buyFromMarket={buyFromMarket} cancelMarketListing={cancelMarketListing} reloadMarket={reloadMarket} />}
         {currentView === "profile" && <ProfileView profile={profile} setProfile={setProfile} user={user} handleLogout={handleLogout} showToast={showToast} inventoryCount={fullInventory.length} canClaimDaily={canClaimDaily} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} isPremiumActive={isPremiumActive} showcases={showcases} cardsCatalog={cardsCatalog} rarities={rarities} fullInventory={fullInventory} setViewingCard={setViewingCard} cardStats={cardStats} />}
         {currentView === "rating" && <RatingView currentUid={user.uid} setViewingPlayerProfile={(uid) => { setViewingPlayerProfile(uid); setCurrentView("publicProfile"); }} />}
         {currentView === "publicProfile" && viewingPlayerProfile && <PublicProfileView targetUid={viewingPlayerProfile} goBack={() => setCurrentView("rating")} cardsCatalog={cardsCatalog} rarities={rarities} setViewingCard={setViewingCard} packsCatalog={packsCatalog} cardStats={cardStats} />}
@@ -570,7 +620,15 @@ export default function App() {
           <NavButton icon={<Swords size={22} />} label="Фарм" isActive={currentView === "farm"} onClick={() => setCurrentView("farm")} />
           <NavButton icon={<PackageOpen size={22} />} label="Магазин" isActive={currentView === "shop"} onClick={() => { setCurrentView("shop"); setPulledCards([]); setSelectedPackId(null); }} />
           <NavButton icon={<LayoutGrid size={22} />} label="Інвентар" isActive={currentView === "inventory"} onClick={() => setCurrentView("inventory")} />
-          <NavButton icon={<Store size={22} />} label="Ринок" isActive={currentView === "market"} onClick={() => setCurrentView("market")} />
+          <NavButton
+            icon={<Store size={22} />}
+            label="Ринок"
+            isActive={currentView === "market"}
+            onClick={() => {
+              setCurrentView("market");
+              reloadMarket(); // Викликаємо оновлення даних ринку
+            }}
+          />
           <NavButton icon={<Trophy size={22} />} label="Рейтинг" isActive={currentView === "rating" || currentView === "publicProfile"} onClick={() => setCurrentView("rating")} />
           <NavButton icon={<User size={22} />} label="Профіль" isActive={currentView === "profile"} onClick={() => setCurrentView("profile")} />
 
