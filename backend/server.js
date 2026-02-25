@@ -104,6 +104,26 @@ app.post('/api/auth/login', async (req, res) => {
 // ПРОФІЛЬ ГРАВЦЯ
 // ----------------------------------------
 
+app.get('/api/profile/market-history', authenticate, async (req, res) => {
+    try {
+        const history = await prisma.marketListing.findMany({
+            where: {
+                status: 'sold',
+                OR: [
+                    { sellerId: req.user.uid },
+                    { buyerId: req.user.uid }
+                ]
+            },
+            include: { card: true, seller: { select: { nickname: true } } },
+            orderBy: { soldAt: 'desc' },
+            take: 30 // Показуємо останні 30 операцій
+        });
+        res.json(history);
+    } catch (e) {
+        res.status(500).json({ error: "Помилка завантаження історії ринку." });
+    }
+});
+
 app.post('/api/profile/change-password', authenticate, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
@@ -438,8 +458,11 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
       });
       // Продавець: +монети
       await tx.user.update({ where: { uid: listing.sellerId }, data: { coins: { increment: listing.price } } });
-      // Лот: статус змінено
-      await tx.marketListing.update({ where: { id: listingId }, data: { status: 'sold', soldAt: new Date() } });
+      // Лот: статус змінено ТА ДОДАНО ПОКУПЦЯ
+      await tx.marketListing.update({ 
+          where: { id: listingId }, 
+          data: { status: 'sold', soldAt: new Date(), buyerId: buyer.uid, buyerNickname: buyer.nickname } 
+      });
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });

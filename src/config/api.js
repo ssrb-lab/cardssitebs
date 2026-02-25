@@ -385,3 +385,10 @@ export const claim2048RewardRequest = async (token, score) => {
     if (!res.ok) throw new Error(data.error);
     return data;
 };
+
+export const fetchMarketHistoryRequest = async (token) => {
+    const res = await fetch(`${API_URL}/profile/market-history`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.json();
+};

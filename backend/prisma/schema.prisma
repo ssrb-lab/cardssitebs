@@ -95,6 +95,8 @@ model MarketListing {
   
   cardId    String
   card      CardCatalog @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  buyerId       String?
+  buyerNickname String?
 }
 
 model Showcase {

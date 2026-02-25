@@ -1,8 +1,8 @@
-import React, { useState, useRef } from "react";
-import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
-import { claimDailyRequest, usePromoRequest, updateAvatarRequest, getToken, changePasswordRequest } from "../config/api";
+import { claimDailyRequest, fetchMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, changePasswordRequest } from "../config/api";
 
 export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats }) {
     const [avatarInput, setAvatarInput] = useState("");
@@ -11,6 +11,19 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
     const [newPassword, setNewPassword] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const actionLock = useRef(false);
+
+    const [marketHistory, setMarketHistory] = useState([]);
+    const [activeTab, setActiveTab] = useState("history"); // "history" або "settings"
+
+    useEffect(() => {
+        const loadHistory = async () => {
+            try {
+                const data = await fetchMarketHistoryRequest(getToken());
+                setMarketHistory(data || []);
+            } catch (e) { console.error("Помилка історії:", e); }
+        };
+        if (profile) loadHistory();
+    }, [profile?.uid]);
     
     const canClaimDaily = profile && (!profile.lastDailyClaim || new Date(profile.lastDailyClaim).getUTCDate() !== new Date().getUTCDate());
     const mainShowcase = showcases?.find(s => s.id === profile?.mainShowcaseId);
@@ -165,64 +178,120 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                 </div>
             </div>
 
-            <div className="max-w-4xl mx-auto">
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
-                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Settings className="text-blue-500" /> Налаштування</h3>
-                    <div className="flex flex-col gap-6">
-    <div className="flex flex-col md:flex-row gap-4">
-        {/* Форма аватарки */}
-        <div className="flex-1">
-            <label className="block text-sm font-bold text-neutral-400 mb-2">URL Аватарки (Необов'язково)</label>
-            <form onSubmit={handleAvatarUpdate} className="flex gap-2 relative z-10">
-                <input 
-                    type="text" 
-                    value={avatarInput} 
-                    onChange={(e) => setAvatarInput(e.target.value)} 
-                    placeholder="https://..." 
-                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm" 
-                />
-                <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm">
-                    Зберегти
+{/* КНОПКИ ПЕРЕМИКАННЯ */}
+            <div className="flex gap-2 max-w-4xl mx-auto mb-6 bg-neutral-900 p-1.5 rounded-2xl border border-neutral-800 shadow-sm">
+                <button 
+                    onClick={() => setActiveTab("history")} 
+                    className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${activeTab === "history" ? "bg-neutral-800 text-white shadow-md border border-neutral-700" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50 border border-transparent"}`}
+                >
+                    <Store size={18} className={activeTab === "history" ? "text-yellow-500" : ""} /> Історія Ринку
                 </button>
-            </form>
-        </div>
-
-        {/* Форма зміни пароля */}
-        <div className="flex-1">
-            <label className="block text-sm font-bold text-neutral-400 mb-2">Зміна пароля</label>
-            <form onSubmit={handleChangePassword} className="flex flex-col gap-2 relative z-10">
-                <input 
-                    type="password" 
-                    value={oldPassword} 
-                    onChange={(e) => setOldPassword(e.target.value)} 
-                    placeholder="Старий пароль" 
-                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 text-white focus:border-blue-500 outline-none text-sm" 
-                />
-                <div className="flex gap-2">
-                    <input 
-                        type="password" 
-                        value={newPassword} 
-                        onChange={(e) => setNewPassword(e.target.value)} 
-                        placeholder="Новий пароль" 
-                        className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 text-white focus:border-blue-500 outline-none text-sm" 
-                    />
-                    <button type="submit" disabled={isProcessing || !oldPassword || !newPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm whitespace-nowrap">
-                         Оновити
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {/* Кнопка виходу */}
-    <div className="flex justify-end mt-2">
-        <button onClick={handleLogout} className="w-full md:w-auto bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-6 rounded-xl transition-colors flex justify-center items-center gap-2 border border-red-900/50">
-            <LogOut size={18} /> Вийти з акаунту
-        </button>
-    </div>
-</div>
-                </div>
+                <button 
+                    onClick={() => setActiveTab("settings")} 
+                    className={`flex-1 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${activeTab === "settings" ? "bg-neutral-800 text-white shadow-md border border-neutral-700" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50 border border-transparent"}`}
+                >
+                    <Settings size={18} className={activeTab === "settings" ? "text-blue-500" : ""} /> Налаштування
+                </button>
             </div>
+
+            {/* ВМІСТ: ІСТОРІЯ РИНКУ */}
+            {activeTab === "history" && (
+                <div className="max-w-4xl mx-auto mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+                        <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                            {!Array.isArray(marketHistory) || marketHistory.length === 0 ? (
+                                <p className="text-neutral-500 text-sm text-center py-4">Ви ще нічого не купували та не продавали.</p>
+                            ) : (
+                                marketHistory.map(item => {
+                                    const isSale = item.sellerId === profile?.uid;
+                                    const cardImg = item.card?.image || "";
+                                    const cardName = item.card?.name || "Невідома картка";
+                                    
+                                    return (
+                                        <div key={item.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                {cardImg && <img src={cardImg} alt="card" className="w-10 h-14 object-cover rounded-md border border-neutral-700" />}
+                                                <div>
+                                                    <div className="font-bold text-white text-sm">{cardName}</div>
+                                                    <div className="text-xs text-neutral-500 mt-0.5">
+                                                        {isSale ? `Покупець: ${item.buyerNickname || "Невідомо"}` : `Продавець: ${item.seller?.nickname || "Невідомо"}`}
+                                                        <span className="mx-2">•</span>
+                                                        {formatDate(item.soldAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className={`font-black flex items-center gap-1 ${isSale ? 'text-green-500' : 'text-red-500'}`}>
+                                                {isSale ? '+' : '-'}{item.price} <Coins size={14} />
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ВМІСТ: НАЛАШТУВАННЯ */}
+            {activeTab === "settings" && (
+                <div className="max-w-4xl mx-auto mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+                        <div className="flex flex-col gap-6">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                {/* Форма аватарки */}
+                                <div className="flex-1 bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50">
+                                    <label className="block text-sm font-bold text-neutral-400 mb-3">Оновлення Аватарки</label>
+                                    <form onSubmit={handleAvatarUpdate} className="flex flex-col gap-3 relative z-10">
+                                        <input 
+                                            type="text" 
+                                            value={avatarInput} 
+                                            onChange={(e) => setAvatarInput(e.target.value)} 
+                                            placeholder="URL зображення (https://...)" 
+                                            className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" 
+                                        />
+                                        <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm w-full">
+                                            Зберегти аватар
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {/* Форма зміни пароля */}
+                                <div className="flex-1 bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50">
+                                    <label className="block text-sm font-bold text-neutral-400 mb-3">Безпека (Зміна пароля)</label>
+                                    <form onSubmit={handleChangePassword} className="flex flex-col gap-3 relative z-10">
+                                        <input 
+                                            type="password" 
+                                            value={oldPassword} 
+                                            onChange={(e) => setOldPassword(e.target.value)} 
+                                            placeholder="Поточний пароль" 
+                                            className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" 
+                                        />
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <input 
+                                                type="password" 
+                                                value={newPassword} 
+                                                onChange={(e) => setNewPassword(e.target.value)} 
+                                                placeholder="Новий пароль" 
+                                                className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" 
+                                            />
+                                            <button type="submit" disabled={isProcessing || !oldPassword || !newPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm whitespace-nowrap">
+                                                Оновити
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {/* Кнопка виходу */}
+                            <div className="flex justify-end mt-2 pt-4 border-t border-neutral-800">
+                                <button onClick={handleLogout} className="w-full md:w-auto bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-8 rounded-xl transition-colors flex justify-center items-center gap-2 border border-red-900/50">
+                                    <LogOut size={18} /> Вийти з акаунту
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
