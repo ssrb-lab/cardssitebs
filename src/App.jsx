@@ -628,7 +628,7 @@ export default function App() {
         {currentView === "profile" && <ProfileView profile={profile} setProfile={setProfile} user={user} handleLogout={handleLogout} showToast={showToast} inventoryCount={fullInventory.length} canClaimDaily={canClaimDaily} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} isPremiumActive={isPremiumActive} showcases={showcases} cardsCatalog={cardsCatalog} rarities={rarities} fullInventory={fullInventory} setViewingCard={setViewingCard} cardStats={cardStats} />}
         {currentView === "rating" && <RatingView currentUid={user.uid} setViewingPlayerProfile={(uid) => { setViewingPlayerProfile(uid); setCurrentView("publicProfile"); }} />}
         {currentView === "publicProfile" && viewingPlayerProfile && <PublicProfileView targetUid={viewingPlayerProfile} goBack={() => setCurrentView("rating")} cardsCatalog={cardsCatalog} rarities={rarities} setViewingCard={setViewingCard} packsCatalog={packsCatalog} cardStats={cardStats} />}
-        {currentView === "admin" && profile?.isAdmin && <AdminView reloadSettings={reloadSettings} currentProfile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} packsCatalog={packsCatalog} setCardsCatalog={setCardsCatalog} setPacksCatalog={setPacksCatalog} rarities={rarities} showToast={showToast} addSystemLog={addSystemLog} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} setViewingPlayerProfile={setViewingPlayerProfile} setCurrentView={setCurrentView} bosses={bosses} setBosses={setBosses} />}
+        {currentView === "admin" && (profile?.isAdmin || profile?.isSuperAdmin) && <AdminView reloadSettings={reloadSettings} currentProfile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} packsCatalog={packsCatalog} setCardsCatalog={setCardsCatalog} setPacksCatalog={setPacksCatalog} rarities={rarities} showToast={showToast} addSystemLog={addSystemLog} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} setViewingPlayerProfile={setViewingPlayerProfile} setCurrentView={setCurrentView} bosses={bosses} setBosses={setBosses} />}
       </main>
 
       {viewingCard && <CardModal viewingCard={viewingCard} setViewingCard={setViewingCard} rarities={rarities} />}
@@ -659,7 +659,7 @@ export default function App() {
           <NavButton icon={<Trophy size={22} />} label="Рейтинг" isActive={currentView === "rating" || currentView === "publicProfile"} onClick={() => setCurrentView("rating")} />
           <NavButton icon={<User size={22} />} label="Профіль" isActive={currentView === "profile"} onClick={() => setCurrentView("profile")} />
 
-          {profile?.isAdmin && (
+          {(profile?.isAdmin || profile?.isSuperAdmin) && (
             <button onClick={() => setCurrentView("admin")} className={`flex flex-col items-center p-2 rounded-lg w-16 sm:w-20 transition-colors ${currentView === "admin" ? "text-purple-500" : "text-neutral-500"}`}>
               <Shield size={22} />
               <span className="text-[9px] sm:text-[10px] mt-1 font-bold uppercase tracking-wider">Адмінка</span>

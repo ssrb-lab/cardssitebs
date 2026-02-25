@@ -589,9 +589,9 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         <button onClick={() => setActiveTab("users")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "users" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Users size={18} /> Гравці</button>
         <button onClick={() => setActiveTab("packs")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "packs" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Layers size={18} /> Паки</button>
         <button onClick={() => setActiveTab("cards")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "cards" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><LayoutGrid size={18} /> Картки</button>
-        {currentProfile.isAdmin && (
-            <>
-                <button onClick={() => setActiveTab("bosses")} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 sm:py-3 rounded-xl font-bold transition-all text-sm sm:text-base ${activeTab === "bosses" ? "bg-red-600/20 text-red-500 border border-red-500/50" : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white"}`}>
+        {(currentProfile.isAdmin || currentProfile.isSuperAdmin) && (
+    <>
+        <button onClick={() => setActiveTab("bosses")} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 sm:py-3 rounded-xl font-bold transition-all text-sm sm:text-base ${activeTab === "bosses" ? "bg-red-600/20 text-red-500 border border-red-500/50" : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white"}`}>
             <Swords size={18} /> Боси
         </button>
                 <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>

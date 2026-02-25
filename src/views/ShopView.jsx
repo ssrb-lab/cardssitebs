@@ -247,7 +247,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
     );
   }
 
-  const visiblePacks = isAdmin ? packs : packs.filter(p => !p.isHidden);
+  const visiblePacks = (isAdmin || profile?.isSuperAdmin) ? packs : packs.filter(p => !p.isHidden);
   const categoriesList = ["all", ...new Set(visiblePacks.map(p => p.category || "Базові"))];
   const displayedPacks = visiblePacks.filter(p => activeCategory === "all" || (p.category || "Базові") === activeCategory);
 
