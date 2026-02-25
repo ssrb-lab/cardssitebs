@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull } from "lucide-react";
+import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull, ArrowLeft } from "lucide-react";
 import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken } from "../config/api";
 
 export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
@@ -20,6 +20,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     const [isLoading, setIsLoading] = useState(true);
     const [isHit, setIsHit] = useState(false);
     const [timeLeft, setTimeLeft] = useState("");
+    const [activeGame, setActiveGame] = useState(null);
     
     const actionLock = useRef(false);
     const accumulatedDamage = useRef(0);
@@ -143,6 +144,38 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
             actionLock.current = false; setIsProcessing(false);
         }
     };
+    
+    if (activeGame === null) {
+        return (
+            <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto">
+               <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-8 px-2">
+                   <Zap className="text-yellow-500" /> Ігрові режими
+               </h2>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
+                   <div onClick={() => setActiveGame('boss')} className="bg-neutral-900 border border-red-900/50 hover:border-red-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
+                       <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                           <Swords size={120} className="text-red-500" />
+                       </div>
+                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Swords className="text-red-500"/> Битва з Босом</h3>
+                       <p className="text-neutral-400 text-sm mb-6 relative z-10">Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.</p>
+                       <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                   </div>
+
+                   <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 relative overflow-hidden opacity-70">
+                       <div className="absolute inset-0 bg-neutral-950/60 z-20 flex items-center justify-center">
+                           <div className="bg-neutral-900 px-4 py-2 rounded-xl border border-neutral-700 font-bold text-neutral-400 flex items-center gap-2 shadow-lg"><Lock size={16}/> У розробці</div>
+                       </div>
+                       <div className="absolute -right-6 -top-6 opacity-10">
+                           <Timer size={120} className="text-blue-500" />
+                       </div>
+                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><Timer className="text-blue-500"/> Колесо Фортуни</h3>
+                       <p className="text-neutral-500 text-sm mb-6">Випробовуйте свою удачу в новій міні-грі. Вже зовсім скоро!</p>
+                       <button className="bg-neutral-800 text-neutral-500 font-bold py-2 px-6 rounded-xl w-full sm:w-auto">Скоро</button>
+                   </div>
+               </div>
+            </div>
+        );
+    }
 
     if (isLoading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-10 h-10 mb-4"/> Підготовка Арени...</div>;
     if (!currentBoss || !bossCard) return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
@@ -150,6 +183,9 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     if (cooldownEnd) {
         return (
             <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-lg mx-auto text-center mt-10 sm:mt-20">
+                <button onClick={() => setActiveGame(null)} className="mb-6 flex items-center justify-center gap-2 text-neutral-400 hover:text-white font-bold transition-colors w-full">
+                    <ArrowLeft size={20} /> Повернутися до вибору гри
+                </button>
                 <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 sm:p-10 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-purple-600"></div>
                     <Timer className="mx-auto text-blue-500 mb-6 w-16 h-16 opacity-50 animate-pulse" />
@@ -177,6 +213,9 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
 
     return (
         <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-lg mx-auto">
+            <button onClick={() => setActiveGame(null)} className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white font-bold transition-colors px-2">
+                <ArrowLeft size={20} /> Повернутися до вибору гри
+            </button>
             <div className="flex justify-between items-end mb-4 px-2">
                 <div>
                     <div className="text-red-500 font-black tracking-widest uppercase text-sm mb-1 flex items-center gap-2">
