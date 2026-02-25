@@ -4,7 +4,7 @@ import {
   Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
   Eye, CheckCircle2, CalendarDays, Gift, Zap // <-- ДОДАНО ZAP (БЛИСКАВКА)
 } from "lucide-react";
-import { fetchPromosRequest, savePromoRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest } from "../config/api";
+import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest } from "../config/api";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
@@ -453,6 +453,22 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
     }
   };
 
+  const clearUserHistory = async () => {
+        if (!confirm(`Очистити історію ринку гравця ${viewingUser.nickname}?`)) return;
+        try {
+            await adminClearUserMarketHistoryRequest(getToken(), viewingUser.uid);
+            showToast("Історію гравця очищено!", "success");
+        } catch (e) { showToast("Помилка.", "error"); }
+    };
+
+    const clearAllMarketHistory = async () => {
+        if (!confirm("УВАГА! Це назавжди видалить історію ринку ВУСІХ гравців. Продовжити?")) return;
+        try {
+            await adminClearAllMarketHistoryRequest(getToken());
+            showToast("Глобальну історію очищено!", "success");
+        } catch (e) { showToast("Помилка.", "error"); }
+    };
+
   const filteredPacks = packsCatalog.filter(p => p.name.toLowerCase().includes(packSearchTerm.toLowerCase()));
   
   const filteredCards = cardsCatalog
@@ -664,6 +680,13 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                         </button>
                     </div>
                 </div>
+
+                        <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mt-4">
+            <h4 className="font-bold text-neutral-300 mb-2">Ринок:</h4>
+            <button onClick={clearUserHistory} className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-2 rounded-xl transition-colors border border-red-900/50">
+                Очистити історію ринку цього гравця
+            </button>
+            </div>
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
                     <div>
@@ -1048,6 +1071,11 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                      </button>
                  )}
              </div>
+
+             {/* ОСЬ НАША НОВА КНОПКА ДЛЯ ОЧИЩЕННЯ РИНКУ */}
+             <button onClick={clearAllMarketHistory} className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-3 px-6 rounded-xl transition-colors border border-red-900/50 flex items-center justify-center gap-2">
+                 <Trash2 size={18} /> Очистити всю Історію Ринку (Всі гравці)
+             </button>
 
              {adminLogs.length === 0 ? (
                  <div className="text-center py-10 bg-neutral-900 rounded-2xl border border-neutral-800">

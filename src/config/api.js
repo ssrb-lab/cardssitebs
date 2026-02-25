@@ -392,3 +392,18 @@ export const fetchMarketHistoryRequest = async (token) => {
     });
     return res.json();
 };
+
+export const clearMyMarketHistoryRequest = async (token) => {
+    const res = await fetch(`${API_URL}/profile/market-history`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    return res.json();
+};
+
+export const adminClearUserMarketHistoryRequest = async (token, targetUid) => {
+    const res = await fetch(`${API_URL}/admin/users/${targetUid}/market-history`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    return res.json();
+};
+
+export const adminClearAllMarketHistoryRequest = async (token) => {
+    const res = await fetch(`${API_URL}/admin/market-history`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+    return res.json();
+};

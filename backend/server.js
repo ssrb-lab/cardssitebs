@@ -15,6 +15,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Мідлвар для перевірки прав адміністратора
+const checkAdmin = (req, res, next) => {
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(403).json({ error: "Доступ заборонено. Тільки для Адмінів." });
+  }
+  next();
+};
+
+
 // ----------------------------------------
 // АВТОРИЗАЦІЯ ТА РЕЄСТРАЦІЯ
 // ----------------------------------------
@@ -124,6 +133,34 @@ app.get('/api/profile/market-history', authenticate, async (req, res) => {
     }
 });
 
+// Видалити ВЛАСНУ історію (Гравець)
+app.delete('/api/profile/market-history', authenticate, async (req, res) => {
+    try {
+        await prisma.marketListing.deleteMany({
+            where: { status: 'sold', OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }] }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+});
+
+// Видалити історію КОНКРЕТНОГО ГРАВЦЯ (Адмін)
+app.delete('/api/admin/users/:uid/market-history', authenticate, checkAdmin, async (req, res) => {
+    try {
+        await prisma.marketListing.deleteMany({
+            where: { status: 'sold', OR: [{ sellerId: req.params.uid }, { buyerId: req.params.uid }] }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+});
+
+// Видалити ВСЮ ІСТОРІЮ РИНКУ всіх гравців (Адмін)
+app.delete('/api/admin/market-history', authenticate, checkAdmin, async (req, res) => {
+    try {
+        await prisma.marketListing.deleteMany({ where: { status: 'sold' } });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+});
+
 app.post('/api/profile/change-password', authenticate, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
@@ -195,13 +232,7 @@ app.get('/api/profile/public/:uid', async (req, res) => {
 // ІГРОВІ ДАНІ ТА АДМІНКА (КАРТКИ ТА ПАКИ)
 // ----------------------------------------
 
-// Мідлвар для перевірки прав адміністратора
-const checkAdmin = (req, res, next) => {
-  if (!req.user || !req.user.isAdmin) {
-    return res.status(403).json({ error: "Доступ заборонено. Тільки для Адмінів." });
-  }
-  next();
-};
+
 
 // Публічний роут для отримання всіх карток та паків
 app.get('/api/catalog', async (req, res) => {
