@@ -35,9 +35,9 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [dbInventory, setDbInventory] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
-  const [showcases, setShowcases] = useState([]); 
+  const [showcases, setShowcases] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   // НАДІЙНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ ТА СПАМУ
   const actionLock = useRef(false);
@@ -51,8 +51,8 @@ export default function App() {
   const [packsCatalog, setPacksCatalog] = useState([]);
   const [cardStats, setCardStats] = useState({});
   const [rarities, setRarities] = useState(DEFAULT_RARITIES);
-  const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]); 
-  const [premiumDailyRewards, setPremiumDailyRewards] = useState([2000, 4000, 6000, 8000, 10000, 12000, 15000]); 
+  const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]);
+  const [premiumDailyRewards, setPremiumDailyRewards] = useState([2000, 4000, 6000, 8000, 10000, 12000, 15000]);
   const [premiumPrice, setPremiumPrice] = useState(10000);
   const [premiumDurationDays, setPremiumDurationDays] = useState(30);
   const [premiumShopItems, setPremiumShopItems] = useState([]);
@@ -69,11 +69,11 @@ export default function App() {
   const [listingCard, setListingCard] = useState(null);
 
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
-  
+
   const checkIsPremiumActive = (prof) => {
-      if (!prof || !prof.isPremium || !prof.premiumUntil) return false;
-      const d = new Date(prof.premiumUntil);
-      return !isNaN(d) && d > new Date();
+    if (!prof || !prof.isPremium || !prof.premiumUntil) return false;
+    const d = new Date(prof.premiumUntil);
+    return !isNaN(d) && d > new Date();
   };
   const isPremiumActive = checkIsPremiumActive(profile);
 
@@ -83,9 +83,9 @@ export default function App() {
 
   const addSystemLog = async (type, details) => {
     try {
-        const logRef = doc(db, "artifacts", GAME_ID, "public", "data", "adminLogs", "log_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5));
-        await setDoc(logRef, { type, details, userUid: user?.uid || "Система", userNickname: profile?.nickname || "Гість", timestamp: new Date().toISOString() });
-    } catch(e) { console.error("Помилка логування:", e); }
+      const logRef = doc(db, "artifacts", GAME_ID, "public", "data", "adminLogs", "log_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5));
+      await setDoc(logRef, { type, details, userUid: user?.uid || "Система", userNickname: profile?.nickname || "Гість", timestamp: new Date().toISOString() });
+    } catch (e) { console.error("Помилка логування:", e); }
   };
 
   useEffect(() => {
@@ -103,23 +103,23 @@ export default function App() {
     // Створюємо асинхронну функцію всередині
     const initAuth = async () => {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         setUser(null);
         setNeedsRegistration(true);
         setLoading(false);
         return;
       }
-      
+
       try {
         const res = await fetch('https://cardgameapp.space/api/profile', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (res.ok) {
           const userData = await res.json();
-          setUser({ uid: userData.uid, email: userData.email }); 
-          setProfile(userData); 
+          setUser({ uid: userData.uid, email: userData.email });
+          setProfile(userData);
           // Додаємо інвентар з MySQL:
           if (userData.inventory) {
             setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
@@ -134,24 +134,24 @@ export default function App() {
         setUser(null);
         setNeedsRegistration(true);
       }
-      
+
       setLoading(false);
     };
-    
+
     // Запускаємо її
     initAuth();
   }, []);
 
-const reloadSettings = async () => {
-      try {
-          const settings = await fetchSettings();
-          setBosses(settings.bosses || DEFAULT_BOSSES);
-          setDailyRewards(settings.dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
-          setPremiumDailyRewards(settings.premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
-          setPremiumPrice(settings.premiumPrice !== undefined ? settings.premiumPrice : 10000);
-          setPremiumDurationDays(settings.premiumDurationDays !== undefined ? settings.premiumDurationDays : 30);
-          setPremiumShopItems(settings.premiumShopItems || []);
-      } catch (e) { console.error("Помилка завантаження налаштувань:", e); }
+  const reloadSettings = async () => {
+    try {
+      const settings = await fetchSettings();
+      setBosses(settings.bosses || DEFAULT_BOSSES);
+      setDailyRewards(settings.dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
+      setPremiumDailyRewards(settings.premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
+      setPremiumPrice(settings.premiumPrice !== undefined ? settings.premiumPrice : 10000);
+      setPremiumDurationDays(settings.premiumDurationDays !== undefined ? settings.premiumDurationDays : 30);
+      setPremiumShopItems(settings.premiumShopItems || []);
+    } catch (e) { console.error("Помилка завантаження налаштувань:", e); }
   };
 
   useEffect(() => {
@@ -160,7 +160,7 @@ const reloadSettings = async () => {
         const { cards, packs } = await fetchCatalog();
         setCardsCatalog(cards || []);
         setPacksCatalog(packs || []);
-        
+
         const marketData = await fetchMarket();
         setMarketListings(marketData || []);
 
@@ -172,7 +172,7 @@ const reloadSettings = async () => {
     loadMySqlData();
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     if (!user) return;
 
 
@@ -184,14 +184,14 @@ useEffect(() => {
       setCardStats(stats);
     });
 
- 
+
 
 
     const showcasesRef = collection(db, "artifacts", GAME_ID, "users", user.uid, "showcases");
     const unsubShowcases = onSnapshot(showcasesRef, (snapshot) => {
-        const list = [];
-        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setShowcases(list);
+      const list = [];
+      snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+      setShowcases(list);
     });
 
     return () => { unsubShowcases(); unsubCardStats(); };
@@ -203,7 +203,7 @@ useEffect(() => {
     const email = e.target.email.value.trim();
     const password = e.target.password.value;
     setLoading(true); setDbError("");
-    
+
     try {
       if (authMode === "register") {
         const nickname = e.target.nickname.value.trim();
@@ -214,7 +214,7 @@ useEffect(() => {
         setToken(data.token);
         setUser({ uid: data.user.uid, email: data.user.email }); // Тимчасовий стейт
         setProfile(data.user);
-        
+
       } else {
         // Виклик нашого нового API для входу
         const data = await loginUser(email, password);
@@ -223,31 +223,31 @@ useEffect(() => {
         setProfile(data.user);
       }
       setNeedsRegistration(false);
-    } catch (err) { 
-      setDbError(err.message); 
+    } catch (err) {
+      setDbError(err.message);
     }
     setLoading(false);
   };
   const toggleAutoSound = async () => {
-      if (!user || actionLock.current) return;
-      const newValue = profile?.autoSoundEnabled === false ? true : false;
-      
-      // Просто оновлюємо стан у грі без Firebase
-      setProfile(prev => ({ ...prev, autoSoundEnabled: newValue }));
-      showToast(newValue ? "Автозвук увімкнено" : "Автозвук вимкнено", "success");
+    if (!user || actionLock.current) return;
+    const newValue = profile?.autoSoundEnabled === false ? true : false;
+
+    // Просто оновлюємо стан у грі без Firebase
+    setProfile(prev => ({ ...prev, autoSoundEnabled: newValue }));
+    showToast(newValue ? "Автозвук увімкнено" : "Автозвук вимкнено", "success");
   };
 
 
   const handleLogout = async () => {
-    setLoading(true); 
+    setLoading(true);
     localStorage.removeItem('token'); // Видаляємо токен
-    try { await signOut(auth); } catch (e) {} 
-    
+    try { await signOut(auth); } catch (e) { }
+
     setUser(null); // <--- ЗМІНЕНО ТУТ
-    setProfile(null); 
-    setDbInventory([]); 
-    setShowcases([]); 
-    setCurrentView("shop"); 
+    setProfile(null);
+    setDbInventory([]);
+    setShowcases([]);
+    setCurrentView("shop");
     setAuthMode("login");
     setNeedsRegistration(true);
     setLoading(false);
@@ -261,129 +261,129 @@ useEffect(() => {
   // --- ЛОГІКА РИНКУ ТА ЕКОНОМІКИ З ЗАХИСТОМ ВІД АВТОКЛІКЕРА ---
   // --- НОВИЙ РИНОК MySQL ---
   const reloadMarket = async () => {
-      try {
-          const marketData = await fetchMarket();
-          setMarketListings(marketData || []);
-      } catch (e) { console.error(e); }
+    try {
+      const marketData = await fetchMarket();
+      setMarketListings(marketData || []);
+    } catch (e) { console.error(e); }
   };
 
   const listOnMarket = async (cardId, price) => {
-      if (actionLock.current) return;
-      actionLock.current = true; setIsProcessing(true);
-      try {
-          const data = await listCardRequest(getToken(), cardId, price);
-          setProfile(data.profile);
-          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-          showToast("Картку успішно виставлено на Ринок!", "success");
-          setListingCard(null);
-          await reloadMarket();
-      } catch(e) {
-          showToast(`Помилка: ${e.message}`);
-      } finally { actionLock.current = false; setIsProcessing(false); }
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
+    try {
+      const data = await listCardRequest(getToken(), cardId, price);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast("Картку успішно виставлено на Ринок!", "success");
+      setListingCard(null);
+      await reloadMarket();
+    } catch (e) {
+      showToast(`Помилка: ${e.message}`);
+    } finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const buyFromMarket = async (listing) => {
-      if (actionLock.current) return;
-      actionLock.current = true; setIsProcessing(true);
-      try {
-          const data = await buyCardRequest(getToken(), listing.id);
-          setProfile(data.profile);
-          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-          showToast(`Картку успішно придбано за ${listing.price} монет!`, "success");
-          await reloadMarket();
-      } catch (e) {
-          showToast(e.message || "Помилка покупки.");
-      } finally { actionLock.current = false; setIsProcessing(false); }
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
+    try {
+      const data = await buyCardRequest(getToken(), listing.id);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Картку успішно придбано за ${listing.price} монет!`, "success");
+      await reloadMarket();
+    } catch (e) {
+      showToast(e.message || "Помилка покупки.");
+    } finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const cancelMarketListing = async (listing) => {
-      if (actionLock.current) return;
-      actionLock.current = true; setIsProcessing(true);
-      try {
-          const data = await cancelListingRequest(getToken(), listing.id);
-          setProfile(data.profile); // Оновлюємо профіль, якщо це наш лот
-          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-          showToast(listing.sellerUid === user.uid ? "Лот знято з продажу." : "Лот примусово видалено.", "success");
-          await reloadMarket();
-      } catch (e) { 
-          showToast(e.message || "Помилка скасування лоту."); 
-      } finally { actionLock.current = false; setIsProcessing(false); }
+    if (actionLock.current) return;
+    actionLock.current = true; setIsProcessing(true);
+    try {
+      const data = await cancelListingRequest(getToken(), listing.id);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); // Оновлюємо профіль, якщо це наш лот
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(listing.sellerUid === user.uid ? "Лот знято з продажу." : "Лот примусово видалено.", "success");
+      await reloadMarket();
+    } catch (e) {
+      showToast(e.message || "Помилка скасування лоту.");
+    } finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const openPack = async (packId, cost, amountToOpen = 1) => {
     if (actionLock.current || !profile || openingPackId || isRouletteSpinning) return;
     actionLock.current = true; setIsProcessing(true);
-    
+
     try {
-        const totalCost = cost * amountToOpen;
-        if (profile.coins < totalCost) { showToast("Недостатньо монет!"); actionLock.current = false; setIsProcessing(false); return; }
+      const totalCost = cost * amountToOpen;
+      if (profile.coins < totalCost) { showToast("Недостатньо монет!"); actionLock.current = false; setIsProcessing(false); return; }
 
-        setOpeningPackId(packId);
-        setPulledCards([]);
+      setOpeningPackId(packId);
+      setPulledCards([]);
 
-        try {
-            // Звертаємось до нашого MySQL бекенду
-            const data = await openPackRequest(getToken(), packId, amountToOpen);
-            const results = data.pulledCards;
-            
-            if (amountToOpen === 1) {
-                const availablePackCards = cardsCatalog.filter((c) => c.packId === packId);
-                const fakeCards = Array.from({length: 45}, () => availablePackCards[Math.floor(Math.random() * availablePackCards.length)]);
-                fakeCards[35] = results[0]; 
-                setRouletteItems(fakeCards);
-                setIsRouletteSpinning(true);
-                setOpeningPackId(null);
-                
-                setTimeout(() => {
-                    setIsRouletteSpinning(false); 
-                    setPulledCards(results); 
-                    
-                    // Оновлюємо стейти після анімації
-                    setProfile(data.profile);
-                    setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-                    
-                    actionLock.current = false; setIsProcessing(false);
-                }, 5000); 
-            } else {
-                setOpeningPackId(null); 
-                setPulledCards(results); 
-                
-                // Оновлюємо стейти миттєво
-                setProfile(data.profile);
-                setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-                
-                actionLock.current = false; setIsProcessing(false);
-            }
-        } catch (err) {
-            console.error(err); showToast(`Помилка: ${err.message}`);
-            setOpeningPackId(null); actionLock.current = false; setIsProcessing(false);
+      try {
+        // Звертаємось до нашого MySQL бекенду
+        const data = await openPackRequest(getToken(), packId, amountToOpen);
+        const results = data.pulledCards;
+
+        if (amountToOpen === 1) {
+          const availablePackCards = cardsCatalog.filter((c) => c.packId === packId);
+          const fakeCards = Array.from({ length: 45 }, () => availablePackCards[Math.floor(Math.random() * availablePackCards.length)]);
+          fakeCards[35] = results[0];
+          setRouletteItems(fakeCards);
+          setIsRouletteSpinning(true);
+          setOpeningPackId(null);
+
+          setTimeout(() => {
+            setIsRouletteSpinning(false);
+            setPulledCards(results);
+
+            // Оновлюємо стейти після анімації
+            setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+            setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+
+            actionLock.current = false; setIsProcessing(false);
+          }, 5000);
+        } else {
+          setOpeningPackId(null);
+          setPulledCards(results);
+
+          // Оновлюємо стейти миттєво
+          setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+
+          actionLock.current = false; setIsProcessing(false);
         }
-    } catch(e) {
-        actionLock.current = false; setIsProcessing(false);
+      } catch (err) {
+        console.error(err); showToast(`Помилка: ${err.message}`);
+        setOpeningPackId(null); actionLock.current = false; setIsProcessing(false);
+      }
+    } catch (e) {
+      actionLock.current = false; setIsProcessing(false);
     }
   };
 
   const sellPulledCards = async () => {
-      if (actionLock.current || pulledCards.length === 0) return;
-      actionLock.current = true; setIsProcessing(true);
-      
-      const cardsToSell = [...pulledCards];
-      setPulledCards([]);
-      
-      const countsMap = {};
-      cardsToSell.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
-      const itemsToSell = Object.entries(countsMap).map(([id, amount]) => ({ cardId: id, amount }));
+    if (actionLock.current || pulledCards.length === 0) return;
+    actionLock.current = true; setIsProcessing(true);
 
-      try {
-        const data = await sellCardsRequest(getToken(), itemsToSell);
-        setProfile(data.profile);
-        setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-        showToast(`Успішно продано всі отримані картки! Отримано ${data.earned} монет.`, "success");
-      } catch(e) { 
-        showToast(e.message || "Помилка продажу карток."); 
-        setPulledCards(cardsToSell); 
-      } 
-      finally { actionLock.current = false; setIsProcessing(false); }
+    const cardsToSell = [...pulledCards];
+    setPulledCards([]);
+
+    const countsMap = {};
+    cardsToSell.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
+    const itemsToSell = Object.entries(countsMap).map(([id, amount]) => ({ cardId: id, amount }));
+
+    try {
+      const data = await sellCardsRequest(getToken(), itemsToSell);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Успішно продано всі отримані картки! Отримано ${data.earned} монет.`, "success");
+    } catch (e) {
+      showToast(e.message || "Помилка продажу карток.");
+      setPulledCards(cardsToSell);
+    }
+    finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellDuplicate = async (cardId) => {
@@ -391,112 +391,112 @@ useEffect(() => {
     actionLock.current = true; setIsProcessing(true);
 
     try {
-        const data = await sellCardsRequest(getToken(), [{ cardId, amount: 1 }]);
-        setProfile(data.profile);
-        setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-        showToast(`Продано за ${data.earned} монет!`, "success");
-    } catch (e) { showToast(e.message || "Помилка під час продажу."); } 
+      const data = await sellCardsRequest(getToken(), [{ cardId, amount: 1 }]);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Продано за ${data.earned} монет!`, "success");
+    } catch (e) { showToast(e.message || "Помилка під час продажу."); }
     finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellAllDuplicates = async (cardId) => {
     if (actionLock.current) return;
     actionLock.current = true; setIsProcessing(true);
-    
+
     try {
-        const existing = dbInventory.find((i) => i.id === cardId);
-        if (!existing || existing.amount <= 1) { actionLock.current = false; setIsProcessing(false); return; }
-        
-        const sellCount = existing.amount - 1;
-        const data = await sellCardsRequest(getToken(), [{ cardId, amount: sellCount }]);
-        setProfile(data.profile);
-        setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-        showToast(`Продано ${sellCount} шт. за ${data.earned} монет!`, "success");
-    } catch (e) { showToast(e.message || "Помилка під час масового продажу."); } 
+      const existing = dbInventory.find((i) => i.id === cardId);
+      if (!existing || existing.amount <= 1) { actionLock.current = false; setIsProcessing(false); return; }
+
+      const sellCount = existing.amount - 1;
+      const data = await sellCardsRequest(getToken(), [{ cardId, amount: sellCount }]);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Продано ${sellCount} шт. за ${data.earned} монет!`, "success");
+    } catch (e) { showToast(e.message || "Помилка під час масового продажу."); }
     finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   const sellEveryDuplicate = async (specificInventory = null) => {
     if (actionLock.current) return;
     actionLock.current = true; setIsProcessing(true);
-    
+
     try {
-        const baseList = specificInventory || dbInventory.map(item => {
-            const cardData = cardsCatalog.find((c) => c.id === item.id);
-            return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
-        }).filter(Boolean);
+      const baseList = specificInventory || dbInventory.map(item => {
+        const cardData = cardsCatalog.find((c) => c.id === item.id);
+        return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
+      }).filter(Boolean);
 
-        const duplicates = baseList.filter(item => item.amount > 1);
-        if (duplicates.length === 0) { showToast("Немає дублікатів для продажу!", "error"); actionLock.current = false; setIsProcessing(false); return; }
+      const duplicates = baseList.filter(item => item.amount > 1);
+      if (duplicates.length === 0) { showToast("Немає дублікатів для продажу!", "error"); actionLock.current = false; setIsProcessing(false); return; }
 
-        const itemsToSell = duplicates.map(item => ({ cardId: item.card?.id || item.id, amount: item.amount - 1 }));
+      const itemsToSell = duplicates.map(item => ({ cardId: item.card?.id || item.id, amount: item.amount - 1 }));
 
-        const data = await sellCardsRequest(getToken(), itemsToSell);
-        setProfile(data.profile);
-        setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-        showToast(`Продано всі дублікати! Отримано ${data.earned} монет.`, "success");
-    } catch (e) { showToast(e.message || "Помилка під час масового продажу інвентарю."); } 
+      const data = await sellCardsRequest(getToken(), itemsToSell);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Продано всі дублікати! Отримано ${data.earned} монет.`, "success");
+    } catch (e) { showToast(e.message || "Помилка під час масового продажу інвентарю."); }
     finally { actionLock.current = false; setIsProcessing(false); }
   };
 
   // --- ЛОГІКА ВІТРИН ---
   const createShowcase = async (name) => {
-      if (!name.trim()) return showToast("Введіть назву вітрини!");
-      if (showcases.length >= 5 && !profile.isSuperAdmin) return showToast("Досягнуто ліміт вітрин (5 шт).");
-      try {
-          await setDoc(doc(collection(db, "artifacts", GAME_ID, "users", user.uid, "showcases")), {
-              name: name.trim(), cardIds: [], createdAt: new Date().toISOString()
-          });
-          showToast("Вітрину успішно створено!", "success");
-      } catch (e) { showToast("Помилка створення вітрини."); }
+    if (!name.trim()) return showToast("Введіть назву вітрини!");
+    if (showcases.length >= 5 && !profile.isSuperAdmin) return showToast("Досягнуто ліміт вітрин (5 шт).");
+    try {
+      await setDoc(doc(collection(db, "artifacts", GAME_ID, "users", user.uid, "showcases")), {
+        name: name.trim(), cardIds: [], createdAt: new Date().toISOString()
+      });
+      showToast("Вітрину успішно створено!", "success");
+    } catch (e) { showToast("Помилка створення вітрини."); }
   };
 
   const deleteShowcase = async (showcaseId) => {
-      if (!confirm("Видалити цю вітрину? Картки залишаться у вашому інвентарі.")) return;
-      try {
-          const batch = writeBatch(db);
-          batch.delete(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId));
-          if (profile.mainShowcaseId === showcaseId) {
-              batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { mainShowcaseId: null });
-          }
-          await batch.commit();
-          showToast("Вітрину видалено.", "success");
-      } catch (e) { showToast("Помилка видалення."); }
+    if (!confirm("Видалити цю вітрину? Картки залишаться у вашому інвентарі.")) return;
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId));
+      if (profile.mainShowcaseId === showcaseId) {
+        batch.update(doc(db, "artifacts", GAME_ID, "public", "data", "profiles", user.uid), { mainShowcaseId: null });
+      }
+      await batch.commit();
+      showToast("Вітрину видалено.", "success");
+    } catch (e) { showToast("Помилка видалення."); }
   };
 
   const setMainShowcase = async (showcaseId) => {
-      try {
-          const data = await setMainShowcaseRequest(getToken(), showcaseId);
-          setProfile(data.profile); // Оновлюємо профіль з бекенду
-          showToast(showcaseId ? "Головну вітрину оновлено!" : "Головну вітрину знято.", "success");
-      } catch (e) { showToast("Помилка оновлення вітрини."); }
+    try {
+      const data = await setMainShowcaseRequest(getToken(), showcaseId);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled })); // Оновлюємо профіль з бекенду
+      showToast(showcaseId ? "Головну вітрину оновлено!" : "Головну вітрину знято.", "success");
+    } catch (e) { showToast("Помилка оновлення вітрини."); }
   };
 
   const saveShowcaseCards = async (showcaseId, newCardIds) => {
-      try {
-          await updateDoc(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId), { cardIds: newCardIds });
-      } catch (e) { showToast("Помилка збереження карток у вітрині."); }
+    try {
+      await updateDoc(doc(db, "artifacts", GAME_ID, "users", user.uid, "showcases", showcaseId), { cardIds: newCardIds });
+    } catch (e) { showToast("Помилка збереження карток у вітрині."); }
   };
 
   // --- ЕКРАНИ ---
   if (dbError && user !== undefined) return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center text-white">
-          <div className="bg-red-950/40 border-2 border-red-900 p-8 rounded-3xl max-w-lg w-full">
-             <h1 className="text-2xl font-black mb-4 uppercase">Помилка</h1>
-             <p className="mb-6">{dbError}</p>
-             {(!user || needsRegistration) && <button onClick={() => { setDbError(""); setLoading(false); }} className="bg-neutral-800 px-6 py-3 rounded-xl font-bold">Спробувати ще раз</button>}
-          </div>
+    <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center text-white">
+      <div className="bg-red-950/40 border-2 border-red-900 p-8 rounded-3xl max-w-lg w-full">
+        <h1 className="text-2xl font-black mb-4 uppercase">Помилка</h1>
+        <p className="mb-6">{dbError}</p>
+        {(!user || needsRegistration) && <button onClick={() => { setDbError(""); setLoading(false); }} className="bg-neutral-800 px-6 py-3 rounded-xl font-bold">Спробувати ще раз</button>}
       </div>
+    </div>
   );
 
   if (profile?.isBanned) return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center text-white">
-          <div className="bg-red-950/30 border-2 border-red-900/50 p-10 rounded-3xl max-w-md w-full">
-              <h1 className="text-4xl font-black mb-2 text-white">ВИ ЗАБАНЕНІ</h1>
-              <p className="text-red-400 font-bold uppercase mb-8 text-sm">Доступ обмежено</p>
-              <button onClick={handleLogout} className="w-full bg-neutral-900 text-white font-bold py-4 rounded-xl">Вийти з акаунту</button>
-          </div>
+    <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center text-white">
+      <div className="bg-red-950/30 border-2 border-red-900/50 p-10 rounded-3xl max-w-md w-full">
+        <h1 className="text-4xl font-black mb-2 text-white">ВИ ЗАБАНЕНІ</h1>
+        <p className="text-red-400 font-bold uppercase mb-8 text-sm">Доступ обмежено</p>
+        <button onClick={handleLogout} className="w-full bg-neutral-900 text-white font-bold py-4 rounded-xl">Вийти з акаунту</button>
       </div>
+    </div>
   );
 
   if (loading || user === undefined) return <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-yellow-500"><Loader2 className="animate-spin w-16 h-16 mb-4" /></div>;
@@ -550,11 +550,11 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden">
-<header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
+      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer" onClick={() => setCurrentView("shop")}>
-             <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl"><Hexagon className="text-white w-5 h-5" /></div>
-             <span className="hidden sm:block">Card Game</span>
+            <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-xl"><Hexagon className="text-white w-5 h-5" /></div>
+            <span className="hidden sm:block">Card Game</span>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-6">
@@ -562,30 +562,30 @@ useEffect(() => {
               <PlayerAvatar profile={profile} className="w-10 h-10 rounded-full" iconSize={20} />
               <div className="hidden md:block text-left">
                 <div className="font-bold text-sm text-white flex items-center gap-1">
-                    {profile?.nickname}
-                    <span className="bg-red-900/50 text-red-400 text-[10px] px-1.5 py-0.5 rounded-md border border-red-800 flex items-center gap-0.5 ml-1"><Swords size={10} /> {profile?.farmLevel || 1}</span>
+                  {profile?.nickname}
+                  <span className="bg-red-900/50 text-red-400 text-[10px] px-1.5 py-0.5 rounded-md border border-red-800 flex items-center gap-0.5 ml-1"><Swords size={10} /> {profile?.farmLevel || 1}</span>
                 </div>
                 <div className="text-xs text-neutral-400">{isPremiumActive ? <span className="text-fuchsia-400 font-bold">Преміум</span> : "Профіль"}</div>
               </div>
             </button>
 
             <div className="flex items-center gap-2 sm:gap-4">
-               {canClaimDaily && (
-                  <button onClick={() => setCurrentView("profile")} className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl border border-orange-500/30"><Gift size={20} /></button>
-               )}
+              {canClaimDaily && (
+                <button onClick={() => setCurrentView("profile")} className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl border border-orange-500/30"><Gift size={20} /></button>
+              )}
 
-               {/* ОСЬ ТУТ ДОДАНА НОВА КНОПКА ЗВУКУ */}
-               <button onClick={toggleAutoSound} className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors" title={profile?.autoSoundEnabled !== false ? "Вимкнути автозвук карток" : "Увімкнути автозвук карток"}>
-                   {profile?.autoSoundEnabled !== false ? <Volume2 size={20} /> : <VolumeX size={20} />}
-               </button>
+              {/* ОСЬ ТУТ ДОДАНА НОВА КНОПКА ЗВУКУ */}
+              <button onClick={toggleAutoSound} className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors" title={profile?.autoSoundEnabled !== false ? "Вимкнути автозвук карток" : "Увімкнути автозвук карток"}>
+                {profile?.autoSoundEnabled !== false ? <Volume2 size={20} /> : <VolumeX size={20} />}
+              </button>
 
-               <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
-                 <Coins size={18} className="text-yellow-500" />
-                 <span className="text-yellow-500 font-black">{profile?.coins}</span>
-               </div>
-               <button onClick={() => setCurrentView("premium")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-neutral-950 border-neutral-800 text-fuchsia-400">
-                 <Gem size={18} /> <span className="hidden sm:block font-bold text-sm">Преміум</span>
-               </button>
+              <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
+                <Coins size={18} className="text-yellow-500" />
+                <span className="text-yellow-500 font-black">{profile?.coins}</span>
+              </div>
+              <button onClick={() => setCurrentView("premium")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-neutral-950 border-neutral-800 text-fuchsia-400">
+                <Gem size={18} /> <span className="hidden sm:block font-bold text-sm">Преміум</span>
+              </button>
             </div>
           </div>
         </div>
@@ -620,7 +620,7 @@ useEffect(() => {
           <NavButton icon={<Store size={22} />} label="Ринок" isActive={currentView === "market"} onClick={() => setCurrentView("market")} />
           <NavButton icon={<Trophy size={22} />} label="Рейтинг" isActive={currentView === "rating" || currentView === "publicProfile"} onClick={() => setCurrentView("rating")} />
           <NavButton icon={<User size={22} />} label="Профіль" isActive={currentView === "profile"} onClick={() => setCurrentView("profile")} />
-          
+
           {profile?.isAdmin && (
             <button onClick={() => setCurrentView("admin")} className={`flex flex-col items-center p-2 rounded-lg w-16 sm:w-20 transition-colors ${currentView === "admin" ? "text-purple-500" : "text-neutral-500"}`}>
               <Shield size={22} />
