@@ -207,7 +207,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                         className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 text-white focus:border-blue-500 outline-none text-sm" 
                     />
                     <button type="submit" disabled={isProcessing || !oldPassword || !newPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-2 rounded-xl transition-colors text-sm whitespace-nowrap">
-                        Оновити
+                         Оновити
                     </button>
                 </div>
             </form>
