@@ -374,3 +374,14 @@ export const fetchAdminLogsRequest = async (token) => {
 export const clearAdminLogsRequest = async (token) => {
     await fetch(`${API_URL}/admin/logs`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
 };
+
+export const claim2048RewardRequest = async (token, score) => {
+    const res = await fetch(`${API_URL}/game/2048/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ score })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};

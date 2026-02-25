@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull, ArrowLeft } from "lucide-react";
 import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken } from "../config/api";
+import Game2048 from "../components/Game2048";
+import { Gamepad2 } from "lucide-react";
 
 export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
     const playerLevel = profile?.farmLevel || 1;
@@ -161,16 +163,13 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                        <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
                    </div>
 
-                   <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 relative overflow-hidden opacity-70">
-                       <div className="absolute inset-0 bg-neutral-950/60 z-20 flex items-center justify-center">
-                           <div className="bg-neutral-900 px-4 py-2 rounded-xl border border-neutral-700 font-bold text-neutral-400 flex items-center gap-2 shadow-lg"><Lock size={16}/> У розробці</div>
+                   <div onClick={() => setActiveGame('2048')} className="bg-neutral-900 border border-purple-900/50 hover:border-purple-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
+                       <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                           <Gamepad2 size={120} className="text-purple-500" />
                        </div>
-                       <div className="absolute -right-6 -top-6 opacity-10">
-                           <Timer size={120} className="text-blue-500" />
-                       </div>
-                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><Timer className="text-blue-500"/> Колесо Фортуни</h3>
-                       <p className="text-neutral-500 text-sm mb-6">Випробовуйте свою удачу в новій міні-грі. Вже зовсім скоро!</p>
-                       <button className="bg-neutral-800 text-neutral-500 font-bold py-2 px-6 rounded-xl w-full sm:w-auto">Скоро</button>
+                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gamepad2 className="text-purple-500"/> Гра 2048</h3>
+                       <p className="text-neutral-400 text-sm mb-6 relative z-10">Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!</p>
+                       <button className="bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
                    </div>
                </div>
             </div>
@@ -179,7 +178,11 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
 
     if (isLoading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-10 h-10 mb-4"/> Підготовка Арени...</div>;
     if (!currentBoss || !bossCard) return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
+    if (activeGame === '2048') {
+        return <Game2048 profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
+        }
 
+    
     if (cooldownEnd) {
         return (
             <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-lg mx-auto text-center mt-10 sm:mt-20">

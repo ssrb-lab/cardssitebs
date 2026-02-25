@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Loader2, Volume2 } from "lucide-react";
+import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Loader2, Volume2, Layers, TrendingDown, TrendingUp } from "lucide-react";
 import { formatDate, getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { Swords } from "lucide-react";
@@ -110,28 +110,33 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
               <span className="flex items-center gap-1"><CalendarDays size={14}/> З нами від: {formatDate(playerInfo.createdAt)}</span>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 relative z-10 max-w-2xl mx-auto">
-              <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <Coins className="text-yellow-500 mb-2 w-6 h-6" />
-                  <span className="text-xl font-black text-white">{playerInfo.coins}</span>
-                  <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Монети</span>
-              </div>
-              <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <LayoutGrid className="text-blue-500 mb-2 w-6 h-6" />
-                  <span className="text-xl font-black text-white">{playerInventory.length}</span>
-                  <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Унікальних</span>
-              </div>
-              <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
-                  <span className="text-xl font-black text-white">{playerInfo.packsOpened || 0}</span>
-                  <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
-              </div>
-              <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
-                  <Star className="text-green-500 mb-2 w-6 h-6" />
-                  <span className="text-xl font-black text-white">{playerInfo.uniqueCardsCount || 0}</span>
-                  <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Всього карт</span>
-              </div>
-          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-8">
+    <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <Coins className="text-yellow-500 mb-2" size={24} />
+        <span className="text-xl sm:text-2xl font-black text-white">{playerInfo.coins || 0}</span>
+        <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase mt-1">Баланс</span>
+    </div>
+    <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <Layers className="text-blue-500 mb-2" size={24} />
+        <span className="text-xl sm:text-2xl font-black text-white">{playerInfo.uniqueCardsCount || 0}</span>
+        <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase mt-1">Унікальних</span>
+    </div>
+    <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <PackageOpen className="text-purple-500 mb-2" size={24} />
+        <span className="text-xl sm:text-2xl font-black text-white">{playerInfo.packsOpened || 0}</span>
+        <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
+    </div>
+    <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <TrendingDown className="text-red-500 mb-2" size={24} />
+        <span className="text-xl sm:text-2xl font-black text-white">{playerInfo.coinsSpentOnPacks || 0}</span>
+        <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase mt-1">Витрачено</span>
+    </div>
+    <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <TrendingUp className="text-green-500 mb-2" size={24} />
+        <span className="text-xl sm:text-2xl font-black text-white">{playerInfo.coinsEarnedFromPacks || 0}</span>
+        <span className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase mt-1">Зароблено</span>
+    </div>
+</div>
       </div>
 
       {mainShowcase && (

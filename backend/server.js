@@ -157,7 +157,14 @@ app.get('/api/profile/public/:uid', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { uid: req.params.uid },
-      select: { uid: true, nickname: true, showcases: true, avatarUrl: true, coins: true, uniqueCardsCount: true, packsOpened: true, farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true }
+      select: { 
+                uid: true, nickname: true, avatarUrl: true, coins: true, 
+                totalCards: true, // <-- ДОДАНО
+                uniqueCardsCount: true, packsOpened: true, 
+                coinsSpentOnPacks: true, // <-- ДОДАНО
+                coinsEarnedFromPacks: true, // <-- ДОДАНО
+                farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true 
+            }
     });
     if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
     res.json(user);
@@ -460,6 +467,29 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Помилка скасування лоту." });
   }
+});
+
+// ----------------------------------------
+// МІНІ-ГРИ (2048)
+// ----------------------------------------
+app.post('/api/game/2048/claim', authenticate, async (req, res) => {
+    const { score } = req.body;
+    
+    if (score < 100) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+    if (score > 500000) return res.status(400).json({ error: "Підозріло великий рахунок. Античіт!" });
+
+    // Курс: 1 поїнт рахунку = 1 монета
+    const coinsToGive = score; 
+
+    try {
+        const updatedUser = await prisma.user.update({
+            where: { uid: req.user.uid },
+            data: { coins: { increment: coinsToGive } }
+        });
+        res.json({ success: true, earned: coinsToGive, profile: updatedUser });
+    } catch (error) {
+        res.status(500).json({ error: "Помилка нарахування монет за гру." });
+    }
 });
 
 // ----------------------------------------
