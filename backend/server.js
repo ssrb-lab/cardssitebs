@@ -196,6 +196,7 @@ app.get('/api/profile', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
       include: { 
+          inventory: true,
           showcases: true,
           _count: { select: { inventory: true } } // Рахуємо картки гравця
       }

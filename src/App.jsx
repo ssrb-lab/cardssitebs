@@ -279,6 +279,24 @@ export default function App() {
     } catch (e) { console.error(e); }
   };
 
+  const reloadProfile = async () => {
+    try {
+      const res = await fetch('https://cardgameapp.space/api/profile', {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      if (res.ok) {
+        const userData = await res.json();
+        setProfile(userData);
+        if (userData.inventory) {
+          setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+        }
+        if (userData.showcases) {
+          setShowcases(userData.showcases);
+        }
+      }
+    } catch (e) { console.error("Помилка оновлення профілю:", e); }
+  };
+
   const listOnMarket = async (cardId, price) => {
     if (actionLock.current) return;
     actionLock.current = true; setIsProcessing(true);
@@ -620,7 +638,15 @@ export default function App() {
         <div className="min-w-max mx-auto flex justify-center sm:gap-2">
           <NavButton icon={<Swords size={22} />} label="Фарм" isActive={currentView === "farm"} onClick={() => setCurrentView("farm")} />
           <NavButton icon={<PackageOpen size={22} />} label="Магазин" isActive={currentView === "shop"} onClick={() => { setCurrentView("shop"); setPulledCards([]); setSelectedPackId(null); }} />
-          <NavButton icon={<LayoutGrid size={22} />} label="Інвентар" isActive={currentView === "inventory"} onClick={() => setCurrentView("inventory")} />
+          <NavButton 
+            icon={<LayoutGrid size={22} />} 
+            label="Інвентар" 
+            isActive={currentView === "inventory"} 
+            onClick={() => { 
+              setCurrentView("inventory"); 
+              reloadProfile(); // Примусово оновлюємо дані з сервера
+            }} 
+          />
           <NavButton
             icon={<Store size={22} />}
             label="Ринок"
