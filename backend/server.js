@@ -195,17 +195,23 @@ app.get('/api/profile', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      include: {
-        inventory: { include: { card: true } },
-        farmState: true,
-        showcases: true
+      include: { 
+          showcases: true,
+          _count: { select: { inventory: true } } // Рахуємо картки гравця
       }
     });
-
-    if (!user) return res.status(404).json({ error: "Профіль не знайдено." });
-    res.json(user);
+    
+    if (!user) return res.status(404).json({ error: "Гравець не знайдений" });
+    
+    // Додаємо підрахунок до профілю, щоб фронтенд його побачив
+    const formattedUser = {
+        ...user,
+        uniqueCardsCount: user._count.inventory
+    };
+    
+    res.json(formattedUser);
   } catch (error) {
-    res.status(500).json({ error: "Помилка сервера." });
+    res.status(500).json({ error: "Помилка завантаження профілю" });
   }
 });
 

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2 } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
-import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, changePasswordRequest } from "../config/api";
+import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
 
 export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats }) {
     const [avatarInput, setAvatarInput] = useState("");
@@ -14,15 +14,23 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
 
     const [marketHistory, setMarketHistory] = useState([]);
     const [activeTab, setActiveTab] = useState("main");
+    const [liveStats, setLiveStats] = useState(null);
 
     useEffect(() => {
-        const loadHistory = async () => {
+        const loadData = async () => {
             try {
-                const data = await fetchMarketHistoryRequest(getToken());
-                setMarketHistory(data || []);
-            } catch (e) { console.error("Помилка історії:", e); }
+                // Завантажуємо історію ринку
+                const historyData = await fetchMarketHistoryRequest(getToken());
+                setMarketHistory(historyData || []);
+                
+                // Завантажуємо свіжу статистику з бази
+                if (profile?.uid) {
+                    const statsData = await fetchPublicProfileRequest(profile.uid);
+                    setLiveStats(statsData);
+                }
+            } catch (e) { console.error("Помилка:", e); }
         };
-        if (profile) loadHistory();
+        if (profile) loadData();
     }, [profile?.uid]);
 
     const handleClearHistory = async () => {
@@ -218,22 +226,22 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                     </div>
                     <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
                         <LayoutGrid className="text-blue-500 mb-2 w-6 h-6" />
-                        <span className="text-xl font-black text-white">{inventoryCount || 0}</span>
+                        <span className="text-xl font-black text-white">{liveStats?.uniqueCardsCount ?? profile?.uniqueCardsCount ?? inventoryCount ?? 0}</span>
                         <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Унікальних</span>
                     </div>
                     <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
                         <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
-                        <span className="text-xl font-black text-white">{profile?.packsOpened || 0}</span>
+                        <span className="text-xl font-black text-white">{liveStats?.packsOpened ?? profile?.packsOpened ?? 0}</span>
                         <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Відкрито паків</span>
                     </div>
                     <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
                         <Zap className="text-red-500 mb-2 w-6 h-6" />
-                        <span className="text-xl font-black text-white">{profile?.coinsSpentOnPacks || 0}</span>
+                        <span className="text-xl font-black text-white">{liveStats?.coinsSpentOnPacks ?? profile?.coinsSpentOnPacks ?? 0}</span>
                         <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Витрачено</span>
                     </div>
                     <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center sm:col-span-1 col-span-2">
                         <Star className="text-green-500 mb-2 w-6 h-6" />
-                        <span className="text-xl font-black text-white">{profile?.coinsEarnedFromPacks || 0}</span>
+                        <span className="text-xl font-black text-white">{liveStats?.coinsEarnedFromPacks ?? profile?.coinsEarnedFromPacks ?? 0}</span>
                         <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Зароблено</span>
                     </div>
                 </div>
@@ -270,43 +278,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                 </div>
             </div>
 
-            {/* ВМІСТ: ІСТОРІЯ РИНКУ */}
-            {activeTab === "history" && (
-                <div className="max-w-4xl mx-auto mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
-                        <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                            {!Array.isArray(marketHistory) || marketHistory.length === 0 ? (
-                                <p className="text-neutral-500 text-sm text-center py-4">Ви ще нічого не купували та не продавали.</p>
-                            ) : (
-                                marketHistory.map(item => {
-                                    const isSale = item.sellerId === profile?.uid;
-                                    const cardImg = item.card?.image || "";
-                                    const cardName = item.card?.name || "Невідома картка";
-                                    
-                                    return (
-                                        <div key={item.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                {cardImg && <img src={cardImg} alt="card" className="w-10 h-14 object-cover rounded-md border border-neutral-700" />}
-                                                <div>
-                                                    <div className="font-bold text-white text-sm">{cardName}</div>
-                                                    <div className="text-xs text-neutral-500 mt-0.5">
-                                                        {isSale ? `Покупець: ${item.buyerNickname || "Невідомо"}` : `Продавець: ${item.seller?.nickname || "Невідомо"}`}
-                                                        <span className="mx-2">•</span>
-                                                        {formatDate(item.soldAt)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className={`font-black flex items-center gap-1 ${isSale ? 'text-green-500' : 'text-red-500'}`}>
-                                                {isSale ? '+' : '-'}{item.price} <Coins size={14} />
-                                            </div>
-                                        </div>
-                                    )
-                                })
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
 {/* КНОПКИ-ВІКНА */}
             <div className="flex flex-col sm:flex-row gap-4 max-w-4xl mx-auto mb-6">
