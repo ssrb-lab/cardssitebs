@@ -229,10 +229,17 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
   };
 
   const removeCardFromUser = async (cardId, currentAmount) => {
-    if (!confirm("Відібрати 1 таку картку в гравця?")) return;
+    const input = prompt(`Скільки карток відібрати? (У гравця зараз: ${currentAmount} шт.)`, "1");
+    if (input === null) return; // Якщо ви натиснули "Скасувати"
+    
+    const amountToRemove = parseInt(input, 10);
+    if (isNaN(amountToRemove) || amountToRemove <= 0) {
+      return showToast("Введіть коректну кількість!", "error");
+    }
+
     try {
-      await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, { cardId, amount: 1 });
-      showToast("Картку вилучено.", "success");
+      await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, { cardId, amount: amountToRemove });
+      showToast(`Успішно вилучено ${amountToRemove} шт.`, "success");
       handleInspectUser(viewingUser.uid); loadUsers();
     } catch (e) { showToast("Помилка вилучення.", "error"); }
   };
@@ -476,12 +483,15 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         let w = 1;
         const globalRObj = rarities.find(r => r.name === c.rarity);
         
-        // 1. Індивідуальна вага картки
-        if (c.weight !== undefined && c.weight !== "") w = Number(c.weight);
-        // 2. Або кастомна вага рідкості в цьому паку
-        else if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== "") w = Number(packInfo.customWeights[c.rarity]);
-        // 3. Або глобальна базова вага рідкості
-        else if (globalRObj) w = Number(globalRObj.weight);
+        if (c.weight !== null && c.weight !== undefined && c.weight !== "" && Number(c.weight) > 0) {
+            w = Number(c.weight);
+        } 
+        else if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== "") {
+            w = Number(packInfo.customWeights[c.rarity]);
+        } 
+        else if (globalRObj) {
+            w = Number(globalRObj.weight);
+        }
         
         totalWeight += w;
         if (c.id === targetCard.id) targetWeight = w;

@@ -292,9 +292,16 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         let w = 1;
         const globalRObj = DEFAULT_RARITIES.find(r => r.name === c.rarity);
 
-        if (c.weight !== null && c.weight !== undefined) w = Number(c.weight);
-        else if (pack.customWeights && pack.customWeights[c.rarity] !== undefined) w = Number(pack.customWeights[c.rarity]);
-        else if (globalRObj) w = Number(globalRObj.weight);
+        // Жорстка перевірка: використовуємо шанс картки, тільки якщо він більший за 0
+        if (c.weight !== null && c.weight !== undefined && c.weight !== "" && Number(c.weight) > 0) {
+            w = Number(c.weight);
+        } 
+        else if (pack.customWeights && pack.customWeights[c.rarity] !== undefined && pack.customWeights[c.rarity] !== "") {
+            w = Number(pack.customWeights[c.rarity]);
+        } 
+        else if (globalRObj) {
+            w = Number(globalRObj.weight);
+        }
 
         totalWeight += w;
         activeWeights.push({ card: c, weight: w });
