@@ -1,4 +1,4 @@
-const API_URL = 'https://cardgameapp.space/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://cardgameapp.space/api';
 
 export const loginUser = async (email, password) => {
     const res = await fetch(`${API_URL}/auth/login`, {

@@ -25,6 +25,8 @@ import RatingView from "./views/RatingView";
 import PublicProfileView from "./views/PublicProfileView";
 import AdminView from "./views/AdminView";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cardgameapp.space/api';
+
 export default function App() {
   const [user, setUser] = useState(undefined);
   const [profile, setProfile] = useState(null);
@@ -113,7 +115,7 @@ export default function App() {
       }
 
       try {
-        const res = await fetch('https://cardgameapp.space/api/profile', {
+        const res = await fetch(`${API_BASE_URL}/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -187,7 +189,7 @@ export default function App() {
 
     const checkMarketNotifications = async () => {
       try {
-        const res = await fetch(`https://cardgameapp.space/api/game/market/notifications?lastCheck=${lastCheckRef.current}`, {
+        const res = await fetch(`${API_BASE_URL}/game/market/notifications?lastCheck=${lastCheckRef.current}`, {
           headers: { 'Authorization': `Bearer ${getToken()}` }
         });
 
@@ -288,7 +290,7 @@ export default function App() {
 
   const reloadProfile = async () => {
     try {
-      const res = await fetch('https://cardgameapp.space/api/profile', {
+      const res = await fetch(`${API_BASE_URL}/profile`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       if (res.ok) {
