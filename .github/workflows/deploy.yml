@@ -24,9 +24,8 @@ jobs:
             git reset --hard origin/main || git reset --hard origin/master
             git pull origin main || git pull origin master
             
-            # Копіюємо .env файли
+            # Копіюємо .env файли (тільки для фронтенду, у бекенда свій)
             cp .env.production .env || true
-            cp .env.production backend/.env || true
             
             # Встановлюємо залежності та білдимо фронтенд
             npm install
