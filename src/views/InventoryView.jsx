@@ -211,19 +211,27 @@ export default function InventoryView({
 
                       {item.amount > 1 ? (
                         <div className="w-full flex flex-col gap-1.5">
-                          <button onClick={(e) => { e.stopPropagation(); sellDuplicate(item.card.id); }} className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-neutral-200 font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                            Продати (+{currentSellPrice} <Coins size={10} className="inline text-yellow-500" />)
-                          </button>
-                          <div className="flex gap-1.5 w-full">
-                            {item.amount > 2 && (
-                              <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
-                                Всі (-1)
+                          {Number(item.card.maxSupply) === 0 ? (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); sellDuplicate(item.card.id); }} className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-neutral-200 font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                                Продати (+{currentSellPrice} <Coins size={10} className="inline text-yellow-500" />)
                               </button>
-                            )}
-                            <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-[10px] py-1.5 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                              <div className="flex gap-1.5 w-full">
+                                {item.amount > 2 && (
+                                  <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
+                                    Всі (-1)
+                                  </button>
+                                )}
+                                <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-[10px] py-1.5 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                                  На Ринок
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-[10px] py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
                               На Ринок
                             </button>
-                          </div>
+                          )}
                         </div>
                       ) : (
                         <div className="w-full flex flex-col gap-1.5">

@@ -299,9 +299,9 @@ export const fetchPublicProfileRequest = async (uid) => {
 export const changePasswordRequest = async (token, oldPassword, newPassword) => {
     const res = await fetch(`${API_URL}/profile/change-password`, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${token}` 
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ oldPassword, newPassword })
     });
@@ -380,6 +380,16 @@ export const claim2048RewardRequest = async (token, score) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ score })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const start2048GameRequest = async (token) => {
+    const res = await fetch(`${API_URL}/game/2048/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);

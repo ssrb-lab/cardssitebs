@@ -417,7 +417,7 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       return res.status(403).json({ error: "Тільки для Преміум гравців!" });
     }
 
-    const availableCards = (await prisma.cardCatalog.findMany({ where: { packId: pack.id } }))
+    let availableCards = (await prisma.cardCatalog.findMany({ where: { packId: pack.id } }))
       .filter(c => c.maxSupply === 0 || c.pulledCount < c.maxSupply);
 
     if (availableCards.length === 0) return res.status(400).json({ error: "У цьому паку закінчились картки." });
@@ -432,7 +432,13 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     let countsMap = {};
     let totalEarnedCoins = 0;
 
+    // Локальне відстеження для запобігання перевищенню ліміту у межах однієї транзакції
+    let localPulledCounts = {};
+    availableCards.forEach(c => localPulledCounts[c.id] = c.pulledCount || 0);
+
     for (let i = 0; i < amount; i++) {
+      if (availableCards.length === 0) break; // Якщо всі картки закінчились під час відкриття
+
       let totalWeight = 0;
       const activeWeights = [];
 
@@ -465,7 +471,13 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
       results.push(newCard);
       countsMap[newCard.id] = (countsMap[newCard.id] || 0) + 1;
+      localPulledCounts[newCard.id] += 1;
       totalEarnedCoins += (newCard.sellPrice || 15);
+
+      // Якщо картка має ліміт і щойно досягла його - видаляємо її з пулу для наступних спроб
+      if (newCard.maxSupply > 0 && localPulledCounts[newCard.id] >= newCard.maxSupply) {
+        availableCards = availableCards.filter(c => c.id !== newCard.id);
+      }
     }
 
     // Зберігаємо результати в базу даних однією транзакцією (безпечно!)
@@ -630,6 +642,43 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
 // ----------------------------------------
 // МІНІ-ГРИ (2048)
 // ----------------------------------------
+app.post('/api/game/2048/start', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // Перевірка початку нового дня (UTC або серверний час)
+    const now = new Date();
+    const lastPlay = user.last2048PlayDate ? new Date(user.last2048PlayDate) : null;
+    let isNewDay = false;
+
+    if (!lastPlay ||
+      now.getDate() !== lastPlay.getDate() ||
+      now.getMonth() !== lastPlay.getMonth() ||
+      now.getFullYear() !== lastPlay.getFullYear()) {
+      isNewDay = true;
+    }
+
+    let currentAttempts = isNewDay ? 0 : user.daily2048Attempts;
+
+    if (currentAttempts >= 25) {
+      return res.status(403).json({ error: "Ви вичерпали ліміт (25 ігор) на сьогодні! Спробуйте завтра." });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: {
+        daily2048Attempts: currentAttempts + 1,
+        last2048PlayDate: now
+      }
+    });
+
+    res.json({ success: true, profile: updatedUser, attemptsLeft: 25 - (currentAttempts + 1) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера при старті гри." });
+  }
+});
+
 app.post('/api/game/2048/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
@@ -1257,6 +1306,10 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
         const card = await tx.cardCatalog.findUnique({ where: { id: item.cardId } });
         if (!card) continue;
 
+        if (card.maxSupply > 0) {
+          throw new Error(`Лімітовану картку "${card.name}" можна продати тільки на ринку гравцям.`);
+        }
+
         const price = card.sellPrice || 15;
         const earn = price * item.amount;
 
@@ -1301,6 +1354,6 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка продажу карток на сервері." });
+    res.status(400).json({ error: error.message || "Помилка продажу карток." });
   }
 });
