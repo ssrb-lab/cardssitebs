@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Store, Tag, Volume2, User, Coins, Trash2, RefreshCw } from "lucide-react";
 import { getCardStyle, playCardSound } from "../utils/helpers";
+import CardFrame from "../components/CardFrame";
 
 export default function MarketView({ marketListings, cardsCatalog, rarities, currentUserUid, buyFromMarket, cancelMarketListing, setViewingCard, isAdmin, reloadMarket }) {
    const [tab, setTab] = useState("all");
@@ -65,7 +66,12 @@ export default function MarketView({ marketListings, cardsCatalog, rarities, cur
                   return (
                      <div key={listing.id} className="flex flex-col items-center animate-in zoom-in-95 group">
                         <div onClick={() => setViewingCard({ card })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 cursor-pointer transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass}`}>
-                           <img src={card.image} alt={card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                           <div className="w-full h-full overflow-hidden relative">
+                              <CardFrame frame={card.frame}>
+                                 <img src={card.image} alt={card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              </CardFrame>
+                              {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
+                           </div>
                            {card.soundUrl && (
                               <button
                                  onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}

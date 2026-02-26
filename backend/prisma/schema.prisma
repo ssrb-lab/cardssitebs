@@ -54,6 +54,7 @@ model CardCatalog {
   soundUrl    String?  @db.Text
   soundVolume Float    @default(0.5)
   weight      Float?
+  frame       String?  @default("normal")
 
   inventoryItems InventoryItem[]
   marketListings MarketListing[]

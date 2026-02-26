@@ -342,12 +342,16 @@ app.get('/api/catalog', async (req, res) => {
 app.post('/api/admin/cards', authenticate, checkAdmin, async (req, res) => {
   try {
     const data = req.body;
-    const existing = await prisma.cardCatalog.findUnique({ where: { id: data.id } });
+
+    // Переконуємося, що frame передається правильно (fallback на "normal")
+    const cardData = { ...data, frame: data.frame || "normal" };
+
+    const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
     let card;
     if (existing) {
-      card = await prisma.cardCatalog.update({ where: { id: data.id }, data });
+      card = await prisma.cardCatalog.update({ where: { id: cardData.id }, data: cardData });
     } else {
-      card = await prisma.cardCatalog.create({ data });
+      card = await prisma.cardCatalog.create({ data: cardData });
     }
     res.json(card);
   } catch (error) {

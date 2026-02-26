@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Sparkles, Coins, ArrowLeft, Gem, Loader2, Volume2 } from "lucide-react";
+import { Search, Filter, Sparkles, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
 import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import { SELL_PRICE } from "../config/constants";
+import CardFrame from "../components/CardFrame";
 
 export default function ShopView({ profile, packs, cardsCatalog, cardStats, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing, isPremiumActive }) {
-  
+
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -12,25 +13,25 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
   useEffect(() => {
     if (isRouletteSpinning) {
       setRoulettePos(0);
-      setRouletteOffset(Math.floor(Math.random() * 100) - 50); 
-      
+      setRouletteOffset(Math.floor(Math.random() * 100) - 50);
+
       const timer = setTimeout(() => {
-        setRoulettePos(1); 
+        setRoulettePos(1);
       }, 50);
       return () => clearTimeout(timer);
     }
   }, [isRouletteSpinning]);
 
-// Автоматичне відтворення звуку найрідкіснішої картки після відкриття паку
+  // Автоматичне відтворення звуку найрідкіснішої картки після відкриття паку
   useEffect(() => {
-      // Відтворюємо звук ТІЛЬКИ якщо гравець НЕ вимкнув цю опцію
-      if (pulledCards && pulledCards.length > 0 && profile?.autoSoundEnabled !== false) {
-          const cardsWithSound = pulledCards.filter(c => c.soundUrl);
-          if (cardsWithSound.length > 0) {
-              cardsWithSound.sort((a,b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
-              playCardSound(cardsWithSound[0].soundUrl, cardsWithSound[0].soundVolume);
-          }
+    // Відтворюємо звук ТІЛЬКИ якщо гравець НЕ вимкнув цю опцію
+    if (pulledCards && pulledCards.length > 0 && profile?.autoSoundEnabled !== false) {
+      const cardsWithSound = pulledCards.filter(c => c.soundUrl);
+      if (cardsWithSound.length > 0) {
+        cardsWithSound.sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
+        playCardSound(cardsWithSound[0].soundUrl, cardsWithSound[0].soundVolume);
       }
+    }
   }, [pulledCards, rarities, profile?.autoSoundEnabled]); // Додали залежність
 
   if (isRouletteSpinning && rouletteItems.length > 0) {
@@ -49,27 +50,30 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
           <div className="absolute left-1/2 bottom-0 -translate-x-1/2 border-solid border-b-[20px] border-b-yellow-500 border-x-[15px] border-x-transparent z-40"></div>
 
           <div
-              className="absolute inset-y-0 flex items-center gap-4"
-              style={{
-                  left: '50%', 
-                  transition: roulettePos === 1 ? 'transform 4.5s cubic-bezier(0.1, 0.85, 0.1, 1)' : 'none',
-                  transform: roulettePos === 1
-                      ? `translateX(-${35 * 176 + 80 + rouletteOffset}px)`
-                      : `translateX(-80px)`
-              }}
+            className="absolute inset-y-0 flex items-center gap-4"
+            style={{
+              left: '50%',
+              transition: roulettePos === 1 ? 'transform 4.5s cubic-bezier(0.1, 0.85, 0.1, 1)' : 'none',
+              transform: roulettePos === 1
+                ? `translateX(-${35 * 176 + 80 + rouletteOffset}px)`
+                : `translateX(-80px)`
+            }}
           >
-              {rouletteItems.map((item, i) => {
-                  const style = getCardStyle(item.rarity, rarities);
-                  const effectClass = item.effect ? `effect-${item.effect}` : '';
-                  return (
-                      <div key={i} className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass}`}>
-                          <img src={item.image} alt="card" className="absolute inset-0 w-full h-full object-cover" />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
-                             <span className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}>{item.rarity}</span>
-                          </div>
-                      </div>
-                  );
-              })}
+            {rouletteItems.map((item, i) => {
+              const style = getCardStyle(item.rarity, rarities);
+              const effectClass = item.effect ? `effect-${item.effect}` : '';
+              return (
+                <div key={i} className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass}`}>
+                  <CardFrame frame={item.frame}>
+                    <img src={item.image} alt="card" className="w-full h-full object-cover" />
+                  </CardFrame>
+                  {item.effect && <div className={`${item.effect} pointer-events-none z-10`} />}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}>{item.rarity}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -84,46 +88,49 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
         <h2 className="text-3xl sm:text-4xl font-black mb-8 text-white uppercase tracking-widest text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
           Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : "!"}
         </h2>
-        
+
         <div className="flex flex-wrap justify-center gap-6 mb-10 w-full max-h-[60vh] overflow-y-auto hide-scrollbar p-4">
           {pulledCards.map((card, index) => {
             const style = getCardStyle(card.rarity, rarities);
             const effectClass = card.effect ? `effect-${card.effect}` : '';
-            
+
             // ЛОГІКА АНІМАЦІЙ: Спочатку кастомна, потім за рідкістю, потім стандартна
             let animClass = "animate-in zoom-in slide-in-from-bottom-6";
             if (card.dropAnim) {
-                animClass = `anim-${card.dropAnim}`;
+              animClass = `anim - ${card.dropAnim} `;
             } else if (card.rarity === "Унікальна") {
-                animClass = "anim-epic";
+              animClass = "anim-epic";
             } else if (card.rarity === "Легендарна") {
-                animClass = "anim-flash";
+              animClass = "anim-flash";
             } else if (card.rarity === "Епічна") {
-                animClass = "anim-flip";
+              animClass = "anim-flip";
             }
 
             return (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 onClick={() => setViewingCard({ card, amount: 1 })}
-                className={`flex flex-col items-center cursor-pointer group ${animClass}`} 
+                className={`flex flex-col items-center cursor-pointer group ${animClass}`}
                 style={{ animationDelay: `${Math.min(index * 50, 2000)}ms`, animationFillMode: 'both' }}
               >
                 <div className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}>
-                  <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                  <CardFrame frame={card.frame}>
+                    <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                  </CardFrame>
+                  {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   {Number(card.maxSupply) > 0 && (
                     <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
                       {cardStats[card.id] || 0} / {card.maxSupply}
                     </div>
                   )}
                   {card.soundUrl && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
-                        className="absolute bottom-2 right-2 bg-black/80 text-white p-2 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
-                        title="Відтворити звук"
-                      >
-                        <Volume2 size={16} />
-                      </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
+                      className="absolute bottom-2 right-2 bg-black/80 text-white p-2 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                      title="Відтворити звук"
+                    >
+                      <Volume2 size={16} />
+                    </button>
                   )}
                 </div>
                 <div className="text-center w-full px-2">
@@ -138,19 +145,19 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => setPulledCards([])}
-              className="px-8 py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg border border-neutral-700"
-            >
-              Забрати картки
-            </button>
-            <button
-              onClick={sellPulledCards}
-              disabled={isProcessing}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2"
-            >
-              Продати всі (+{totalSellPrice} <Coins size={16}/>)
-            </button>
+          <button
+            onClick={() => setPulledCards([])}
+            className="px-8 py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg border border-neutral-700"
+          >
+            Забрати картки
+          </button>
+          <button
+            onClick={sellPulledCards}
+            disabled={isProcessing}
+            className="px-8 py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2"
+          >
+            Продати всі (+{totalSellPrice} <Coins size={16} />)
+          </button>
         </div>
       </div>
     );
@@ -171,12 +178,12 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
         <div className="flex flex-col items-center mb-12 bg-neutral-900/50 p-6 rounded-3xl border border-neutral-800 max-w-3xl mx-auto">
           {selectedPack.isPremiumOnly && (
-              <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
-                  <Gem size={14}/> Преміум Пак
-              </div>
+            <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
+              <Gem size={14} /> Преміум Пак
+            </div>
           )}
           <h2 className="text-3xl font-black mb-6 text-white text-center">{selectedPack.name}</h2>
-          
+
           <div className="relative w-48 h-48 mb-8 flex justify-center items-center perspective-1000">
             {openingPackId === selectedPack.id ? (
               <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl border-4 border-indigo-500 shadow-[0_0_40px_rgba(99,102,241,0.6)] animate-pulse flex items-center justify-center">
@@ -195,11 +202,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
             <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-red-950" />
             <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-purple-600 hover:bg-purple-500 text-white" />
           </div>
-          
+
           {selectedPack.isPremiumOnly && !isPremiumActive && (
-              <div className="mt-6 text-red-400 font-bold bg-red-900/20 px-4 py-2 rounded-xl border border-red-900/50">
-                  У вас немає Преміум-акаунту для відкриття цього паку.
-              </div>
+            <div className="mt-6 text-red-400 font-bold bg-red-900/20 px-4 py-2 rounded-xl border border-red-900/50">
+              У вас немає Преміум-акаунту для відкриття цього паку.
+            </div>
           )}
         </div>
 
@@ -217,13 +224,17 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               return (
                 <div key={card.id} className={`flex flex-col items-center group ${isSoldOut ? "opacity-50 grayscale" : "cursor-pointer"}`} onClick={() => !isSoldOut && setViewingCard({ card })}>
                   <div className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? "group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]" : ""} ${style.border} ${effectClass}`}>
-                    <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <CardFrame frame={card.frame}>
+                      <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    </CardFrame>
+                    {card.effect && <div className={`${card.effect} z-10 pointer-events-none`} />}
                     {maxSup > 0 && (
                       <div className="absolute top-1 right-1 bg-black/90 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 font-bold z-10">
                         {isSoldOut ? "РОЗПРОДАНО" : `${maxSup - (cardStats[card.id] || 0)}/${maxSup}`}
-                      </div>
+                      </div >
                     )}
-                    {card.soundUrl && (
+                    {
+                      card.soundUrl && (
                         <button
                           onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
                           className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
@@ -231,19 +242,20 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                         >
                           <Volume2 size={12} />
                         </button>
-                    )}
-                  </div>
+                      )
+                    }
+                  </div >
                   <div className="text-center px-1 w-full">
                     <div className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${style.text}`}>{card.rarity}</div>
                     <div className="font-bold text-xs leading-tight text-white truncate w-full group-hover:text-yellow-100 transition-colors" title={card.name}>{card.name}</div>
                   </div>
-                </div>
+                </div >
               );
             })}
             {packCards.length === 0 && <p className="col-span-full text-center text-neutral-500 py-4">Картки відсутні.</p>}
-          </div>
-        </div>
-      </div>
+          </div >
+        </div >
+      </div >
     );
   }
 
@@ -259,36 +271,36 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
       </div>
 
       {categoriesList.length > 2 && (
-         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 hide-scrollbar justify-center max-w-4xl mx-auto">
-            {categoriesList.map(c => (
-               <button 
-                 key={c} 
-                 onClick={() => setActiveCategory(c)}
-                 className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap transition-colors border ${activeCategory === c ? "bg-purple-600 border-purple-500 text-white" : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white"}`}
-               >
-                 {c === "all" ? "Всі Паки" : c}
-               </button>
-            ))}
-         </div>
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 hide-scrollbar justify-center max-w-4xl mx-auto">
+          {categoriesList.map(c => (
+            <button
+              key={c}
+              onClick={() => setActiveCategory(c)}
+              className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap transition-colors border ${activeCategory === c ? "bg-purple-600 border-purple-500 text-white" : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white"}`}
+            >
+              {c === "all" ? "Всі Паки" : c}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
         {displayedPacks.map((pack) => (
           <button key={pack.id} onClick={() => setSelectedPackId(pack.id)} className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-3xl p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}>
             {pack.isHidden && (
-                <div className="absolute top-3 left-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
-                    Приховано
-                </div>
+              <div className="absolute top-3 left-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
+                Приховано
+              </div>
             )}
             {pack.isPremiumOnly && (
-                <div className="absolute top-3 right-3 bg-fuchsia-900 text-fuchsia-100 text-[10px] px-2 py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
-                    <Gem size={10}/> Преміум
-                </div>
+              <div className="absolute top-3 right-3 bg-fuchsia-900 text-fuchsia-100 text-[10px] px-2 py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
+                <Gem size={10} /> Преміум
+              </div>
             )}
-            
+
             <div className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}>{pack.category || "Базові"}</div>
             <h3 className="text-xl font-bold text-white mb-2 text-center w-full relative z-10">{pack.name}</h3>
-            
+
             <div className="flex items-center justify-center gap-1.5 text-yellow-500 font-bold mb-4 bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10">
               {pack.cost} <Coins size={16} />
             </div>
@@ -316,9 +328,8 @@ function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hov
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${
-        disabled ? "bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70" : `${color} transform hover:-translate-y-1`
-      }`}
+      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${disabled ? "bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70" : `${color} transform hover:-translate-y-1`
+        }`}
     >
       Відкрити {amount}x
       <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">

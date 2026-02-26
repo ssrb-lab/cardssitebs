@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LayoutGrid, Star, Zap, Coins, PackageOpen, Trash2, GripHorizontal, ArrowLeft, Volume2 } from "lucide-react";
 import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
+import CardFrame from "../components/CardFrame";
 
 export default function InventoryView({
   inventory, rarities, sellDuplicate, sellAllDuplicates, sellEveryDuplicate,
@@ -178,7 +179,7 @@ export default function InventoryView({
 
                 return (
                   <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}>
-                    <div onClick={() => setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass}`}>
+                    <div onClick={() => setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border}`}>
                       {Number(item.card.maxSupply) > 0 && (
                         <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
                           {item.card.maxSupply}
@@ -189,7 +190,10 @@ export default function InventoryView({
                           x{item.amount}
                         </div>
                       )}
-                      <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <CardFrame frame={item.card.frame}>
+                        <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      </CardFrame>
+                      {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
 
                       {item.card.soundUrl && (
                         <button
@@ -266,7 +270,14 @@ export default function InventoryView({
                         {(s.cardIds || []).slice(0, 5).map((cId, i) => {
                           const c = cardsCatalog.find(x => x.id === cId);
                           if (!c) return null;
-                          return <img key={i} src={c.image} alt="m" className="inline-block h-12 w-8 object-cover rounded border border-neutral-700 bg-neutral-950" />
+                          return (
+                            <div key={i} className="inline-block h-12 w-8 rounded border border-neutral-700 bg-neutral-950 overflow-hidden">
+                              <CardFrame frame={c.frame}>
+                                <img src={c.image} alt="m" className="w-full h-full object-cover" />
+                              </CardFrame>
+                              {c.effect && <div className={`${c.effect} pointer-events-none z-10`} />}
+                            </div>
+                          );
                         })}
                         {(s.cardIds?.length || 0) > 5 && <div className="h-12 w-8 rounded border border-neutral-700 bg-neutral-900 flex items-center justify-center text-[10px] font-bold text-white z-10">+{s.cardIds.length - 5}</div>}
                       </div>
@@ -310,12 +321,14 @@ export default function InventoryView({
                   const cData = cardsCatalog.find(c => c.id === cId);
                   if (!cData) return null;
                   const style = getCardStyle(cData.rarity, rarities);
-                  const effectClass = cData.effect ? `effect-${cData.effect}` : '';
 
                   return (
                     <div key={index} onClick={() => removeCardFromShowcase(index)} className="relative group cursor-pointer animate-in zoom-in-95">
-                      <div className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass}`}>
-                        <img src={cData.image} alt={cData.name} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                      <div className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border}`}>
+                        <CardFrame frame={cData.frame}>
+                          <img src={cData.image} alt={cData.name} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                        </CardFrame>
+                        {cData.effect && <div className={`${cData.effect} pointer-events-none z-10`} />}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="bg-red-600 text-white rounded-full p-2"><Trash2 size={20} /></div>
                         </div>
@@ -355,7 +368,12 @@ export default function InventoryView({
                           {available}
                         </div>
                       )}
-                      <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover pointer-events-none" />
+                      <div className="w-full h-full relative group">
+                        <CardFrame frame={item.card.frame}>
+                          <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover pointer-events-none" />
+                        </CardFrame>
+                        {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
+                      </div>
                     </div>
                   )
                 })}

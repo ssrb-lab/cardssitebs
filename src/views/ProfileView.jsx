@@ -3,6 +3,7 @@ import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, Packag
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
 import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
+import CardFrame from "../components/CardFrame";
 
 export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats }) {
     const [avatarInput, setAvatarInput] = useState("");
@@ -22,7 +23,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                 // Завантажуємо історію ринку
                 const historyData = await fetchMarketHistoryRequest(getToken());
                 setMarketHistory(historyData || []);
-                
+
                 // Завантажуємо свіжу статистику з бази
                 if (profile?.uid) {
                     const statsData = await fetchPublicProfileRequest(profile.uid);
@@ -41,10 +42,10 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             showToast("Історію успішно очищено!", "success");
         } catch (e) { showToast("Помилка очищення історії", "error"); }
     };
-    
+
     const canClaimDaily = profile && (!profile.lastDailyClaim || new Date(profile.lastDailyClaim).getUTCDate() !== new Date().getUTCDate());
     const mainShowcase = showcases?.find(s => s.id === profile?.mainShowcaseId);
-    
+
     const validShowcaseCards = [];
     if (mainShowcase && mainShowcase.cardIds) {
         const tempInv = JSON.parse(JSON.stringify(fullInventory));
@@ -78,7 +79,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             setProfile(prev => ({ ...prev, avatarUrl: avatarInput.trim() }));
             showToast("Аватар успішно оновлено!", "success");
             setAvatarInput("");
-        } catch (e) { showToast("Помилка оновлення аватару"); } 
+        } catch (e) { showToast("Помилка оновлення аватару"); }
         finally { actionLock.current = false; setIsProcessing(false); }
     };
 
@@ -91,23 +92,23 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             setProfile(data.profile);
             showToast(`Промокод застосовано! Отримано: ${data.reward} монет`, "success");
             setPromoInput("");
-        } catch (e) { showToast(e.message || "Помилка промокоду", "error"); } 
+        } catch (e) { showToast(e.message || "Помилка промокоду", "error"); }
         finally { actionLock.current = false; setIsProcessing(false); }
     };
 
     const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (actionLock.current || isProcessing || !oldPassword.trim() || !newPassword.trim()) return;
-    actionLock.current = true; setIsProcessing(true);
-    try {
-        await changePasswordRequest(getToken(), oldPassword, newPassword);
-        showToast("Мій лорд, пароль успішно змінено!", "success");
-        setOldPassword("");
-        setNewPassword("");
-    } catch (e) { 
-        showToast(e.message || "Помилка зміни пароля", "error"); 
-    } 
-    finally { actionLock.current = false; setIsProcessing(false); }
+        e.preventDefault();
+        if (actionLock.current || isProcessing || !oldPassword.trim() || !newPassword.trim()) return;
+        actionLock.current = true; setIsProcessing(true);
+        try {
+            await changePasswordRequest(getToken(), oldPassword, newPassword);
+            showToast("Мій лорд, пароль успішно змінено!", "success");
+            setOldPassword("");
+            setNewPassword("");
+        } catch (e) {
+            showToast(e.message || "Помилка зміни пароля", "error");
+        }
+        finally { actionLock.current = false; setIsProcessing(false); }
     };
 
     if (activeTab === "history") {
@@ -132,7 +133,13 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                                 return (
                                     <div key={item.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-colors">
                                         <div className="flex items-center gap-3">
-                                            {item.card?.image && <img src={item.card.image} alt="card" className="w-10 h-14 object-cover rounded-md border border-neutral-700" />}
+                                            {item.card?.image && (
+                                                <div className="w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative">
+                                                    <CardFrame frame={item.card.frame}>
+                                                        <img src={item.card.image} alt="card" className="w-full h-full object-cover" />
+                                                    </CardFrame>
+                                                </div>
+                                            )}
                                             <div>
                                                 <div className="font-bold text-white text-sm">{item.card?.name || "Невідома картка"}</div>
                                                 <div className="text-xs text-neutral-500 mt-0.5">
@@ -197,7 +204,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
         <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
                 <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? "from-orange-900/40" : profile?.isAdmin ? "from-purple-900/40" : isPremiumActive ? "from-fuchsia-900/30" : "from-blue-900/20"} to-transparent`}></div>
-                
+
                 <div className="relative w-24 h-24 mx-auto mb-4 z-10">
                     <PlayerAvatar profile={profile} className={`w-full h-full rounded-full text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`} iconSize={48} />
                     {isPremiumActive && (
@@ -206,7 +213,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                         </div>
                     )}
                 </div>
-                
+
                 <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
                     {profile?.nickname}
                     <span className="bg-red-600/20 text-red-400 text-sm px-2 py-1 rounded-xl border border-red-500/50 flex items-center gap-1" title="Ваш рівень Фарму">
@@ -215,9 +222,9 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                     {isPremiumActive && <Gem size={18} className="text-fuchsia-400 fill-fuchsia-400" title="Преміум Гравець" />}
                 </h2>
                 <div className="text-neutral-500 text-sm flex justify-center gap-4 mt-2 mb-6">
-                    <span className="flex items-center gap-1"><CalendarDays size={14}/> З нами від: {formatDate(profile?.createdAt)}</span>
+                    <span className="flex items-center gap-1"><CalendarDays size={14} /> З нами від: {formatDate(profile?.createdAt)}</span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 relative z-10 max-w-2xl mx-auto">
                     <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
                         <Coins className="text-yellow-500 mb-2 w-6 h-6" />
@@ -250,14 +257,13 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
                     <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gift className="text-orange-500" /> Щоденна Нагорода</h3>
-                    <button 
-                        onClick={claimDaily} 
+                    <button
+                        onClick={claimDaily}
                         disabled={!canClaimDaily || isProcessing}
-                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${
-                            canClaimDaily 
-                            ? "bg-gradient-to-r from-orange-600 to-yellow-500 text-yellow-950 shadow-[0_0_20px_rgba(249,115,22,0.4)]" 
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${canClaimDaily
+                            ? "bg-gradient-to-r from-orange-600 to-yellow-500 text-yellow-950 shadow-[0_0_20px_rgba(249,115,22,0.4)]"
                             : "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                        }`}
+                            }`}
                     >
                         {canClaimDaily ? "Отримати нагороду" : "Вже отримано (Чекайте завтра)"}
                     </button>
@@ -266,12 +272,12 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
                     <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Ticket className="text-purple-500" /> Промокоди</h3>
                     <form onSubmit={redeemPromo} className="flex gap-2 relative z-10">
-                        <input 
-                            type="text" 
-                            value={promoInput} 
-                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())} 
-                            placeholder="Код..." 
-                            className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none" 
+                        <input
+                            type="text"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                            placeholder="Код..."
+                            className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none"
                         />
                         <button type="submit" disabled={isProcessing || !promoInput.trim()} className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3 rounded-xl">Ок</button>
                     </form>
@@ -280,7 +286,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
 
 
 
-{/* КНОПКИ-ВІКНА */}
+            {/* КНОПКИ-ВІКНА */}
             <div className="flex flex-col sm:flex-row gap-4 max-w-4xl mx-auto mb-6">
                 <button onClick={() => setActiveTab("history")} className="flex-1 bg-neutral-900 border border-neutral-800 hover:border-yellow-600/50 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all group shadow-md">
                     <Store size={36} className="text-yellow-500 group-hover:scale-110 transition-transform" />
