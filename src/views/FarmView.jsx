@@ -153,19 +153,14 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                 accumulatedDamage.current = 0;
             }
 
-            const maxHitsAllowed = Math.ceil(currentBoss.maxHp / (currentBoss.damagePerClick || 10));
-            const totalReward = (maxHitsAllowed * (currentBoss.rewardPerClick || 2)) + (currentBoss.killBonus || 0);
-            const isLevelUp = playerLevel < maxBossLevel;
-            const cdHours = currentBoss.cooldownHours || 4;
-
-            const data = await claimFarmRewardRequest(getToken(), currentBoss.id, totalReward, isLevelUp, cdHours, currentBoss.maxHp);
+            const data = await claimFarmRewardRequest(getToken(), currentBoss.id);
 
             if (setProfile) setProfile(data.profile); // Оновлюємо монети гравця на екрані
             setCooldownEnd(data.cdUntil);
             setHp(0);
 
-            if (isLevelUp) showToast(`Чудово! Рівень підвищено. Отримано: ${totalReward} монет!`, "success");
-            else showToast(`Скарб забрано! Отримано: ${totalReward} монет!`, "success");
+            if (data.isLevelUp) showToast(`Чудово! Рівень підвищено. Отримано: ${data.reward} монет!`, "success");
+            else showToast(`Скарб забрано! Отримано: ${data.reward} монет!`, "success");
 
         } catch (error) {
             showToast(error.message || "Помилка отримання нагороди!", "error");

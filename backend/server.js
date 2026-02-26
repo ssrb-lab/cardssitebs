@@ -765,30 +765,35 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
 
     // АНТИЧІТ: Динамічний ліміт
     if (!req.user.isAdmin) {
-      const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
-      
-      // Безпечний доступ до JSON поля
-      let bosses = [];
-      if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
-        bosses = settings.data.bosses;
-      }
-      
-      const currentBoss = bosses.find(b => b.id === bossId);
-      const damagePerClick = currentBoss && currentBoss.damagePerClick ? Number(currentBoss.damagePerClick) : 10;
+    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
 
-      let elapsedSeconds = 0;
-      if (farm && farm.lastUpdated) {
-        elapsedSeconds = (new Date() - new Date(farm.lastUpdated)) / 1000;
-        // Захист від від'ємного часу якщо збереглось майбутнім часом
-        if (elapsedSeconds < 0) elapsedSeconds = 0;
-      }
-      // Максимум 10 секунд буферу щоб уникнути накопичення при довгому AFK
-      elapsedSeconds = Math.min(elapsedSeconds, 10);
+    // Безпечний доступ до JSON поля
+    let bosses = [];
+    if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
+      bosses = settings.data.bosses;
+    }
 
-      // (Час + 2 сек на пінг) * 20 кліків макс * damagePerClick
-      const maxAllowedDamage = (elapsedSeconds + 2) * 20 * damagePerClick;
+    const currentBoss = bosses.find(b => b.id === bossId);
+    const damagePerClick = currentBoss && currentBoss.damagePerClick ? Number(currentBoss.damagePerClick) : 10;
+    const dbMaxHp = currentBoss && currentBoss.maxHp ? Number(currentBoss.maxHp) : (maxHp || 1000);
 
-      if (damageDone > maxAllowedDamage) {
+    let elapsedSeconds = 0;
+    if (farm && farm.lastUpdated) {
+      elapsedSeconds = (new Date() - new Date(farm.lastUpdated)) / 1000;
+      // Захист від від'ємного часу якщо збереглось майбутнім часом
+      if (elapsedSeconds < 0) elapsedSeconds = 0;
+    }
+    // Дозволяємо накопичення кліків до 30 секунд (для гравців з поганим з'єднанням)
+    let bufferedSeconds = Math.min(elapsedSeconds, 30);
+
+    // (Час + 5 сек на пінги/паралельні запити) * 25 кліків/сек * damagePerClick
+    const maxAllowedDamage = (bufferedSeconds + 5) * 25 * Math.max(1, damagePerClick);
+
+    let finalDamageDone = damageDone;
+
+    if (finalDamageDone > maxAllowedDamage) {
+      // Якщо перевищення більше ніж в 2 рази (явний бот/API експлойт)
+      if (finalDamageDone > maxAllowedDamage * 2) {
         // Логуємо чітера
         await prisma.adminLog.create({
           data: {
@@ -800,17 +805,23 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
         });
         return res.status(400).json({ error: "Виявлено автоклікер! Занадто швидкі кліки!" });
       }
+
+      // Якщо невелике перевищення (лаг мережі) - просто обрізаємо урон без помилки (Soft Cap)
+      finalDamageDone = maxAllowedDamage;
     }
 
+    // Використовуємо обрізаний урон замість оригінального
+    damageDone = finalDamageDone;
+    }
     if (!farm) {
-      farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, maxHp - damageDone), lastUpdated: new Date() } });
+      farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, dbMaxHp - damageDone), lastUpdated: new Date() } });
     } else if (farm.bossId !== bossId) {
-      farm = await prisma.farmState.update({ where: { userId: user.uid }, data: { bossId, currentHp: Math.max(0, maxHp - damageDone), cooldownUntil: null, lastUpdated: new Date() } });
+      farm = await prisma.farmState.update({ where: { userId: user.uid }, data: { bossId, currentHp: Math.max(0, dbMaxHp - damageDone), cooldownUntil: null, lastUpdated: new Date() } });
     } else {
       if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date()) {
         return res.status(400).json({ error: "Бос ще на кулдауні!" });
       }
-      const currentHp = farm.currentHp ?? maxHp;
+      const currentHp = farm.currentHp ?? dbMaxHp;
       farm = await prisma.farmState.update({
         where: { userId: user.uid },
         data: { currentHp: Math.max(0, currentHp - damageDone), lastUpdated: new Date() }
@@ -825,7 +836,7 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
 
 // Забрати нагороду
 app.post('/api/game/farm/claim', authenticate, async (req, res) => {
-  const { bossId, reward, isLevelUp, cdHours, maxHp } = req.body;
+  const { bossId } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { farmState: true } });
     const farm = user.farmState;
@@ -833,12 +844,38 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
     if (!farm || farm.bossId !== bossId || farm.currentHp > 0) return res.status(400).json({ error: "Боса ще не переможено!" });
     if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date()) return res.status(400).json({ error: "Нагороду вже забрано!" });
 
+    // БЕЗПЕКА: Дістаємо дані про боса з БД замість того, щоб вірити клієнту (F12 bypass prevention)
+    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    let bosses = [];
+    if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
+      bosses = settings.data.bosses;
+    }
+    const currentBoss = bosses.find(b => b.id === bossId);
+    if (!currentBoss) return res.status(404).json({ error: "Боса не знайдено!" });
+
+    const maxHp = Number(currentBoss.maxHp) || 1000;
+    const damagePerClick = Number(currentBoss.damagePerClick) || 10;
+    const rewardPerClick = Number(currentBoss.rewardPerClick) || 2;
+    const killBonus = Number(currentBoss.killBonus) || 0;
+    const cdHours = Number(currentBoss.cooldownHours) || 4;
+
+    const maxHitsAllowed = Math.ceil(maxHp / damagePerClick);
+    const calculatedReward = (maxHitsAllowed * rewardPerClick) + killBonus;
+
+    // Визначаємо чи треба підвищити рівень (якщо вбитий бос - поточний за рівнем)
+    const sortedBosses = [...bosses].sort((a, b) => a.level - b.level);
+    const maxBossLevel = sortedBosses.length > 0 ? sortedBosses[sortedBosses.length - 1].level : 1;
+    const isLevelUp = user.farmLevel < maxBossLevel && currentBoss.level === user.farmLevel;
+
     const cdUntil = new Date(Date.now() + cdHours * 60 * 60 * 1000);
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { increment: reward }, farmLevel: isLevelUp ? { increment: 1 } : undefined }
+        data: { 
+          coins: { increment: calculatedReward }, 
+          farmLevel: isLevelUp ? { increment: 1 } : undefined 
+        }
       });
       await tx.farmState.update({
         where: { userId: user.uid },
@@ -847,8 +884,9 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    res.json({ success: true, profile: updatedUser, cdUntil });
+    res.json({ success: true, profile: updatedUser, cdUntil, reward: calculatedReward, isLevelUp });
   } catch (error) {
+    console.error("Помилка отримання нагороди:", error);
     res.status(500).json({ error: "Помилка отримання нагороди." });
   }
 });

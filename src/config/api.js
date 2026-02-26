@@ -159,10 +159,10 @@ export const syncFarmHitRequest = async (token, bossId, damageDone, maxHp) => {
     return data;
 };
 
-export const claimFarmRewardRequest = async (token, bossId, reward, isLevelUp, cdHours, maxHp) => {
+export const claimFarmRewardRequest = async (token, bossId) => {
     const res = await fetch(`${API_URL}/game/farm/claim`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ bossId, reward, isLevelUp, cdHours, maxHp })
+        body: JSON.stringify({ bossId })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
