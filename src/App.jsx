@@ -70,6 +70,8 @@ export default function App() {
   const [viewingPlayerProfile, setViewingPlayerProfile] = useState(null);
   const [toastMsg, setToastMsg] = useState({ text: "", type: "" });
   const [listingCard, setListingCard] = useState(null);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
 
@@ -572,7 +574,7 @@ export default function App() {
   }).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
       <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer" onClick={() => setCurrentView("shop")}>
@@ -619,7 +621,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto p-4 mt-4">
+      <main className="max-w-5xl w-full mx-auto p-4 mt-4 flex-grow">
         {currentView === "farm" && <FarmView profile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} showToast={showToast} bosses={bosses} rarities={rarities} />}
         {currentView === "shop" && <ShopView profile={profile} cardStats={cardStats} packs={packsCatalog} cardsCatalog={cardsCatalog} rarities={rarities} openPack={openPack} openingPackId={openingPackId} isRouletteSpinning={isRouletteSpinning} rouletteItems={rouletteItems} pulledCards={pulledCards} setPulledCards={setPulledCards} sellPulledCards={sellPulledCards} selectedPackId={selectedPackId} setSelectedPackId={setSelectedPackId} setViewingCard={setViewingCard} isPremiumActive={isPremiumActive} isAdmin={profile?.isAdmin} isProcessing={isProcessing} />}
         {currentView === "premium" && <PremiumShopView profile={profile} setProfile={setProfile} user={user} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} showToast={showToast} isProcessing={isProcessing} setIsProcessing={setIsProcessing} addSystemLog={addSystemLog} isPremiumActive={isPremiumActive} cardsCatalog={cardsCatalog} setViewingCard={setViewingCard} rarities={rarities} cardStats={cardStats} />}
@@ -631,6 +633,47 @@ export default function App() {
         {currentView === "admin" && (profile?.isAdmin || profile?.isSuperAdmin) && <AdminView reloadSettings={reloadSettings} currentProfile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} packsCatalog={packsCatalog} setCardsCatalog={setCardsCatalog} setPacksCatalog={setPacksCatalog} rarities={rarities} showToast={showToast} addSystemLog={addSystemLog} dailyRewards={dailyRewards} premiumDailyRewards={premiumDailyRewards} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} setViewingPlayerProfile={setViewingPlayerProfile} setCurrentView={setCurrentView} bosses={bosses} setBosses={setBosses} />}
       </main>
 
+      <footer className="w-full text-center text-neutral-600 text-xs py-8 mt-auto px-4 relative z-10">
+        <p>&copy; {new Date().getFullYear()} Card Game. Всі права захищені.</p>
+        <div className="flex justify-center gap-4 mt-2">
+          <button onClick={() => setShowTerms(true)} className="hover:text-neutral-300 transition-colors">Правила користування</button>
+          <button onClick={() => setShowPrivacy(true)} className="hover:text-neutral-300 transition-colors">Політика конфіденційності</button>
+        </div>
+      </footer>
+
+      {showTerms && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl">
+            <h2 className="text-2xl font-black text-white mb-4">Правила користування</h2>
+            <div className="text-neutral-300 text-sm space-y-3 mb-6">
+              <p>Ця гра створена виключно з розважальною метою.</p>
+              <p>1. Усі ігрові цінності (монети, картки, преміум-статуси тощо) не мають реальної грошової вартості і не можуть бути продані за реальні фіатні гроші.</p>
+              <p>2. Адміністрація залишає за собою право блокувати акаунти за порушення правил: використання стороннього ПЗ, ботів, використання багів, образи інших гравців або спроби шахрайства.</p>
+              <p>3. Адміністрація не несе відповідальності за втрату акаунту або ігрового майна внаслідок передачі реєстраційних даних третім особам.</p>
+              <p>4. Гра та її правила можуть бути змінені або доповнені адміністрацією в будь-який час.</p>
+              <p>Продовжуючи грати, ви автоматично погоджуєтесь із цими умовами.</p>
+            </div>
+            <button onClick={() => setShowTerms(false)} className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 text-base font-black py-3 rounded-xl transition-colors">Зрозуміло</button>
+          </div>
+        </div>
+      )}
+
+      {showPrivacy && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl">
+            <h2 className="text-2xl font-black text-white mb-4">Політика конфіденційності</h2>
+            <div className="text-neutral-300 text-sm space-y-3 mb-6">
+              <p>Ми відповідально ставимося до ваших даних і збираємо лише необхідний мінімум для функціонування гри.</p>
+              <p>1. <strong>Збір даних:</strong> Ми збираємо вашу електронну адресу (яку ви вказуєте при реєстрації або через Google) виключно для ідентифікації вашого акаунту та збереження прогресу.</p>
+              <p>2. <strong>Захист даних:</strong> Ваші паролі зберігаються в базі даних виключно у зашифрованому вигляді. Ми не маємо доступу до ваших паролів.</p>
+              <p>3. <strong>Використання:</strong> Ми не передаємо ваші персональні дані третім особам і не використовуємо їх для рекламних розсилок.</p>
+              <p>4. <strong>Видалення:</strong> Ви маєте право запросити повне видалення вашого акаунту та всіх пов'язаних з ним ігрових даних, звернувшись до адміністрації.</p>
+            </div>
+            <button onClick={() => setShowPrivacy(false)} className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 text-base font-black py-3 rounded-xl transition-colors">Зрозуміло</button>
+          </div>
+        </div>
+      )}
+
       {viewingCard && <CardModal viewingCard={viewingCard} setViewingCard={setViewingCard} rarities={rarities} />}
       {listingCard && <ListingModal listingCard={listingCard} setListingCard={setListingCard} isProcessing={isProcessing} listOnMarket={listOnMarket} />}
 
@@ -638,14 +681,14 @@ export default function App() {
         <div className="min-w-max mx-auto flex justify-center sm:gap-2">
           <NavButton icon={<Swords size={22} />} label="Фарм" isActive={currentView === "farm"} onClick={() => setCurrentView("farm")} />
           <NavButton icon={<PackageOpen size={22} />} label="Магазин" isActive={currentView === "shop"} onClick={() => { setCurrentView("shop"); setPulledCards([]); setSelectedPackId(null); }} />
-          <NavButton 
-            icon={<LayoutGrid size={22} />} 
-            label="Інвентар" 
-            isActive={currentView === "inventory"} 
-            onClick={() => { 
-              setCurrentView("inventory"); 
+          <NavButton
+            icon={<LayoutGrid size={22} />}
+            label="Інвентар"
+            isActive={currentView === "inventory"}
+            onClick={() => {
+              setCurrentView("inventory");
               reloadProfile(); // Примусово оновлюємо дані з сервера
-            }} 
+            }}
           />
           <NavButton
             icon={<Store size={22} />}
