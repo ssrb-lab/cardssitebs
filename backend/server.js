@@ -709,8 +709,17 @@ app.get('/api/game/market/notifications', authenticate, async (req, res) => {
   const serverTime = Date.now();
 
   try {
+    const currentUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      select: { isBanned: true }
+    });
+
+    if (currentUser?.isBanned) {
+      return res.json({ isBanned: true, serverTime });
+    }
+
     if (!lastCheck || lastCheck === 'null') {
-      return res.json({ sales: [], serverTime });
+      return res.json({ sales: [], serverTime, isBanned: false });
     }
 
     const checkDate = new Date(parseInt(lastCheck));
@@ -967,6 +976,8 @@ app.get('/api/game/leaderboard', async (req, res) => {
         avatarUrl: true,
         isAdmin: true,       // <-- ДОДАНО
         isSuperAdmin: true,  // <-- ДОДАНО
+        isPremium: true,     // <-- ДОДАНО
+        premiumUntil: true,  // <-- ДОДАНО
         lastIp: true,        // <-- ДОДАНО для адмінів
         // Рахуємо кількість унікальних записів в інвентарі гравця
         _count: {
@@ -985,6 +996,8 @@ app.get('/api/game/leaderboard', async (req, res) => {
       avatarUrl: user.avatarUrl,
       isAdmin: user.isAdmin,             // <-- ДОДАНО
       isSuperAdmin: user.isSuperAdmin,   // <-- ДОДАНО
+      isPremium: user.isPremium,         // <-- ДОДАНО
+      premiumUntil: user.premiumUntil,   // <-- ДОДАНО
       lastIp: user.lastIp,               // <-- ДОДАНО
       uniqueCardsCount: user._count.inventory
     }));

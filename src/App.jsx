@@ -194,6 +194,11 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
 
+          if (data.isBanned) {
+            setProfile(prev => ({ ...prev, isBanned: true }));
+            return;
+          }
+
           if (data.serverTime) {
             lastCheckRef.current = data.serverTime;
           }
