@@ -30,6 +30,8 @@ const checkAdmin = (req, res, next) => {
 
 app.post('/api/auth/google', async (req, res) => {
   const { credential } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
@@ -51,13 +53,35 @@ app.post('/api/auth/google', async (req, res) => {
       const passwordHash = await bcrypt.hash(randomPassword, 10);
 
       user = await prisma.user.create({
-        data: { email, nickname, passwordHash, avatarUrl, coins: 200 }
+        data: { email, nickname, passwordHash, avatarUrl, coins: 200, lastIp: ip }
       });
-    } else if (!user.avatarUrl && avatarUrl) {
+    } else {
       user = await prisma.user.update({
         where: { uid: user.uid },
-        data: { avatarUrl }
+        data: {
+          avatarUrl: (!user.avatarUrl && avatarUrl) ? avatarUrl : user.avatarUrl,
+          lastIp: ip
+        }
       });
+    }
+
+    // Перевірка на мультиаккаунт
+    if (ip) {
+      const otherAccounts = await prisma.user.findMany({
+        where: { lastIp: ip, uid: { not: user.uid } },
+        select: { nickname: true }
+      });
+      if (otherAccounts.length > 0) {
+        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        await prisma.adminLog.create({
+          data: {
+            type: "Система",
+            details: `⚠️ Підозра на мультиакаунт! Гравець зайшов з IP ${ip}, який також використовують: ${otherNicks}`,
+            userUid: user.uid,
+            userNickname: user.nickname
+          }
+        });
+      }
     }
 
     const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -71,6 +95,8 @@ app.post('/api/auth/google', async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   const { nickname, email, password } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
   try {
     const existingUser = await prisma.user.findFirst({
       where: { OR: [{ email }, { nickname }] }
@@ -82,29 +108,78 @@ app.post('/api/auth/register', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { nickname, email, passwordHash }
+      data: { nickname, email, passwordHash, lastIp: ip }
     });
+
+    // Перевірка на мультиаккаунт
+    if (ip) {
+      const otherAccounts = await prisma.user.findMany({
+        where: { lastIp: ip, uid: { not: user.uid } },
+        select: { nickname: true }
+      });
+      if (otherAccounts.length > 0) {
+        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        await prisma.adminLog.create({
+          data: {
+            type: "Система",
+            details: `⚠️ Підозра на мультиакаунт! Новий гравець зареєструвався з IP ${ip}, який також використовують: ${otherNicks}`,
+            userUid: user.uid,
+            userNickname: user.nickname
+          }
+        });
+      }
+    }
 
     const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user });
   } catch (error) {
-    console.error(error);
+    console.error("Помилка реєстрації:", error);
     res.status(500).json({ error: "Помилка сервера." });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ error: "Користувача не знайдено." });
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) return res.status(401).json({ error: "Неправильний пароль." });
 
+    // Оновлюємо IP при логіні
+    if (user.lastIp !== ip) {
+      user = await prisma.user.update({
+        where: { uid: user.uid },
+        data: { lastIp: ip }
+      });
+    }
+
+    // Перевірка на мультиаккаунт
+    if (ip) {
+      const otherAccounts = await prisma.user.findMany({
+        where: { lastIp: ip, uid: { not: user.uid } },
+        select: { nickname: true }
+      });
+      if (otherAccounts.length > 0) {
+        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        await prisma.adminLog.create({
+          data: {
+            type: "Система",
+            details: `⚠️ Підозра на мультиакаунт! Гравець зайшов з IP ${ip}, який також використовують: ${otherNicks}`,
+            userUid: user.uid,
+            userNickname: user.nickname
+          }
+        });
+      }
+    }
+
     const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user });
   } catch (error) {
+    console.error("Помилка логіну:", error);
     res.status(500).json({ error: "Помилка сервера." });
   }
 });
@@ -114,51 +189,51 @@ app.post('/api/auth/login', async (req, res) => {
 // ----------------------------------------
 
 app.get('/api/profile/market-history', authenticate, async (req, res) => {
-    try {
-        const history = await prisma.marketListing.findMany({
-            where: {
-                status: 'sold',
-                OR: [
-                    { sellerId: req.user.uid },
-                    { buyerId: req.user.uid }
-                ]
-            },
-            include: { card: true, seller: { select: { nickname: true } } },
-            orderBy: { soldAt: 'desc' },
-            take: 30 // Показуємо останні 30 операцій
-        });
-        res.json(history);
-    } catch (e) {
-        res.status(500).json({ error: "Помилка завантаження історії ринку." });
-    }
+  try {
+    const history = await prisma.marketListing.findMany({
+      where: {
+        status: 'sold',
+        OR: [
+          { sellerId: req.user.uid },
+          { buyerId: req.user.uid }
+        ]
+      },
+      include: { card: true, seller: { select: { nickname: true } } },
+      orderBy: { soldAt: 'desc' },
+      take: 30 // Показуємо останні 30 операцій
+    });
+    res.json(history);
+  } catch (e) {
+    res.status(500).json({ error: "Помилка завантаження історії ринку." });
+  }
 });
 
 // Видалити ВЛАСНУ історію (Гравець)
 app.delete('/api/profile/market-history', authenticate, async (req, res) => {
-    try {
-        await prisma.marketListing.deleteMany({
-            where: { status: 'sold', OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }] }
-        });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  try {
+    await prisma.marketListing.deleteMany({
+      where: { status: 'sold', OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }] }
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: "Помилка." }); }
 });
 
 // Видалити історію КОНКРЕТНОГО ГРАВЦЯ (Адмін)
 app.delete('/api/admin/users/:uid/market-history', authenticate, checkAdmin, async (req, res) => {
-    try {
-        await prisma.marketListing.deleteMany({
-            where: { status: 'sold', OR: [{ sellerId: req.params.uid }, { buyerId: req.params.uid }] }
-        });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  try {
+    await prisma.marketListing.deleteMany({
+      where: { status: 'sold', OR: [{ sellerId: req.params.uid }, { buyerId: req.params.uid }] }
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: "Помилка." }); }
 });
 
 // Видалити ВСЮ ІСТОРІЮ РИНКУ всіх гравців (Адмін)
 app.delete('/api/admin/market-history', authenticate, checkAdmin, async (req, res) => {
-    try {
-        await prisma.marketListing.deleteMany({ where: { status: 'sold' } });
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  try {
+    await prisma.marketListing.deleteMany({ where: { status: 'sold' } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: "Помилка." }); }
 });
 
 app.post('/api/profile/change-password', authenticate, async (req, res) => {
@@ -195,21 +270,21 @@ app.get('/api/profile', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      include: { 
-          inventory: true,
-          showcases: true,
-          _count: { select: { inventory: true } } // Рахуємо картки гравця
+      include: {
+        inventory: true,
+        showcases: true,
+        _count: { select: { inventory: true } } // Рахуємо картки гравця
       }
     });
-    
+
     if (!user) return res.status(404).json({ error: "Гравець не знайдений" });
-    
+
     // Додаємо підрахунок до профілю, щоб фронтенд його побачив
     const formattedUser = {
-        ...user,
-        uniqueCardsCount: user._count.inventory
+      ...user,
+      uniqueCardsCount: user._count.inventory
     };
-    
+
     res.json(formattedUser);
   } catch (error) {
     res.status(500).json({ error: "Помилка завантаження профілю" });
@@ -221,28 +296,28 @@ app.get('/api/profile/public/:uid', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { uid: req.params.uid },
-      select: { 
-                uid: true, nickname: true, avatarUrl: true, coins: true, 
-                totalCards: true, 
-                packsOpened: true, 
-                coinsSpentOnPacks: true, 
-                coinsEarnedFromPacks: true, 
-                farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
-                _count: { select: { inventory: true } } // Динамічно рахуємо унікальні картки
-            }
+      select: {
+        uid: true, nickname: true, avatarUrl: true, coins: true,
+        totalCards: true,
+        packsOpened: true,
+        coinsSpentOnPacks: true,
+        coinsEarnedFromPacks: true,
+        farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
+        _count: { select: { inventory: true } } // Динамічно рахуємо унікальні картки
+      }
     });
-    
+
     if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
-    
+
     // Форматуємо результат для фронтенду
     const formattedUser = {
-        ...user,
-        uniqueCardsCount: user._count.inventory
+      ...user,
+      uniqueCardsCount: user._count.inventory
     };
-    
+
     res.json(formattedUser);
-  } catch (error) { 
-    res.status(500).json({ error: "Помилка завантаження профілю." }); 
+  } catch (error) {
+    res.status(500).json({ error: "Помилка завантаження профілю." });
   }
 });
 
@@ -363,13 +438,13 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
         // Жорстка перевірка: використовуємо шанс картки, тільки якщо він більший за 0
         if (c.weight !== null && c.weight !== undefined && c.weight !== "" && Number(c.weight) > 0) {
-            w = Number(c.weight);
-        } 
+          w = Number(c.weight);
+        }
         else if (pack.customWeights && pack.customWeights[c.rarity] !== undefined && pack.customWeights[c.rarity] !== "") {
-            w = Number(pack.customWeights[c.rarity]);
-        } 
+          w = Number(pack.customWeights[c.rarity]);
+        }
         else if (globalRObj) {
-            w = Number(globalRObj.weight);
+          w = Number(globalRObj.weight);
         }
 
         totalWeight += w;
@@ -508,9 +583,9 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
       // Продавець: +монети
       await tx.user.update({ where: { uid: listing.sellerId }, data: { coins: { increment: listing.price } } });
       // Лот: статус змінено ТА ДОДАНО ПОКУПЦЯ
-      await tx.marketListing.update({ 
-          where: { id: listingId }, 
-          data: { status: 'sold', soldAt: new Date(), buyerId: buyer.uid, buyerNickname: buyer.nickname } 
+      await tx.marketListing.update({
+        where: { id: listingId },
+        data: { status: 'sold', soldAt: new Date(), buyerId: buyer.uid, buyerNickname: buyer.nickname }
       });
     });
 
@@ -552,23 +627,23 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
 // МІНІ-ГРИ (2048)
 // ----------------------------------------
 app.post('/api/game/2048/claim', authenticate, async (req, res) => {
-    const { score } = req.body;
-    
-    if (score < 100) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
-    if (score > 500000) return res.status(400).json({ error: "Підозріло великий рахунок. Античіт!" });
+  const { score } = req.body;
 
-    // Курс: 1 поїнт рахунку = 1 монета
-    const coinsToGive = score; 
+  if (score < 100) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+  if (score > 500000) return res.status(400).json({ error: "Підозріло великий рахунок. Античіт!" });
 
-    try {
-        const updatedUser = await prisma.user.update({
-            where: { uid: req.user.uid },
-            data: { coins: { increment: coinsToGive } }
-        });
-        res.json({ success: true, earned: coinsToGive, profile: updatedUser });
-    } catch (error) {
-        res.status(500).json({ error: "Помилка нарахування монет за гру." });
-    }
+  // Курс: 1 поїнт рахунку = 1 монета
+  const coinsToGive = score;
+
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: { coins: { increment: coinsToGive } }
+    });
+    res.json({ success: true, earned: coinsToGive, profile: updatedUser });
+  } catch (error) {
+    res.status(500).json({ error: "Помилка нарахування монет за гру." });
+  }
 });
 
 // ----------------------------------------
@@ -839,6 +914,7 @@ app.get('/api/game/leaderboard', async (req, res) => {
         avatarUrl: true,
         isAdmin: true,       // <-- ДОДАНО
         isSuperAdmin: true,  // <-- ДОДАНО
+        lastIp: true,        // <-- ДОДАНО для адмінів
         // Рахуємо кількість унікальних записів в інвентарі гравця
         _count: {
           select: { inventory: true }
@@ -856,11 +932,13 @@ app.get('/api/game/leaderboard', async (req, res) => {
       avatarUrl: user.avatarUrl,
       isAdmin: user.isAdmin,             // <-- ДОДАНО
       isSuperAdmin: user.isSuperAdmin,   // <-- ДОДАНО
-      uniqueCardsCount: user._count.inventory 
+      lastIp: user.lastIp,               // <-- ДОДАНО
+      uniqueCardsCount: user._count.inventory
     }));
 
     res.json(formattedUsers);
   } catch (error) {
+    console.error("Помилка лідерборду:", error);
     res.status(500).json({ error: "Помилка завантаження рейтингу." });
   }
 });
@@ -963,7 +1041,7 @@ app.post('/api/profile/main-showcase', authenticate, async (req, res) => {
 // Завантаження всіх гравців
 app.get('/api/admin/users', authenticate, checkAdmin, async (req, res) => {
   try {
-    const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+    const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, select: { uid: true, nickname: true, email: true, coins: true, totalCards: true, createdAt: true, isAdmin: true, isSuperAdmin: true, isBanned: true, banReason: true, banUntil: true, isPremium: true, premiumUntil: true, avatarUrl: true, mainShowcaseId: true, lastIp: true, autoSoundEnabled: true, farmLevel: true } });
     res.json(users);
   } catch (error) { res.status(500).json({ error: "Помилка завантаження гравців." }); }
 });
