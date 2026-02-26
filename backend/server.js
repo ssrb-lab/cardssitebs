@@ -759,19 +759,53 @@ app.get('/api/game/farm/state', authenticate, async (req, res) => {
 app.post('/api/game/farm/sync', authenticate, async (req, res) => {
   const { bossId, damageDone, maxHp } = req.body;
 
-  // АНТИЧІТ: Ігноруємо адмінів (для кнопки InstaKill), і ставимо адекватніший ліміт для високих рівнів
-  if (!req.user.isAdmin && damageDone > 50000) {
-    return res.status(400).json({ error: "Виявлено автоклікер! Занадто швидкі кліки!" });
-  }
-
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { farmState: true } });
     let farm = user.farmState;
 
+    // АНТИЧІТ: Динамічний ліміт
+    if (!req.user.isAdmin) {
+      const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+      
+      // Безпечний доступ до JSON поля
+      let bosses = [];
+      if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
+        bosses = settings.data.bosses;
+      }
+      
+      const currentBoss = bosses.find(b => b.id === bossId);
+      const damagePerClick = currentBoss && currentBoss.damagePerClick ? Number(currentBoss.damagePerClick) : 10;
+
+      let elapsedSeconds = 0;
+      if (farm && farm.lastUpdated) {
+        elapsedSeconds = (new Date() - new Date(farm.lastUpdated)) / 1000;
+        // Захист від від'ємного часу якщо збереглось майбутнім часом
+        if (elapsedSeconds < 0) elapsedSeconds = 0;
+      }
+      // Максимум 10 секунд буферу щоб уникнути накопичення при довгому AFK
+      elapsedSeconds = Math.min(elapsedSeconds, 10);
+
+      // (Час + 2 сек на пінг) * 20 кліків макс * damagePerClick
+      const maxAllowedDamage = (elapsedSeconds + 2) * 20 * damagePerClick;
+
+      if (damageDone > maxAllowedDamage) {
+        // Логуємо чітера
+        await prisma.adminLog.create({
+          data: {
+            type: "Античіт",
+            details: `⚠️ Автоклікер на босі! Гравець ${user.nickname} (uid: ${user.uid}) надіслав ${damageDone} урону за ${elapsedSeconds.toFixed(1)} сек. Макс дозволено: ${maxAllowedDamage.toFixed(0)}.`,
+            userUid: user.uid,
+            userNickname: user.nickname
+          }
+        });
+        return res.status(400).json({ error: "Виявлено автоклікер! Занадто швидкі кліки!" });
+      }
+    }
+
     if (!farm) {
-      farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, maxHp - damageDone) } });
+      farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, maxHp - damageDone), lastUpdated: new Date() } });
     } else if (farm.bossId !== bossId) {
-      farm = await prisma.farmState.update({ where: { userId: user.uid }, data: { bossId, currentHp: Math.max(0, maxHp - damageDone), cooldownUntil: null } });
+      farm = await prisma.farmState.update({ where: { userId: user.uid }, data: { bossId, currentHp: Math.max(0, maxHp - damageDone), cooldownUntil: null, lastUpdated: new Date() } });
     } else {
       if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date()) {
         return res.status(400).json({ error: "Бос ще на кулдауні!" });
@@ -784,6 +818,7 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
     }
     res.json({ success: true, farmState: farm });
   } catch (error) {
+    console.error("Помилка синхронізації кліків:", error);
     res.status(500).json({ error: "Помилка синхронізації кліків." });
   }
 });

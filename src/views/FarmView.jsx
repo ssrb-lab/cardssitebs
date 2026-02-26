@@ -11,7 +11,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     const maxBossLevel = sortedBosses.length > 0 ? sortedBosses[sortedBosses.length - 1].level : 1;
 
     let currentBoss = sortedBosses.find(b => b.level === playerLevel);
-    if (!currentBoss && sortedBosses.length > 0) currentBoss = sortedBosses[sortedBosses.length - 1]; 
+    if (!currentBoss && sortedBosses.length > 0) currentBoss = sortedBosses[sortedBosses.length - 1];
 
     let bossCard = currentBoss ? cardsCatalog.find(c => c.id === currentBoss.cardId) : null;
     if (!bossCard && cardsCatalog && cardsCatalog.length > 0) bossCard = cardsCatalog[0];
@@ -23,9 +23,11 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     const [isHit, setIsHit] = useState(false);
     const [timeLeft, setTimeLeft] = useState("");
     const [activeGame, setActiveGame] = useState(null);
-    
+
     const actionLock = useRef(false);
     const accumulatedDamage = useRef(0);
+    const clickTimes = useRef([]);
+    const isAntiCheatTriggered = useRef(false);
 
     // Завантаження стану з MySQL
     useEffect(() => {
@@ -74,7 +76,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                 accumulatedDamage.current = 0; // Очищаємо локальний лічильник
                 try {
                     await syncFarmHitRequest(getToken(), currentBoss.id, dmgToSync, currentBoss.maxHp);
-                } catch(e) {
+                } catch (e) {
                     accumulatedDamage.current += dmgToSync; // Якщо помилка - повертаємо урон в чергу
                 }
             }
@@ -97,13 +99,38 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
             await adminResetCdRequest(getToken(), profile.uid, currentBoss.maxHp);
             setCooldownEnd(null); setHp(currentBoss.maxHp); accumulatedDamage.current = 0;
             showToast("АДМІН: Кулдаун скинуто!", "success");
-        } catch (e) { showToast("Помилка скидання КД.", "error"); } 
+        } catch (e) { showToast("Помилка скидання КД.", "error"); }
         finally { setIsProcessing(false); }
     };
     // ----------------------------
 
     const handleHit = () => {
-        if (hp <= 0 || cooldownEnd || isProcessing || actionLock.current) return; 
+        if (hp <= 0 || cooldownEnd || isProcessing || actionLock.current) return;
+
+        // АНТИЧІТ: Перевірка інтервалів кліків
+        const now = Date.now();
+        clickTimes.current.push(now);
+        if (clickTimes.current.length > 20) clickTimes.current.shift();
+
+        if (clickTimes.current.length === 20 && !isAntiCheatTriggered.current && !profile?.isAdmin) {
+            const intervals = [];
+            for (let i = 1; i < clickTimes.current.length; i++) {
+                intervals.push(clickTimes.current[i] - clickTimes.current[i - 1]);
+            }
+            const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            const variance = intervals.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / intervals.length;
+            const stdDev = Math.sqrt(variance);
+
+            if (avg < 40 || stdDev < 5) {
+                isAntiCheatTriggered.current = true;
+                showToast("Виявлено автоклікер! Кліки заблоковано.", "error");
+                setTimeout(() => { isAntiCheatTriggered.current = false; clickTimes.current = []; }, 3000);
+                return;
+            }
+        }
+
+        if (isAntiCheatTriggered.current) return;
+
         setIsHit(true); setTimeout(() => setIsHit(false), 100);
 
         const dmg = currentBoss?.damagePerClick || 10;
@@ -132,57 +159,57 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
             const cdHours = currentBoss.cooldownHours || 4;
 
             const data = await claimFarmRewardRequest(getToken(), currentBoss.id, totalReward, isLevelUp, cdHours, currentBoss.maxHp);
-            
+
             if (setProfile) setProfile(data.profile); // Оновлюємо монети гравця на екрані
             setCooldownEnd(data.cdUntil);
             setHp(0);
-            
+
             if (isLevelUp) showToast(`Чудово! Рівень підвищено. Отримано: ${totalReward} монет!`, "success");
             else showToast(`Скарб забрано! Отримано: ${totalReward} монет!`, "success");
 
-        } catch (error) { 
-            showToast(error.message || "Помилка отримання нагороди!", "error"); 
+        } catch (error) {
+            showToast(error.message || "Помилка отримання нагороди!", "error");
         } finally {
             actionLock.current = false; setIsProcessing(false);
         }
     };
-    
+
     if (activeGame === null) {
         return (
             <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto">
-               <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-8 px-2">
-                   <Zap className="text-yellow-500" /> Ігрові режими
-               </h2>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
-                   <div onClick={() => setActiveGame('boss')} className="bg-neutral-900 border border-red-900/50 hover:border-red-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
-                       <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                           <Swords size={120} className="text-red-500" />
-                       </div>
-                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Swords className="text-red-500"/> Битва з Босом</h3>
-                       <p className="text-neutral-400 text-sm mb-6 relative z-10">Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.</p>
-                       <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
-                   </div>
+                <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-8 px-2">
+                    <Zap className="text-yellow-500" /> Ігрові режими
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
+                    <div onClick={() => setActiveGame('boss')} className="bg-neutral-900 border border-red-900/50 hover:border-red-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
+                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Swords size={120} className="text-red-500" />
+                        </div>
+                        <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Swords className="text-red-500" /> Битва з Босом</h3>
+                        <p className="text-neutral-400 text-sm mb-6 relative z-10">Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.</p>
+                        <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                    </div>
 
-                   <div onClick={() => setActiveGame('2048')} className="bg-neutral-900 border border-purple-900/50 hover:border-purple-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
-                       <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                           <Gamepad2 size={120} className="text-purple-500" />
-                       </div>
-                       <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gamepad2 className="text-purple-500"/> Гра 2048</h3>
-                       <p className="text-neutral-400 text-sm mb-6 relative z-10">Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!</p>
-                       <button className="bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
-                   </div>
-               </div>
+                    <div onClick={() => setActiveGame('2048')} className="bg-neutral-900 border border-purple-900/50 hover:border-purple-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
+                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Gamepad2 size={120} className="text-purple-500" />
+                        </div>
+                        <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gamepad2 className="text-purple-500" /> Гра 2048</h3>
+                        <p className="text-neutral-400 text-sm mb-6 relative z-10">Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!</p>
+                        <button className="bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                    </div>
+                </div>
             </div>
         );
     }
 
-    if (isLoading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-10 h-10 mb-4"/> Підготовка Арени...</div>;
+    if (isLoading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-10 h-10 mb-4" /> Підготовка Арени...</div>;
     if (!currentBoss || !bossCard) return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
     if (activeGame === '2048') {
         return <Game2048 profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
-        }
+    }
 
-    
+
     if (cooldownEnd) {
         return (
             <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-lg mx-auto text-center mt-10 sm:mt-20">
@@ -198,7 +225,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                         {timeLeft}
                     </div>
                     <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mt-4">Час до появи</p>
-                    
+
                     {profile?.isAdmin && (
                         <button onClick={adminResetCD} disabled={isProcessing} className="mt-8 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/50 font-bold py-3 px-6 rounded-xl text-sm mx-auto flex items-center gap-2 transition-colors">
                             <Zap size={16} /> [АДМІН] Скинути кулдаун
@@ -238,16 +265,15 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                         {visualCoins} <Coins size={28} />
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={claimRewards}
                     disabled={hp > 0 || isProcessing}
-                    className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${
-                        hp <= 0 
-                        ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse" 
-                        : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
-                    }`}
+                    className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
+                            ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse"
+                            : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
+                        }`}
                 >
-                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : (hp <= 0 ? <Unlock size={18} /> : <Lock size={18} />)} 
+                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : (hp <= 0 ? <Unlock size={18} /> : <Lock size={18} />)}
                     {hp <= 0 ? "Забрати" : "Закрито"}
                 </button>
             </div>
@@ -267,11 +293,11 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                         </button>
                     )}
 
-                    <button 
+                    <button
                         onClick={handleHit}
                         disabled={hp <= 0 || isProcessing}
                         className={`relative group outline-none transition-transform duration-75 select-none ${isHit ? 'scale-95 brightness-125 -rotate-2' : 'hover:scale-105'}`}
-                        style={{ WebkitTapHighlightColor: 'transparent' }} 
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                         <div className="absolute -inset-6 bg-red-600/20 rounded-[3rem] blur-2xl group-hover:bg-red-600/40 transition-colors animate-pulse pointer-events-none"></div>
                         <div className="relative w-48 sm:w-64 aspect-[2/3] rounded-3xl border-4 border-red-900 overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.4)] bg-neutral-900 cursor-crosshair">
