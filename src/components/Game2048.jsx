@@ -25,13 +25,11 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   const [gameWon, setGameWon] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [attemptsLeft, setAttemptsLeft] = useState(null);
 
   const startGame = async () => {
     setIsProcessing(true);
     try {
       const data = await start2048GameRequest(getToken());
-      setAttemptsLeft(data.attemptsLeft);
 
       uidRef.current = 0;
       const newBoard = getEmptyBoard();
@@ -59,13 +57,12 @@ export default function Game2048({ setProfile, goBack, showToast }) {
     const saved = localStorage.getItem('2048_state');
     if (saved) {
       try {
-        const { board: savedBoard, score: savedScore, gameOver: savedGameOver, gameWon: savedGameWon, attemptsLeft: savedAttempts, nextId } = JSON.parse(saved);
+        const { board: savedBoard, score: savedScore, gameOver: savedGameOver, gameWon: savedGameWon, nextId } = JSON.parse(saved);
         uidRef.current = nextId || 1000;
         setBoard(savedBoard);
         setScore(savedScore);
         setGameOver(savedGameOver);
         setGameWon(savedGameWon || false);
-        setAttemptsLeft(savedAttempts !== undefined ? savedAttempts : null);
         setIsInitialized(true);
         return;
       } catch (e) { }
@@ -77,9 +74,9 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   // Збереження стану при кожному ході
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem('2048_state', JSON.stringify({ board, score, gameOver, gameWon, attemptsLeft, nextId: uidRef.current }));
+      localStorage.setItem('2048_state', JSON.stringify({ board, score, gameOver, gameWon, nextId: uidRef.current }));
     }
-  }, [board, score, gameOver, gameWon, attemptsLeft, isInitialized]);
+  }, [board, score, gameOver, gameWon, isInitialized]);
 
   const move = useCallback((direction) => {
     if (gameOver || gameWon || isProcessing) return;
@@ -285,7 +282,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
           </button>
 
           <button onClick={restartGame} className="mt-4 text-neutral-400 hover:text-white font-bold underline">
-            Грати заново{attemptsLeft !== null && ` (спроб: ${attemptsLeft})`}
+            Грати заново
           </button>
         </div>
       )}

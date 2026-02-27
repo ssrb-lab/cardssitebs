@@ -646,33 +646,16 @@ app.post('/api/game/2048/start', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
-    // Перевірка початку нового дня (UTC або серверний час)
+    // Оновлюємо дату гри
     const now = new Date();
-    const lastPlay = user.last2048PlayDate ? new Date(user.last2048PlayDate) : null;
-    let isNewDay = false;
-
-    if (!lastPlay ||
-      now.getDate() !== lastPlay.getDate() ||
-      now.getMonth() !== lastPlay.getMonth() ||
-      now.getFullYear() !== lastPlay.getFullYear()) {
-      isNewDay = true;
-    }
-
-    let currentAttempts = isNewDay ? 0 : user.daily2048Attempts;
-
-    if (currentAttempts >= 25) {
-      return res.status(403).json({ error: "Ви вичерпали ліміт (25 ігор) на сьогодні! Спробуйте завтра." });
-    }
-
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
-        daily2048Attempts: currentAttempts + 1,
         last2048PlayDate: now
       }
     });
 
-    res.json({ success: true, profile: updatedUser, attemptsLeft: 25 - (currentAttempts + 1) });
+    res.json({ success: true, profile: updatedUser });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Помилка сервера при старті гри." });
@@ -683,15 +666,42 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
   if (score < 100) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
-  if (score > 500000) return res.status(400).json({ error: "Підозріло великий рахунок. Античіт!" });
-
-  // Курс: 1 поїнт рахунку = 1 монета
-  const coinsToGive = score;
 
   try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const now = new Date();
+    let currentDailyFarm = user.dailyFarmAmount || 0;
+
+    // Скидання денного фарму
+    if (user.lastFarmDate) {
+      const lastFarm = new Date(user.lastFarmDate);
+      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+        lastFarm.getUTCMonth() !== now.getUTCMonth() ||
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        currentDailyFarm = 0;
+      }
+    }
+
+    if (currentDailyFarm >= 500000) {
+      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+    }
+
+    // Курс: 1 поїнт рахунку = 1 монета
+    let coinsToGive = score;
+
+    // Обрізаємо нагороду, якщо вона перевищує залишок ліміту
+    if (currentDailyFarm + coinsToGive > 500000) {
+      coinsToGive = 500000 - currentDailyFarm;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { uid: req.user.uid },
-      data: { coins: { increment: coinsToGive } }
+      data: {
+        coins: { increment: coinsToGive },
+        dailyFarmAmount: currentDailyFarm + coinsToGive,
+        lastFarmDate: now
+      }
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
   } catch (error) {
@@ -763,8 +773,6 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { farmState: true } });
     let farm = user.farmState;
 
-    // АНТИЧІТ: Динамічний ліміт
-    if (!req.user.isAdmin) {
     const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
 
     // Безпечний доступ до JSON поля
@@ -774,45 +782,8 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
     }
 
     const currentBoss = bosses.find(b => b.id === bossId);
-    const damagePerClick = currentBoss && currentBoss.damagePerClick ? Number(currentBoss.damagePerClick) : 10;
     const dbMaxHp = currentBoss && currentBoss.maxHp ? Number(currentBoss.maxHp) : (maxHp || 1000);
 
-    let elapsedSeconds = 0;
-    if (farm && farm.lastUpdated) {
-      elapsedSeconds = (new Date() - new Date(farm.lastUpdated)) / 1000;
-      // Захист від від'ємного часу якщо збереглось майбутнім часом
-      if (elapsedSeconds < 0) elapsedSeconds = 0;
-    }
-    // Дозволяємо накопичення кліків до 30 секунд (для гравців з поганим з'єднанням)
-    let bufferedSeconds = Math.min(elapsedSeconds, 30);
-
-    // (Час + 5 сек на пінги/паралельні запити) * 25 кліків/сек * damagePerClick
-    const maxAllowedDamage = (bufferedSeconds + 5) * 25 * Math.max(1, damagePerClick);
-
-    let finalDamageDone = damageDone;
-
-    if (finalDamageDone > maxAllowedDamage) {
-      // Якщо перевищення більше ніж в 2 рази (явний бот/API експлойт)
-      if (finalDamageDone > maxAllowedDamage * 2) {
-        // Логуємо чітера
-        await prisma.adminLog.create({
-          data: {
-            type: "Античіт",
-            details: `⚠️ Автоклікер на босі! Гравець ${user.nickname} (uid: ${user.uid}) надіслав ${damageDone} урону за ${elapsedSeconds.toFixed(1)} сек. Макс дозволено: ${maxAllowedDamage.toFixed(0)}.`,
-            userUid: user.uid,
-            userNickname: user.nickname
-          }
-        });
-        return res.status(400).json({ error: "Виявлено автоклікер! Занадто швидкі кліки!" });
-      }
-
-      // Якщо невелике перевищення (лаг мережі) - просто обрізаємо урон без помилки (Soft Cap)
-      finalDamageDone = maxAllowedDamage;
-    }
-
-    // Використовуємо обрізаний урон замість оригінального
-    damageDone = finalDamageDone;
-    }
     if (!farm) {
       farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, dbMaxHp - damageDone), lastUpdated: new Date() } });
     } else if (farm.bossId !== bossId) {
@@ -869,12 +840,36 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
 
     const cdUntil = new Date(Date.now() + cdHours * 60 * 60 * 1000);
 
+    const now = new Date();
+    let currentDailyFarm = user.dailyFarmAmount || 0;
+
+    // Скидання денного фарму
+    if (user.lastFarmDate) {
+      const lastFarm = new Date(user.lastFarmDate);
+      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+        lastFarm.getUTCMonth() !== now.getUTCMonth() ||
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        currentDailyFarm = 0;
+      }
+    }
+
+    let actualReward = calculatedReward;
+
+    if (currentDailyFarm >= 500000) {
+      // Якщо ліміт вичерпано, гравець не отримує нових монет, але вбиває боса
+      actualReward = 0;
+    } else if (currentDailyFarm + actualReward > 500000) {
+      actualReward = 500000 - currentDailyFarm;
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
-        data: { 
-          coins: { increment: calculatedReward }, 
-          farmLevel: isLevelUp ? { increment: 1 } : undefined 
+        data: {
+          coins: { increment: actualReward },
+          farmLevel: isLevelUp ? { increment: 1 } : undefined,
+          dailyFarmAmount: currentDailyFarm + actualReward,
+          lastFarmDate: now
         }
       });
       await tx.farmState.update({
@@ -884,7 +879,7 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    res.json({ success: true, profile: updatedUser, cdUntil, reward: calculatedReward, isLevelUp });
+    res.json({ success: true, profile: updatedUser, cdUntil, reward: actualReward, isLevelUp });
   } catch (error) {
     console.error("Помилка отримання нагороди:", error);
     res.status(500).json({ error: "Помилка отримання нагороди." });

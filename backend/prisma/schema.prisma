@@ -33,6 +33,8 @@ model User {
   lastIp               String?
   autoSoundEnabled     Boolean  @default(true)
   farmLevel            Int      @default(1)
+  dailyFarmAmount      Int      @default(0)
+  lastFarmDate         DateTime?
   daily2048Attempts    Int      @default(0)
   last2048PlayDate     DateTime?
 

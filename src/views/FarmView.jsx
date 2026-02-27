@@ -107,30 +107,6 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     const handleHit = () => {
         if (hp <= 0 || cooldownEnd || isProcessing || actionLock.current) return;
 
-        // АНТИЧІТ: Перевірка інтервалів кліків
-        const now = Date.now();
-        clickTimes.current.push(now);
-        if (clickTimes.current.length > 20) clickTimes.current.shift();
-
-        if (clickTimes.current.length === 20 && !isAntiCheatTriggered.current && !profile?.isAdmin) {
-            const intervals = [];
-            for (let i = 1; i < clickTimes.current.length; i++) {
-                intervals.push(clickTimes.current[i] - clickTimes.current[i - 1]);
-            }
-            const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-            const variance = intervals.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / intervals.length;
-            const stdDev = Math.sqrt(variance);
-
-            if (avg < 40 || stdDev < 5) {
-                isAntiCheatTriggered.current = true;
-                showToast("Виявлено автоклікер! Кліки заблоковано.", "error");
-                setTimeout(() => { isAntiCheatTriggered.current = false; clickTimes.current = []; }, 3000);
-                return;
-            }
-        }
-
-        if (isAntiCheatTriggered.current) return;
-
         setIsHit(true); setTimeout(() => setIsHit(false), 100);
 
         const dmg = currentBoss?.damagePerClick || 10;
@@ -170,11 +146,32 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     };
 
     if (activeGame === null) {
+
+        let currentDailyFarm = profile?.dailyFarmAmount || 0;
+        if (profile?.lastFarmDate) {
+            const now = new Date();
+            const lastFarm = new Date(profile.lastFarmDate);
+            if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+                lastFarm.getUTCMonth() !== now.getUTCMonth() ||
+                lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+                currentDailyFarm = 0;
+            }
+        }
+        const availableFarm = Math.max(0, 500000 - currentDailyFarm);
+
         return (
             <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto">
-                <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3 mb-8 px-2">
-                    <Zap className="text-yellow-500" /> Ігрові режими
-                </h2>
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 px-2 gap-4">
+                    <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3">
+                        <Zap className="text-yellow-500" /> Ігрові режими
+                    </h2>
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 flex items-center gap-2 shadow-inner">
+                        <div className="text-sm font-bold text-neutral-400 uppercase tracking-wider">Фарм на сьогодні:</div>
+                        <div className={`font-black flex items-center gap-1 ${availableFarm === 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            {availableFarm.toLocaleString()} / 500,000 <Coins size={16} />
+                        </div>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
                     <div onClick={() => setActiveGame('boss')} className="bg-neutral-900 border border-red-900/50 hover:border-red-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
                         <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -264,8 +261,8 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                     onClick={claimRewards}
                     disabled={hp > 0 || isProcessing}
                     className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
-                            ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse"
-                            : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
+                        ? "bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse"
+                        : "bg-neutral-800 text-neutral-600 cursor-not-allowed"
                         }`}
                 >
                     {isProcessing ? <Loader2 size={18} className="animate-spin" /> : (hp <= 0 ? <Unlock size={18} /> : <Lock size={18} />)}
