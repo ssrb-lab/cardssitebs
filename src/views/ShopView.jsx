@@ -65,7 +65,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               return (
                 <div key={i} className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass}`}>
                   <CardFrame frame={item.frame}>
-                    <img src={item.image} alt="card" className="w-full h-full object-cover" />
+                    <img src={item.image} alt="card" className="w-full h-full object-cover" loading="lazy" />
                   </CardFrame>
                   {item.effect && <div className={`${item.effect} pointer-events-none z-10`} />}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
@@ -115,7 +115,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               >
                 <div className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}>
                   <CardFrame frame={card.frame}>
-                    <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                    <img src={card.image} alt={card.name} className="w-full h-full object-cover" loading="lazy" />
                   </CardFrame>
                   {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   {Number(card.maxSupply) > 0 && (
@@ -191,7 +191,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               </div>
             ) : (
               <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 overflow-hidden ${selectedPack.isPremiumOnly ? 'border-fuchsia-600 shadow-[0_10px_40px_rgba(217,70,239,0.3)]' : 'border-neutral-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)]'}`}>
-                <img src={selectedPack.image} alt={selectedPack.name} className="w-full h-full object-cover" />
+                <img src={selectedPack.image} alt={selectedPack.name} className="w-full h-full object-cover" loading="lazy" />
               </div>
             )}
           </div>
@@ -225,7 +225,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                 <div key={card.id} className={`flex flex-col items-center group ${isSoldOut ? "opacity-50 grayscale" : "cursor-pointer"}`} onClick={() => !isSoldOut && setViewingCard({ card })}>
                   <div className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? "group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]" : ""} ${style.border} ${effectClass}`}>
                     <CardFrame frame={card.frame}>
-                      <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" />
                     </CardFrame>
                     {card.effect && <div className={`${card.effect} z-10 pointer-events-none`} />}
                     {maxSup > 0 && (
@@ -307,7 +307,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
             <div className="relative w-40 h-40 mb-6 flex justify-center items-center perspective-1000">
               <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}>
-                <img src={pack.image} alt={pack.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500 ${pack.isHidden ? 'grayscale' : ''}`} />
+                <img src={pack.image} alt={pack.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500 ${pack.isHidden ? 'grayscale' : ''}`} loading="lazy" />
               </div>
             </div>
             <div className={`w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10`}>

@@ -153,7 +153,7 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
                   <div key={index} onClick={() => setViewingCard({ card: c, amount: 1 })} className="relative group cursor-pointer animate-in zoom-in-95">
                     <div className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} transition-transform group-hover:-translate-y-2`}>
                       <CardFrame frame={c.frame}>
-                        <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                        <img src={c.image} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
                       </CardFrame>
                       {c.effect && <div className={`${c.effect} pointer-events-none z-10`} />}
                     </div>
@@ -204,7 +204,7 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
                   </div>
                 )}
                 <CardFrame frame={item.card.frame}>
-                  <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
                 </CardFrame>
                 {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
                 {item.card.soundUrl && (

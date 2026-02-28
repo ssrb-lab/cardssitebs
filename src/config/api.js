@@ -396,6 +396,29 @@ export const start2048GameRequest = async (token) => {
     return data;
 };
 
+export const claimTetrisRewardRequest = async (token, score) => {
+    const res = await fetch(`${API_URL}/game/tetris/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ score })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const startTetrisGameRequest = async (token) => {
+    const res = await fetch(`${API_URL}/game/tetris/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+
+
 export const fetchMarketHistoryRequest = async (token) => {
     const res = await fetch(`${API_URL}/profile/market-history`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -416,4 +439,26 @@ export const adminClearUserMarketHistoryRequest = async (token, targetUid) => {
 export const adminClearAllMarketHistoryRequest = async (token) => {
     const res = await fetch(`${API_URL}/admin/market-history`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
     return res.json();
+};
+
+// --- GAME STATUS (ADMIN & PUBLIC) ---
+export const fetchGameStatuses = async () => {
+    const res = await fetch(`${API_URL}/games/status`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const adminToggleGameStatus = async (token, gameName) => {
+    const res = await fetch(`${API_URL}/admin/games/toggle`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ game: gameName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
 };

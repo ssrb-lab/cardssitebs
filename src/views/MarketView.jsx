@@ -68,7 +68,7 @@ export default function MarketView({ marketListings, cardsCatalog, rarities, cur
                         <div onClick={() => setViewingCard({ card })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 cursor-pointer transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass}`}>
                            <div className="w-full h-full overflow-hidden relative">
                               <CardFrame frame={card.frame}>
-                                 <img src={card.image} alt={card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                 <img src={card.image} alt={card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                               </CardFrame>
                               {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                            </div>

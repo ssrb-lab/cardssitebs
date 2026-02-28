@@ -585,7 +585,7 @@ export default function App() {
       <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer" onClick={() => setCurrentView("shop")}>
-            <img src={logo1} alt="Card Game Logo" className="w-10 h-10 object-contain rounded-xl" />
+            <img src={logo1} alt="Card Game Logo" className="w-10 h-10 object-contain rounded-xl" loading="lazy" />
             <span className="hidden sm:block">Card Game</span>
           </div>
 

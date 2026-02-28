@@ -136,7 +136,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                                             {item.card?.image && (
                                                 <div className="w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative">
                                                     <CardFrame frame={item.card.frame}>
-                                                        <img src={item.card.image} alt="card" className="w-full h-full object-cover" />
+                                                        <img src={item.card.image} alt="card" className="w-full h-full object-cover" loading="lazy" />
                                                     </CardFrame>
                                                 </div>
                                             )}

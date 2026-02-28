@@ -37,6 +37,8 @@ model User {
   lastFarmDate         DateTime?
   daily2048Attempts    Int      @default(0)
   last2048PlayDate     DateTime?
+  dailyTetrisAttempts  Int      @default(0)
+  lastTetrisPlayDate   DateTime?
 
   inventory      InventoryItem[]
   marketListings MarketListing[]

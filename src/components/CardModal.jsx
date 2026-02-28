@@ -60,7 +60,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
             className={`w-full aspect-[2/3] rounded-3xl border-4 overflow-hidden ${style.border} ${effectClass} relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)]`}
           >
             <CardFrame frame={card.frame}>
-              <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+              <img src={card.image} alt={card.name} className="w-full h-full object-cover" loading="lazy" />
             </CardFrame>
             {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
             {/* Відблиск світла при нахилі */}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull, ArrowLeft } from "lucide-react";
-import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken } from "../config/api";
+import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull, ArrowLeft, Gamepad2, Blocks, ShieldAlert } from "lucide-react";
+import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken, fetchGameStatuses, adminToggleGameStatus } from "../config/api";
 import Game2048 from "../components/Game2048";
-import { Gamepad2 } from "lucide-react";
+import GameTetris from "../components/GameTetris";
 
 export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
     const playerLevel = profile?.farmLevel || 1;
@@ -23,11 +23,54 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     const [isHit, setIsHit] = useState(false);
     const [timeLeft, setTimeLeft] = useState("");
     const [activeGame, setActiveGame] = useState(null);
+    const [blockedGames, setBlockedGames] = useState([]);
 
     const actionLock = useRef(false);
     const accumulatedDamage = useRef(0);
     const clickTimes = useRef([]);
     const isAntiCheatTriggered = useRef(false);
+
+    // Завантаження статусів ігор та підключення SSE
+    useEffect(() => {
+        const loadStatuses = async () => {
+            try {
+                const res = await fetchGameStatuses();
+                setBlockedGames(res.blockedGames || []);
+            } catch (e) {
+                console.error("Помилка завантаження статусів ігор");
+            }
+        };
+        loadStatuses();
+
+        const API_URL = import.meta.env.VITE_API_URL || 'https://cardgameapp.space/api';
+        const eventSource = new EventSource(`${API_URL}/games/stream`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === "GAME_BLOCKED") {
+                    setBlockedGames(prev => {
+                        if (!prev.includes(data.game)) return [...prev, data.game];
+                        return prev;
+                    });
+                } else if (data.type === "GAME_UNBLOCKED") {
+                    setBlockedGames(prev => prev.filter(g => g !== data.game));
+                }
+            } catch (e) { }
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, []);
+
+    // Примусовий вихід з гри, якщо її заблокували в реальному часі
+    useEffect(() => {
+        if (activeGame && blockedGames.includes(activeGame)) {
+            setActiveGame(null);
+            showToast("Гра тимчасово недоступна (Заблоковано адміністратором)", "error");
+        }
+    }, [blockedGames, activeGame, showToast]);
 
     // Завантаження стану з MySQL
     useEffect(() => {
@@ -102,6 +145,20 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         } catch (e) { showToast("Помилка скидання КД.", "error"); }
         finally { setIsProcessing(false); }
     };
+
+    const adminToggleBlock = async (gameName) => {
+        if (!profile?.isAdmin || isProcessing) return;
+        setIsProcessing(true);
+        try {
+            const res = await adminToggleGameStatus(getToken(), gameName);
+            setBlockedGames(res.blockedGames);
+            showToast(`Статус гри ${gameName} змінено.`, "success");
+        } catch (e) {
+            showToast("Помилка зміни статусу", "error");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
     // ----------------------------
 
     const handleHit = () => {
@@ -160,7 +217,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         const availableFarm = Math.max(0, 500000 - currentDailyFarm);
 
         return (
-            <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto">
+            <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-5xl mx-auto">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-8 px-2 gap-4">
                     <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3">
                         <Zap className="text-yellow-500" /> Ігрові режими
@@ -172,24 +229,66 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                         </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
-                    <div onClick={() => setActiveGame('boss')} className="bg-neutral-900 border border-red-900/50 hover:border-red-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
-                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Swords size={120} className="text-red-500" />
+
+                {profile?.isAdmin && (
+                    <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-4 mb-8 mx-2 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                        <div className="flex items-center gap-2 text-red-400 font-bold uppercase tracking-widest text-sm">
+                            <ShieldAlert size={20} /> Панель блокування ігор
                         </div>
-                        <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Swords className="text-red-500" /> Битва з Босом</h3>
+                        <div className="flex gap-2 flex-wrap justify-center">
+                            <button onClick={() => adminToggleBlock('boss')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('boss') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>Битва босів</button>
+                            <button onClick={() => adminToggleBlock('2048')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('2048') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>2048</button>
+                            <button onClick={() => adminToggleBlock('tetris')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('tetris') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>Тетріс</button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 px-2">
+                    <div onClick={() => blockedGames.includes('boss') ? null : setActiveGame('boss')} className={`bg-neutral-900 border ${blockedGames.includes('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}>
+                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Swords size={120} className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'} />
+                        </div>
+                        <h3 className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('boss') ? 'text-neutral-500' : 'text-white'}`}>
+                            <Swords className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'} /> Битва з Босом
+                        </h3>
                         <p className="text-neutral-400 text-sm mb-6 relative z-10">Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.</p>
-                        <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                        {blockedGames.includes('boss') ? (
+                            <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2"><Lock size={16} /> Тимчасово недоступна</div>
+                        ) : (
+                            <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                        )}
                     </div>
 
-                    <div onClick={() => setActiveGame('2048')} className="bg-neutral-900 border border-purple-900/50 hover:border-purple-500 rounded-3xl p-6 cursor-pointer group transition-all relative overflow-hidden shadow-lg">
+                    <div onClick={() => blockedGames.includes('2048') ? null : setActiveGame('2048')} className={`bg-neutral-900 border ${blockedGames.includes('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}>
                         <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Gamepad2 size={120} className="text-purple-500" />
+                            <Gamepad2 size={120} className={blockedGames.includes('2048') ? 'text-neutral-500' : 'text-purple-500'} />
                         </div>
-                        <h3 className="text-2xl font-black text-white mb-2 flex items-center gap-2 relative z-10"><Gamepad2 className="text-purple-500" /> Гра 2048</h3>
+                        <h3 className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('2048') ? 'text-neutral-500' : 'text-white'}`}>
+                            <Gamepad2 className={blockedGames.includes('2048') ? 'text-neutral-500' : 'text-purple-500'} /> Гра 2048
+                        </h3>
                         <p className="text-neutral-400 text-sm mb-6 relative z-10">Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!</p>
-                        <button className="bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                        {blockedGames.includes('2048') ? (
+                            <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2"><Lock size={16} /> Тимчасово недоступна</div>
+                        ) : (
+                            <button className="bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                        )}
                     </div>
+
+                    <div onClick={() => blockedGames.includes('tetris') ? null : setActiveGame('tetris')} className={`bg-neutral-900 border ${blockedGames.includes('tetris') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-cyan-900/50 hover:border-cyan-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}>
+                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Blocks size={120} className={blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-cyan-500'} />
+                        </div>
+                        <h3 className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-white'}`}>
+                            <Blocks className={blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-cyan-500'} /> Тетріс
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 relative z-10">Класична неонова гра! Збирайте лінії, набирайте рахунок та отримуйте монети.</p>
+                        {blockedGames.includes('tetris') ? (
+                            <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2"><Lock size={16} /> Тимчасово недоступна</div>
+                        ) : (
+                            <button className="bg-cyan-600/20 text-cyan-400 group-hover:bg-cyan-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Грати</button>
+                        )}
+                    </div>
+
                 </div>
             </div>
         );
@@ -197,8 +296,15 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
 
     if (isLoading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto w-10 h-10 mb-4" /> Підготовка Арени...</div>;
     if (!currentBoss || !bossCard) return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
+
     if (activeGame === '2048') {
         return <Game2048 profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
+    }
+    if (activeGame === 'tetris') {
+        return <GameTetris profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
+    }
+    if (activeGame === 'runner') {
+        return <GameRunner profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
     }
 
 
@@ -293,7 +399,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                     >
                         <div className="absolute -inset-6 bg-red-600/20 rounded-[3rem] blur-2xl group-hover:bg-red-600/40 transition-colors animate-pulse pointer-events-none"></div>
                         <div className="relative w-48 sm:w-64 aspect-[2/3] rounded-3xl border-4 border-red-900 overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.4)] bg-neutral-900 cursor-crosshair">
-                            <img src={bossCard.image} alt="boss" className="w-full h-full object-cover pointer-events-none" draggable="false" />
+                            <img src={bossCard.image} alt="boss" className="w-full h-full object-cover pointer-events-none" draggable="false" loading="lazy" />
                             {hp <= 0 && (
                                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm animate-in zoom-in">
                                     <div className="text-green-500 font-black text-3xl sm:text-4xl uppercase tracking-widest border-4 border-green-500 p-4 rounded-xl transform -rotate-12 shadow-[0_0_30px_rgba(34,197,94,0.5)]">

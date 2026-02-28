@@ -191,7 +191,7 @@ export default function InventoryView({
                         </div>
                       )}
                       <CardFrame frame={item.card.frame}>
-                        <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                       </CardFrame>
                       {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
 
@@ -281,7 +281,7 @@ export default function InventoryView({
                           return (
                             <div key={i} className="inline-block h-12 w-8 rounded border border-neutral-700 bg-neutral-950 overflow-hidden">
                               <CardFrame frame={c.frame}>
-                                <img src={c.image} alt="m" className="w-full h-full object-cover" />
+                                <img src={c.image} alt="m" className="w-full h-full object-cover" loading="lazy" />
                               </CardFrame>
                               {c.effect && <div className={`${c.effect} pointer-events-none z-10`} />}
                             </div>
@@ -334,7 +334,7 @@ export default function InventoryView({
                     <div key={index} onClick={() => removeCardFromShowcase(index)} className="relative group cursor-pointer animate-in zoom-in-95">
                       <div className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border}`}>
                         <CardFrame frame={cData.frame}>
-                          <img src={cData.image} alt={cData.name} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
+                          <img src={cData.image} alt={cData.name} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" loading="lazy" />
                         </CardFrame>
                         {cData.effect && <div className={`${cData.effect} pointer-events-none z-10`} />}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -378,7 +378,7 @@ export default function InventoryView({
                       )}
                       <div className="w-full h-full relative group">
                         <CardFrame frame={item.card.frame}>
-                          <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover pointer-events-none" />
+                          <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover pointer-events-none" loading="lazy" />
                         </CardFrame>
                         {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
                       </div>

@@ -12,6 +12,9 @@ const authenticate = require('./middleware/auth');
 const prisma = new PrismaClient();
 const app = express();
 
+// SSE Clients for real-time game status updates
+let gameClients = [];
+
 app.use(cors());
 app.use(express.json());
 
@@ -640,7 +643,7 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
 });
 
 // ----------------------------------------
-// МІНІ-ГРИ (2048)
+// МІНІ-ГРИ (2048 та Tetris)
 // ----------------------------------------
 app.post('/api/game/2048/start', authenticate, async (req, res) => {
   try {
@@ -705,9 +708,148 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка нарахування монет за гру." });
+    res.status(500).json({ error: "Помилка нарахування монет за гру 2048." });
   }
 });
+
+app.post('/api/game/tetris/start', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const now = new Date();
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: {
+        lastTetrisPlayDate: now
+      }
+    });
+
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера при старті гри Тетріс." });
+  }
+});
+
+app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
+  const { score } = req.body;
+
+  if (score < 50) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const now = new Date();
+    let currentDailyFarm = user.dailyFarmAmount || 0;
+
+    // Скидання денного фарму
+    if (user.lastFarmDate) {
+      const lastFarm = new Date(user.lastFarmDate);
+      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+        lastFarm.getUTCMonth() !== now.getUTCMonth() ||
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        currentDailyFarm = 0;
+      }
+    }
+
+    if (currentDailyFarm >= 500000) {
+      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+    }
+
+    // Курс: 1 поїнт рахунку = 6 монети (було 3)
+    let coinsToGive = score * 6;
+
+    if (currentDailyFarm + coinsToGive > 500000) {
+      coinsToGive = 500000 - currentDailyFarm;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: {
+        coins: { increment: coinsToGive },
+        dailyFarmAmount: currentDailyFarm + coinsToGive,
+        lastFarmDate: now
+      }
+    });
+    res.json({ success: true, earned: coinsToGive, profile: updatedUser });
+  } catch (error) {
+    res.status(500).json({ error: "Помилка нарахування монет за Тетріс." });
+  }
+});
+
+
+// ----------------------------------------
+// GAME BLOCKED STATUS & SSE (Admin feature)
+// ----------------------------------------
+
+app.get('/api/games/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  res.write(`data: {"type": "CONNECTED"}\n\n`);
+
+  gameClients.push(res);
+
+  req.on('close', () => {
+    gameClients = gameClients.filter(client => client !== res);
+  });
+});
+
+app.get('/api/games/status', async (req, res) => {
+  try {
+    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const blockedGames = settings?.data?.blockedGames || [];
+    res.json({ blockedGames });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка завантаження статусів ігор." });
+  }
+});
+
+app.post('/api/admin/games/toggle', authenticate, checkAdmin, async (req, res) => {
+  const { game } = req.body;
+  if (!game) return res.status(400).json({ error: "Не вказано гру." });
+
+  try {
+    let settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    if (!settings) {
+      settings = await prisma.gameSettings.create({
+        data: { id: "main", data: { blockedGames: [] } }
+      });
+    }
+
+    let blockedGames = settings.data?.blockedGames || [];
+
+    let isBlocked = false;
+    if (blockedGames.includes(game)) {
+      blockedGames = blockedGames.filter(g => g !== game);
+    } else {
+      blockedGames.push(game);
+      isBlocked = true;
+    }
+
+    await prisma.gameSettings.update({
+      where: { id: "main" },
+      data: { data: { ...settings.data, blockedGames } }
+    });
+
+    // Send SSE Event to all clients if the game was just blocked
+    if (isBlocked) {
+      const message = `data: ${JSON.stringify({ type: "GAME_BLOCKED", game })}\n\n`;
+      gameClients.forEach(client => client.write(message));
+    } else {
+      const message = `data: ${JSON.stringify({ type: "GAME_UNBLOCKED", game })}\n\n`;
+      gameClients.forEach(client => client.write(message));
+    }
+
+    res.json({ success: true, blockedGames });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка зміни статусу гри." });
+  }
+});
+
 
 // ----------------------------------------
 // ФАРМ (БИТВИ З БОСАМИ ТА АНТИЧІТ)

@@ -722,7 +722,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
 
                                         return (
                                             <div key={invItem.id} className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass}`}>
-                                                <img src={c.image} alt={c.name} className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity" />
+                                                <img src={c.image} alt={c.name} className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity" loading="lazy" />
                                                 <div className="text-[10px] font-bold text-white truncate w-full text-center">{c.name}</div>
                                                 <div className="text-xs font-black text-yellow-500 mb-1 z-10">x{invItem.amount}</div>
 
@@ -941,7 +941,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                             return (
                                 <div key={boss.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex gap-4 relative overflow-hidden group">
                                     <div className="w-20 aspect-[2/3] rounded-lg border border-neutral-700 overflow-hidden flex-shrink-0 relative">
-                                        {bCard && <img src={bCard.image} alt="boss" className="w-full h-full object-cover" />}
+                                        {bCard && <img src={bCard.image} alt="boss" className="w-full h-full object-cover" loading="lazy" />}
                                         <div className="absolute top-0 left-0 w-full bg-black/80 text-center text-[10px] font-black text-red-500 py-0.5">LVL {boss.level}</div>
                                     </div>
                                     <div className="flex-1">
@@ -998,7 +998,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                 <div key={item.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex gap-4 relative">
                                     <button onClick={() => deletePremiumShopItem(item.id)} className="absolute top-2 right-2 text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={16} /></button>
                                     <div className="w-16 h-24 bg-neutral-950 border border-neutral-700 rounded-md shrink-0 overflow-hidden">
-                                        <img src={cDef?.image} className="w-full h-full object-cover" alt="" />
+                                        <img src={cDef?.image} className="w-full h-full object-cover" alt="" loading="lazy" />
                                     </div>
                                     <div className="flex-1 min-w-0 pr-6">
                                         <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-1">Картка</div>
@@ -1168,7 +1168,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                             <div key={pack.id} className={`bg-neutral-900 rounded-xl p-4 border ${pack.isPremiumOnly ? 'border-fuchsia-900' : 'border-neutral-800'} relative group`}>
                                 {pack.isHidden && <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded border border-neutral-600 uppercase font-black tracking-widest absolute top-2 right-2 z-10">Приховано</span>}
                                 {pack.isPremiumOnly && <span className="text-[10px] bg-fuchsia-900 text-fuchsia-100 px-2 py-0.5 rounded border border-fuchsia-500 uppercase font-black tracking-widest absolute top-2 left-2 z-10 flex items-center gap-1"><Gem size={10} /> Преміум</span>}
-                                <img src={pack.image} alt={pack.name} className={`w-24 h-24 object-cover rounded-lg mx-auto mb-3 ${pack.isHidden ? 'opacity-50 grayscale' : ''}`} />
+                                <img src={pack.image} alt={pack.name} className={`w-24 h-24 object-cover rounded-lg mx-auto mb-3 ${pack.isHidden ? 'opacity-50 grayscale' : ''}`} loading="lazy" />
                                 <div className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1`}>{pack.category || "Базові"}</div>
                                 <h4 className="text-center font-bold text-white mb-1">{pack.name}</h4>
                                 <div className="text-center text-yellow-500 font-bold text-sm mb-4">{pack.cost} Монет</div>
@@ -1275,7 +1275,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                     {/* ВЕРХНЯ ЧАСТИНА (Картинка та кнопки) */}
                                     <div className={`aspect-[2/3] w-full relative shrink-0 ${effectClass}`}>
                                         <CardFrame frame={card.frame}>
-                                            <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                                            <img src={card.image} alt={card.name} className="w-full h-full object-cover" loading="lazy" />
                                         </CardFrame>
                                         {card.maxSupply > 0 && (
                                             <div className="absolute top-1 left-1 bg-black/80 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 z-10">
