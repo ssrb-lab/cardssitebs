@@ -19,11 +19,23 @@ app.use(cors());
 app.use(express.json());
 
 // Мідлвар для перевірки прав адміністратора
-const checkAdmin = (req, res, next) => {
-  if (!req.user || !req.user.isAdmin) {
-    return res.status(403).json({ error: "Доступ заборонено. Тільки для Адмінів." });
+const checkAdmin = async (req, res, next) => {
+  if (!req.user || !req.user.uid) {
+    return res.status(403).json({ error: "Доступ заборонено." });
   }
-  next();
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
+      return res.status(403).json({ error: "Доступ заборонено. Тільки для Адмінів." });
+    }
+    // Оновлюємо права в req.user для наступних мідлварів/роутів
+    req.user.isAdmin = user.isAdmin;
+    req.user.isSuperAdmin = user.isSuperAdmin;
+    next();
+  } catch (error) {
+    console.error("Помилка перевірки прав:", error);
+    return res.status(500).json({ error: "Помилка сервера при перевірці прав." });
+  }
 };
 
 
