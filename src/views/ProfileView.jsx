@@ -288,26 +288,45 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
             {achievementsCatalog && achievementsCatalog.length > 0 && (
                 <div className="max-w-4xl mx-auto mb-8 bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
-                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Усі Досягнення ({profile?.achievements?.length || 0} / {achievementsCatalog.length})</h3>
+                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
+                        <Trophy className="text-yellow-500" /> Усі Досягнення ({
+                            achievementsCatalog.filter(ach => {
+                                if (profile?.achievements?.find(ua => ua.achievementId === ach.id)) return true;
+                                const pack = packsCatalog.find(p => p.id === ach.packId);
+                                if (!pack) return false;
+                                const totalInPack = cardsCatalog.filter(c => c.packId === pack.id).length;
+                                if (totalInPack === 0) return false;
+                                const userCardsInPack = new Set();
+                                fullInventory.forEach(inv => {
+                                    if (inv.card?.packId === pack.id) userCardsInPack.add(inv.card.id);
+                                });
+                                return userCardsInPack.size === totalInPack;
+                            }).length
+                        } / {achievementsCatalog.length})
+                    </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {achievementsCatalog.map((ach) => {
-                            const isUnlocked = profile?.achievements?.find(ua => ua.achievementId === ach.id);
-
-                            // Calculate progress for locked achievements
+                            let isUnlocked = profile?.achievements?.find(ua => ua.achievementId === ach.id);
                             let progressText = null;
-                            if (!isUnlocked) {
-                                const pack = packsCatalog.find(p => p.id === ach.packId);
-                                if (pack) {
-                                    const packCards = cardsCatalog.filter(c => c.packId === pack.id);
-                                    const totalInPack = packCards.length;
 
-                                    const userCardsInPack = new Set();
-                                    fullInventory.forEach(inv => {
-                                        const card = inv.card;
-                                        if (card && card.packId === pack.id) {
-                                            userCardsInPack.add(card.id);
-                                        }
-                                    });
+                            const pack = packsCatalog.find(p => p.id === ach.packId);
+                            if (pack) {
+                                const packCards = cardsCatalog.filter(c => c.packId === pack.id);
+                                const totalInPack = packCards.length;
+
+                                const userCardsInPack = new Set();
+                                fullInventory.forEach(inv => {
+                                    const card = inv.card;
+                                    if (card && card.packId === pack.id) {
+                                        userCardsInPack.add(card.id);
+                                    }
+                                });
+
+                                if (!isUnlocked && totalInPack > 0 && userCardsInPack.size === totalInPack) {
+                                    isUnlocked = { createdAt: null }; // Динамічно розблоковано
+                                }
+
+                                if (!isUnlocked) {
                                     progressText = `${userCardsInPack.size} / ${totalInPack}`;
                                 }
                             }
@@ -325,7 +344,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                                     <AchievementIcon iconUrl={ach.iconUrl} className="w-16 h-16 rounded-lg mb-2" size={32} />
                                     <div className="text-xs font-bold text-white mb-1 line-clamp-1 w-full" title={ach.name}>{ach.name}</div>
                                     <div className="text-[9px] text-neutral-400 line-clamp-2 leading-tight" title={ach.description}>{ach.description}</div>
-                                    {isUnlocked && <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(isUnlocked.createdAt)}</div>}
+                                    {isUnlocked && <div className="text-[8px] text-yellow-600/60 mt-2">{isUnlocked.createdAt ? formatDate(isUnlocked.createdAt) : "Зібрано"}</div>}
                                 </div>
                             );
                         })}
