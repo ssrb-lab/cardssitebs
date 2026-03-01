@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useRef } from "react";
 import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
