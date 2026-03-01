@@ -1229,12 +1229,21 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                             <input type="text" placeholder="Назва Паку" value={packForm.name} onChange={(e) => setPackForm({ ...packForm, name: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
                             <div className="relative">
-                                <input type="text" list="pack-categories" placeholder="Категорія (напр. Базові)" value={packForm.category} onChange={(e) => setPackForm({ ...packForm, category: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
-                                <datalist id="pack-categories">
-                                    {[...new Set(packsCatalog.map(p => p.category).filter(Boolean))].map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </datalist>
+                                <input type="text" placeholder="Категорія (напр. Базові)" value={packForm.category} onChange={(e) => setPackForm({ ...packForm, category: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                                {packsCatalog && packsCatalog.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {[...new Set(packsCatalog.map(p => p.category).filter(Boolean))].map(cat => (
+                                            <button
+                                                key={cat}
+                                                type="button"
+                                                onClick={() => setPackForm({ ...packForm, category: cat })}
+                                                className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-2.5 py-1.5 rounded-lg transition-colors border border-neutral-700"
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <input type="number" placeholder="Вартість" value={packForm.cost} onChange={(e) => setPackForm({ ...packForm, cost: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" min="0" required />
                             <input type="text" placeholder="URL Картинки" value={packForm.image} onChange={(e) => setPackForm({ ...packForm, image: e.target.value })} className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
