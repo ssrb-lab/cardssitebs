@@ -1170,12 +1170,14 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                         <button type="button" className="bg-neutral-800 p-2 rounded-xl border border-neutral-700 hover:bg-neutral-700 transition">
                                             <AchievementIcon iconUrl={achievementForm.iconUrl} className="w-8 h-8 rounded-md" size={18} />
                                         </button>
-                                        <div className="absolute top-14 right-0 bg-neutral-900 border border-neutral-700 rounded-xl p-3 shadow-2xl z-50 hidden group-hover:flex flex-wrap gap-2 w-64">
-                                            {Object.keys(ACHIEVEMENT_PRESETS).map(key => (
-                                                <button type="button" key={key} onClick={() => setAchievementForm({ ...achievementForm, iconUrl: key })} className={`p-1.5 rounded-lg transition-colors ${achievementForm.iconUrl === key ? 'bg-yellow-900/50' : 'hover:bg-neutral-800'}`} title={key}>
-                                                    <AchievementIcon iconUrl={key} className="w-8 h-8 rounded-md" size={18} />
-                                                </button>
-                                            ))}
+                                        <div className="absolute top-full right-0 pt-2 z-50 hidden group-hover:block w-64">
+                                            <div className="bg-neutral-900 border border-neutral-700 rounded-xl p-3 shadow-2xl flex flex-wrap gap-2">
+                                                {Object.keys(ACHIEVEMENT_PRESETS).map(key => (
+                                                    <button type="button" key={key} onClick={() => setAchievementForm({ ...achievementForm, iconUrl: key })} className={`p-1.5 rounded-lg transition-colors ${achievementForm.iconUrl === key ? 'bg-yellow-900/50' : 'hover:bg-neutral-800'}`} title={key}>
+                                                        <AchievementIcon iconUrl={key} className="w-8 h-8 rounded-md" size={18} />
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
