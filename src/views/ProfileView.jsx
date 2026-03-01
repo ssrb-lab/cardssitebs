@@ -293,13 +293,33 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                         {achievementsCatalog.map((ach) => {
                             const isUnlocked = profile?.achievements?.find(ua => ua.achievementId === ach.id);
 
+                            // Calculate progress for locked achievements
+                            let progressText = null;
+                            if (!isUnlocked) {
+                                const pack = packsCatalog.find(p => p.id === ach.packId);
+                                if (pack) {
+                                    const packCards = cardsCatalog.filter(c => c.packId === pack.id);
+                                    const totalInPack = packCards.length;
+
+                                    const userCardsInPack = new Set();
+                                    fullInventory.forEach(inv => {
+                                        const card = cardsCatalog.find(c => c.id === inv.cardId);
+                                        if (card && card.packId === pack.id) {
+                                            userCardsInPack.add(inv.cardId);
+                                        }
+                                    });
+                                    progressText = `${userCardsInPack.size} / ${totalInPack}`;
+                                }
+                            }
+
                             return (
                                 <div key={ach.id} className={`bg-neutral-950 border ${isUnlocked ? 'border-yellow-900/40' : 'border-neutral-800 opacity-50 grayscale'} rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden`}>
                                     {isUnlocked ? (
                                         <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                     ) : (
-                                        <div className="absolute inset-0 bg-neutral-900/40 z-10 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
-                                            <div className="bg-black/80 text-white text-xs px-2 py-1 flex items-center gap-1 rounded font-bold"><Lock size={12} /> Заблоковано</div>
+                                        <div className="absolute inset-0 bg-neutral-900/40 z-10 flex flex-col items-center justify-center transition-opacity opacity-0 group-hover:opacity-100 gap-1">
+                                            <div className="bg-black/80 text-white text-[10px] px-2 py-1 flex items-center gap-1 rounded font-bold"><Lock size={10} /> Заблоковано</div>
+                                            {progressText && <div className="bg-black/80 text-yellow-500 text-[10px] px-2 py-1 rounded font-bold">{progressText}</div>}
                                         </div>
                                     )}
                                     <AchievementIcon iconUrl={ach.iconUrl} className="w-16 h-16 rounded-lg mb-2" size={32} />
