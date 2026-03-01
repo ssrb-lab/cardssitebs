@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2 } from "lucide-react";
+import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
 import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
@@ -284,7 +283,27 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                 </div>
             </div>
 
-
+            {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
+            {profile?.achievements && profile.achievements.length > 0 && (
+                <div className="max-w-4xl mx-auto mb-8 bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
+                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Ваші Досягнення</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {profile.achievements.map((ua) => {
+                            const ach = ua.achievement;
+                            if (!ach) return null;
+                            return (
+                                <div key={ua.id} className="bg-neutral-950 border border-yellow-900/40 rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden">
+                                    <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <img src={ach.iconUrl} alt={ach.name} className="w-16 h-16 object-cover rounded-lg mb-2 shadow-[0_0_15px_rgba(234,179,8,0.2)]" loading="lazy" />
+                                    <div className="text-xs font-bold text-white mb-1 line-clamp-1 w-full" title={ach.name}>{ach.name}</div>
+                                    <div className="text-[9px] text-neutral-400 line-clamp-2 leading-tight" title={ach.description}>{ach.description}</div>
+                                    <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(ua.createdAt)}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* КНОПКИ-ВІКНА */}
             <div className="flex flex-col sm:flex-row gap-4 max-w-4xl mx-auto mb-6">

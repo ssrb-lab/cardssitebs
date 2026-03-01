@@ -44,6 +44,30 @@ model User {
   marketListings MarketListing[]
   showcases      Showcase[]
   farmState      FarmState?
+  achievements   UserAchievement[]
+}
+
+model AchievementSettings {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @db.Text
+  iconUrl     String   @db.Text
+  packId      String   @unique
+  createdAt   DateTime @default(now())
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  createdAt     DateTime @default(now())
+
+  user        User                @relation(fields: [userId], references: [uid], onDelete: Cascade)
+  achievement AchievementSettings @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
 }
 
 model CardCatalog {

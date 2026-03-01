@@ -40,6 +40,91 @@ const checkAdmin = async (req, res, next) => {
 
 
 // ----------------------------------------
+// ДОСЯГНЕННЯ (ACHIEVEMENTS)
+// ----------------------------------------
+const checkAndAwardCollectionAchievement = async (userId, packId) => {
+  try {
+    const achievement = await prisma.achievementSettings.findUnique({
+      where: { packId: packId }
+    });
+    if (!achievement) return null;
+
+    const existing = await prisma.userAchievement.findUnique({
+      where: { userId_achievementId: { userId, achievementId: achievement.id } }
+    });
+    if (existing) return null;
+
+    const totalCardsInPack = await prisma.cardCatalog.count({
+      where: { packId: packId }
+    });
+    if (totalCardsInPack === 0) return null;
+
+    const userCardsFromPack = await prisma.inventoryItem.count({
+      where: {
+        userId: userId,
+        amount: { gt: 0 },
+        card: { packId: packId }
+      }
+    });
+
+    if (userCardsFromPack === totalCardsInPack) {
+      const awarded = await prisma.userAchievement.create({
+        data: {
+          userId: userId,
+          achievementId: achievement.id
+        },
+        include: { achievement: true }
+      });
+      return awarded;
+    }
+    return null;
+  } catch (err) {
+    console.error("Помилка видачі досягнення:", err);
+    return null;
+  }
+};
+
+app.get('/api/admin/achievements', authenticate, checkAdmin, async (req, res) => {
+  try {
+    const achievements = await prisma.achievementSettings.findMany();
+    res.json(achievements);
+  } catch (err) {
+    res.status(500).json({ error: "Помилка завантаження ачівок." });
+  }
+});
+
+app.post('/api/admin/achievements', authenticate, checkAdmin, async (req, res) => {
+  try {
+    const { id, name, description, iconUrl, packId } = req.body;
+    let achievement;
+    if (id) {
+      achievement = await prisma.achievementSettings.update({
+        where: { id },
+        data: { name, description, iconUrl, packId }
+      });
+    } else {
+      achievement = await prisma.achievementSettings.create({
+        data: { name, description, iconUrl, packId }
+      });
+    }
+    res.json(achievement);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Помилка збереження ачівки. Можливо цей пак вже має ачівку?" });
+  }
+});
+
+app.delete('/api/admin/achievements/:id', authenticate, checkAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.achievementSettings.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Помилка видалення ачівки." });
+  }
+});
+
+// ----------------------------------------
 // АВТОРИЗАЦІЯ ТА РЕЄСТРАЦІЯ
 // ----------------------------------------
 
@@ -294,10 +379,18 @@ app.get('/api/profile', authenticate, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: "Гравець не знайдений" });
 
+    // Отримуємо ачівки користувача з деталями (назва, іконка з AchievementSettings)
+    const userAchievements = await prisma.userAchievement.findMany({
+      where: { userId: user.uid },
+      include: { achievement: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
     // Додаємо підрахунок до профілю, щоб фронтенд його побачив
     const formattedUser = {
       ...user,
-      uniqueCardsCount: user._count.inventory
+      uniqueCardsCount: user._count.inventory,
+      achievements: userAchievements
     };
 
     res.json(formattedUser);
@@ -324,10 +417,17 @@ app.get('/api/profile/public/:uid', async (req, res) => {
 
     if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
 
+    const userAchievements = await prisma.userAchievement.findMany({
+      where: { userId: user.uid },
+      include: { achievement: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
     // Форматуємо результат для фронтенду
     const formattedUser = {
       ...user,
-      uniqueCardsCount: user._count.inventory
+      uniqueCardsCount: user._count.inventory,
+      achievements: userAchievements
     };
 
     res.json(formattedUser);
@@ -527,7 +627,14 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       include: { inventory: true, farmState: true }
     });
 
-    res.json({ pulledCards: results, profile: updatedUser });
+    // Перевірка ачівок для цього паку
+    const newAchievement = await checkAndAwardCollectionAchievement(updatedUser.uid, pack.id);
+    if (newAchievement) {
+      // Додамо до відповіді інфу про отримання нової ачівки
+      res.json({ pulledCards: results, profile: updatedUser, newAchievement });
+    } else {
+      res.json({ pulledCards: results, profile: updatedUser });
+    }
 
   } catch (error) {
     console.error(error);
@@ -621,7 +728,19 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
-    res.json({ success: true, profile: updatedUser });
+
+    // Перевірка ачівки для паку купленої картки
+    const boughtCard = await prisma.cardCatalog.findUnique({ where: { id: listing.cardId } });
+    let newAchievement = null;
+    if (boughtCard && boughtCard.packId) {
+      newAchievement = await checkAndAwardCollectionAchievement(updatedUser.uid, boughtCard.packId);
+    }
+
+    if (newAchievement) {
+      res.json({ success: true, profile: updatedUser, newAchievement });
+    } else {
+      res.json({ success: true, profile: updatedUser });
+    }
   } catch (error) {
     res.status(500).json({ error: "Помилка покупки." });
   }

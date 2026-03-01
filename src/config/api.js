@@ -470,3 +470,29 @@ export const adminToggleGameStatus = async (token, gameName) => {
     if (!res.ok) throw new Error(data.error);
     return data;
 };
+
+// --- ACHIEVEMENTS ---
+export const fetchAdminAchievements = async (token) => {
+    const res = await fetch(`${API_URL}/admin/achievements`, { headers: { 'Authorization': `Bearer ${token}` } });
+    return res.json();
+};
+
+export const saveAchievementSettingsRequest = async (token, achievementData) => {
+    const res = await fetch(`${API_URL}/admin/achievements`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(achievementData)
+    });
+    return res.json();
+};
+
+export const deleteAchievementSettingsRequest = async (token, id) => {
+    const res = await fetch(`${API_URL}/admin/achievements/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.json();
+};

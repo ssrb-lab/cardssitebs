@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import {
     Users, Layers, LayoutGrid, Ticket, Settings, ScrollText, Bug, Edit2,
     Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
-    Eye, CheckCircle2, CalendarDays, Gift, Zap // <-- ДОДАНО ZAP (БЛИСКАВКА)
+    Eye, CheckCircle2, CalendarDays, Gift, Zap, Trophy // <-- ДОДАНО Trophy (Досягнення)
 } from "lucide-react";
-import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest } from "../config/api";
+import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest, fetchAdminAchievements, saveAchievementSettingsRequest, deleteAchievementSettingsRequest } from "../config/api";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
@@ -41,6 +41,10 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
     const [cardForm, setCardForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal" });
     const [editingPack, setEditingPack] = useState(null);
     const [packForm, setPackForm] = useState({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+
+    const [allAchievements, setAllAchievements] = useState([]);
+    const [achievementForm, setAchievementForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", description: "", iconUrl: "" });
+    const [editingAchievement, setEditingAchievement] = useState(null);
 
     const [allPromos, setAllPromos] = useState([]);
     const [promoForm, setPromoForm] = useState({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
@@ -103,6 +107,16 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                 } catch (e) { console.error(e); }
             };
             loadLogs();
+        }
+
+        if (activeTab === "achievements" && currentProfile.isAdmin) {
+            const loadAchievements = async () => {
+                try {
+                    const data = await fetchAdminAchievements(getToken());
+                    setAllAchievements(data || []);
+                } catch (e) { console.error(e); }
+            }
+            loadAchievements();
         }
     }, [activeTab, db, appId, currentProfile]);
 
@@ -485,6 +499,31 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             return wA - wB;
         });
 
+    const saveAchievement = async (e) => {
+        e.preventDefault();
+        try {
+            await saveAchievementSettingsRequest(getToken(), achievementForm);
+            showToast(editingAchievement ? "Ачівку оновлено!" : "Ачівку створено!", "success");
+            setAchievementForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", description: "", iconUrl: "" });
+            setEditingAchievement(null);
+            const data = await fetchAdminAchievements(getToken());
+            setAllAchievements(data || []);
+        } catch (err) {
+            showToast("Помилка збереження ачівки", "error");
+        }
+    };
+
+    const deleteAchievement = async (id) => {
+        if (!confirm("Видалити ачівку?")) return;
+        try {
+            await deleteAchievementSettingsRequest(getToken(), id);
+            showToast("Ачівку видалено.", "success");
+            setAllAchievements(allAchievements.filter(a => a.id !== id));
+        } catch (err) {
+            showToast("Помилка видалення ачівки", "error");
+        }
+    }
+
     // --- ДОДАТИ ЦЮ ФУНКЦІЮ ПЕРЕД return ( ---
     const calculateDropChance = (targetCard, packInfo) => {
         if (!packInfo) return "0%";
@@ -593,6 +632,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                 <button onClick={() => setActiveTab("cards")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "cards" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><LayoutGrid size={18} /> Картки</button>
                 {(currentProfile.isAdmin || currentProfile.isSuperAdmin) && (
                     <>
+                        <button onClick={() => setActiveTab("achievements")} className={`flex-1 min-w-[100px] py-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "achievements" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Trophy size={18} /> Ачівки</button>
                         <button onClick={() => setActiveTab("bosses")} className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 sm:py-3 rounded-xl font-bold transition-all text-sm sm:text-base ${activeTab === "bosses" ? "bg-red-600/20 text-red-500 border border-red-500/50" : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white"}`}>
                             <Swords size={18} /> Боси
                         </button>
@@ -1106,6 +1146,64 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                     )}
                 </div>
             )}
+
+            {/* --- Вкладка: АЧІВКИ (ДОСЯГНЕННЯ) --- */}
+            {activeTab === "achievements" && currentProfile.isAdmin && (
+                <div className="space-y-6 animate-in fade-in">
+                    <form onSubmit={saveAchievement} className="bg-neutral-900 border border-yellow-900/50 p-6 rounded-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-yellow-500 flex items-center gap-2"><Trophy /> {editingAchievement ? "Редагувати Ачівку" : "Створити Ачівку"}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Назва досягнення:</label>
+                                <input type="text" placeholder="Напр: Легенда Базового Паку" value={achievementForm.name} onChange={(e) => setAchievementForm({ ...achievementForm, name: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Короткий опис:</label>
+                                <input type="text" placeholder="Зібрати всі картки Базового Паку" value={achievementForm.description} onChange={(e) => setAchievementForm({ ...achievementForm, description: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">URL іконки:</label>
+                                <input type="text" placeholder="https://..." value={achievementForm.iconUrl} onChange={(e) => setAchievementForm({ ...achievementForm, iconUrl: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Пак для ачівки:</label>
+                                <select value={achievementForm.packId} onChange={(e) => setAchievementForm({ ...achievementForm, packId: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required>
+                                    <option value="" disabled>Оберіть пак...</option>
+                                    {packsCatalog.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button type="submit" className="flex-1 bg-yellow-600 text-yellow-950 font-bold py-3 rounded-xl shadow-lg hover:bg-yellow-500 transition-colors">Зберегти Ачівку</button>
+                            {editingAchievement && (
+                                <button type="button" onClick={() => { setEditingAchievement(null); setAchievementForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", description: "", iconUrl: "" }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl text-center">Скасувати</button>
+                            )}
+                        </div>
+                    </form>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {allAchievements.map(a => {
+                            const pack = packsCatalog.find(p => p.id === a.packId);
+                            return (
+                                <div key={a.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex gap-4 relative">
+                                    <div className="absolute top-2 right-2 flex gap-2">
+                                        <button onClick={() => { setEditingAchievement(a); setAchievementForm(a); }} className="text-blue-500 hover:bg-blue-900/30 p-1.5 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                        <button onClick={() => deleteAchievement(a.id)} className="text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                    </div>
+                                    <img src={a.iconUrl} alt="achievement" className="w-16 h-16 object-cover rounded-lg shrink-0 border border-neutral-700" loading="lazy" />
+                                    <div className="flex-1 pr-16">
+                                        <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-1">{pack ? pack.name : "Невідомий пак"}</div>
+                                        <div className="font-bold text-white mb-1">{a.name}</div>
+                                        <div className="text-xs text-neutral-400 line-clamp-2">{a.description}</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {allAchievements.length === 0 && <p className="col-span-full text-center text-neutral-500 py-6">Створених досягнень немає.</p>}
+                    </div>
+                </div>
+            )}
+
             {/* --- Вкладка: ПАКИ --- */}
             {activeTab === "packs" && (
                 <div className="space-y-6 animate-in fade-in">

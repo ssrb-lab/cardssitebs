@@ -377,6 +377,11 @@ export default function App() {
             setPulledCards(results);
             setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
             setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+            if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
+              data.unlockedAchievements.forEach(ach => {
+                showToast(`🏆 Досягнення розблоковано: ${ach.name}!`, "success");
+              });
+            }
             actionLock.current = false; setIsProcessing(false);
           }, 5000);
         } else {
@@ -384,6 +389,11 @@ export default function App() {
           setPulledCards(results);
           setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
           setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+          if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
+            data.unlockedAchievements.forEach(ach => {
+              showToast(`🏆 Досягнення розблоковано: ${ach.name}!`, "success");
+            });
+          }
           actionLock.current = false; setIsProcessing(false);
         }
       } catch (err) {
