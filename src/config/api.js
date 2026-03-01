@@ -193,7 +193,9 @@ export const saveSettingsRequest = async (token, settingsData) => {
 
 export const fetchPromosRequest = async (token) => {
     const res = await fetch(`${API_URL}/admin/promos`, { headers: { 'Authorization': `Bearer ${token}` } });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Помилка');
+    return data;
 };
 
 export const savePromoRequest = async (token, promoData) => {
@@ -270,12 +272,16 @@ export const setMainShowcaseRequest = async (token, showcaseId) => {
 // --- АДМІНКА: ГРАВЦІ ---
 export const fetchAdminUsers = async (token) => {
     const res = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Помилка');
+    return data;
 };
 
 export const fetchAdminUserInventory = async (token, targetUid) => {
     const res = await fetch(`${API_URL}/admin/users/${targetUid}/inventory`, { headers: { 'Authorization': `Bearer ${token}` } });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Помилка');
+    return data;
 };
 
 export const adminUserActionRequest = async (token, action, targetUid, payload = {}) => {
@@ -368,7 +374,9 @@ export const createAdminLogRequest = async (token, type, details) => {
 
 export const fetchAdminLogsRequest = async (token) => {
     const res = await fetch(`${API_URL}/admin/logs`, { headers: { 'Authorization': `Bearer ${token}` } });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Помилка');
+    return data;
 };
 
 export const clearAdminLogsRequest = async (token) => {
