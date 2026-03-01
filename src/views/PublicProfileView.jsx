@@ -184,9 +184,9 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
 
                   const userCardsInPack = new Set();
                   playerInventory.forEach(inv => {
-                    const card = cardsCatalog.find(c => c.id === inv.cardId);
+                    const card = inv.card;
                     if (card && card.packId === pack.id) {
-                      userCardsInPack.add(inv.cardId);
+                      userCardsInPack.add(card.id);
                     }
                   });
                   progressText = `${userCardsInPack.size} / ${totalInPack}`;
