@@ -6,7 +6,7 @@ import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryReque
 import CardFrame from "../components/CardFrame";
 import AchievementIcon from "../components/AchievementIcon";
 
-export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats, achievementsCatalog = [] }) {
+export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats, achievementsCatalog = [], packsCatalog = [] }) {
     const [avatarInput, setAvatarInput] = useState("");
     const [promoInput, setPromoInput] = useState("");
     const [oldPassword, setOldPassword] = useState("");
