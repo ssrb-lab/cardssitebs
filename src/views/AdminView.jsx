@@ -1232,7 +1232,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                 <input type="text" list="pack-categories" placeholder="Категорія (напр. Базові)" value={packForm.category} onChange={(e) => setPackForm({ ...packForm, category: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
                                 <datalist id="pack-categories">
                                     {[...new Set(packsCatalog.map(p => p.category).filter(Boolean))].map(cat => (
-                                        <option key={cat} value={cat} />
+                                        <option key={cat} value={cat}>{cat}</option>
                                     ))}
                                 </datalist>
                             </div>
