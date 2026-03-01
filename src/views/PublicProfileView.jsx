@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Loader2, Volume2, Layers, TrendingDown, TrendingUp, Swords, User, Award, Clock, Trophy, AlertCircle, ShieldAlert, Key } from "lucide-react";
+import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Loader2, Volume2, Layers, TrendingDown, TrendingUp, Swords, User, Award, Clock, Trophy, AlertCircle, ShieldAlert, Key, Lock } from "lucide-react";
 import { formatDate, getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import PlayerAvatar from "../components/PlayerAvatar";
 import CardFrame from "../components/CardFrame";
 import AchievementIcon from "../components/AchievementIcon";
 import { fetchPublicProfileRequest } from "../config/api";
 
-export default function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard, packsCatalog, cardStats }) {
+export default function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard, packsCatalog, cardStats, achievementsCatalog = [] }) {
   const [playerInfo, setPlayerInfo] = useState(null);
   const [playerInventory, setPlayerInventory] = useState([]);
   const [mainShowcase, setMainShowcase] = useState(null);
@@ -167,20 +167,25 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
       )}
 
       {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
-      {playerInfo?.achievements && playerInfo.achievements.length > 0 && (
+      {achievementsCatalog && achievementsCatalog.length > 0 && (
         <div className="mb-10 bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-xl">
-          <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Досягнення</h3>
+          <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Досягнення ({playerInfo?.achievements?.length || 0} / {achievementsCatalog.length})</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {playerInfo.achievements.map((ua) => {
-              const ach = ua.achievement;
-              if (!ach) return null;
+            {achievementsCatalog.map((ach) => {
+              const isUnlocked = playerInfo?.achievements?.find(ua => ua.achievementId === ach.id);
               return (
-                <div key={ua.id} className="bg-neutral-950 border border-yellow-900/40 rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden">
-                  <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div key={ach.id} className={`bg-neutral-950 border ${isUnlocked ? 'border-yellow-900/40' : 'border-neutral-800 opacity-50 grayscale'} rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden`}>
+                  {isUnlocked ? (
+                    <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  ) : (
+                    <div className="absolute inset-0 bg-neutral-900/40 z-10 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
+                      <div className="bg-black/80 text-white text-xs px-2 py-1 flex items-center gap-1 rounded font-bold"><Lock size={12} /> Заблоковано</div>
+                    </div>
+                  )}
                   <AchievementIcon iconUrl={ach.iconUrl} className="w-16 h-16 rounded-lg mb-2" size={32} />
                   <div className="text-xs font-bold text-white mb-1 line-clamp-1 w-full" title={ach.name}>{ach.name}</div>
                   <div className="text-[9px] text-neutral-400 line-clamp-2 leading-tight" title={ach.description}>{ach.description}</div>
-                  <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(ua.createdAt)}</div>
+                  {isUnlocked && <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(isUnlocked.createdAt)}</div>}
                 </div>
               );
             })}

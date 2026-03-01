@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy } from "lucide-react";
+import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy, Lock } from "lucide-react";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
 import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
 import CardFrame from "../components/CardFrame";
 import AchievementIcon from "../components/AchievementIcon";
 
-export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats }) {
+export default function ProfileView({ profile, setProfile, handleLogout, showToast, inventoryCount, isPremiumActive, showcases, cardsCatalog, rarities, fullInventory, setViewingCard, cardStats, achievementsCatalog = [] }) {
     const [avatarInput, setAvatarInput] = useState("");
     const [promoInput, setPromoInput] = useState("");
     const [oldPassword, setOldPassword] = useState("");
@@ -286,20 +286,26 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             </div>
 
             {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
-            {profile?.achievements && profile.achievements.length > 0 && (
+            {achievementsCatalog && achievementsCatalog.length > 0 && (
                 <div className="max-w-4xl mx-auto mb-8 bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
-                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Ваші Досягнення</h3>
+                    <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2"><Trophy className="text-yellow-500" /> Усі Досягнення ({profile?.achievements?.length || 0} / {achievementsCatalog.length})</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {profile.achievements.map((ua) => {
-                            const ach = ua.achievement;
-                            if (!ach) return null;
+                        {achievementsCatalog.map((ach) => {
+                            const isUnlocked = profile?.achievements?.find(ua => ua.achievementId === ach.id);
+
                             return (
-                                <div key={ua.id} className="bg-neutral-950 border border-yellow-900/40 rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden">
-                                    <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <div key={ach.id} className={`bg-neutral-950 border ${isUnlocked ? 'border-yellow-900/40' : 'border-neutral-800 opacity-50 grayscale'} rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden`}>
+                                    {isUnlocked ? (
+                                        <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    ) : (
+                                        <div className="absolute inset-0 bg-neutral-900/40 z-10 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
+                                            <div className="bg-black/80 text-white text-xs px-2 py-1 flex items-center gap-1 rounded font-bold"><Lock size={12} /> Заблоковано</div>
+                                        </div>
+                                    )}
                                     <AchievementIcon iconUrl={ach.iconUrl} className="w-16 h-16 rounded-lg mb-2" size={32} />
                                     <div className="text-xs font-bold text-white mb-1 line-clamp-1 w-full" title={ach.name}>{ach.name}</div>
                                     <div className="text-[9px] text-neutral-400 line-clamp-2 leading-tight" title={ach.description}>{ach.description}</div>
-                                    <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(ua.createdAt)}</div>
+                                    {isUnlocked && <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(isUnlocked.createdAt)}</div>}
                                 </div>
                             );
                         })}

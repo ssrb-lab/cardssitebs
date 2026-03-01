@@ -447,7 +447,8 @@ app.get('/api/catalog', async (req, res) => {
   try {
     const cards = await prisma.cardCatalog.findMany();
     const packs = await prisma.packCatalog.findMany();
-    res.json({ cards, packs });
+    const achievements = await prisma.achievementSettings.findMany();
+    res.json({ cards, packs, achievements });
   } catch (error) {
     res.status(500).json({ error: "Помилка завантаження каталогу." });
   }
