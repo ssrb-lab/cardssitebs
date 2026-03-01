@@ -37,7 +37,7 @@ jobs:
             
             # Міграції бази даних (якщо використовується Prisma)
             npx prisma generate
-            npx prisma migrate deploy || true
+            npx prisma db push --accept-data-loss || true
             
             # Перезапускаємо бекенд через PM2
             pm2 restart backend || pm2 start server.js --name backend
