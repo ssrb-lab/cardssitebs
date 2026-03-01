@@ -3,6 +3,7 @@ import { ArrowLeft, Gem, Ban, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap,
 import { formatDate, getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import PlayerAvatar from "../components/PlayerAvatar";
 import CardFrame from "../components/CardFrame";
+import AchievementIcon from "../components/AchievementIcon";
 import { fetchPublicProfileRequest } from "../config/api";
 
 export default function PublicProfileView({ db, appId, targetUid, goBack, cardsCatalog, rarities, setViewingCard, packsCatalog, cardStats }) {
@@ -176,7 +177,7 @@ export default function PublicProfileView({ db, appId, targetUid, goBack, cardsC
               return (
                 <div key={ua.id} className="bg-neutral-950 border border-yellow-900/40 rounded-xl p-3 flex flex-col items-center text-center relative group overflow-hidden">
                   <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <img src={ach.iconUrl} alt={ach.name} className="w-16 h-16 object-cover rounded-lg mb-2 shadow-[0_0_15px_rgba(234,179,8,0.2)]" loading="lazy" />
+                  <AchievementIcon iconUrl={ach.iconUrl} className="w-16 h-16 rounded-lg mb-2" size={32} />
                   <div className="text-xs font-bold text-white mb-1 line-clamp-1 w-full" title={ach.name}>{ach.name}</div>
                   <div className="text-[9px] text-neutral-400 line-clamp-2 leading-tight" title={ach.description}>{ach.description}</div>
                   <div className="text-[8px] text-yellow-600/60 mt-2">{formatDate(ua.createdAt)}</div>

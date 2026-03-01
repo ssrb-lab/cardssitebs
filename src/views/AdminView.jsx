@@ -9,6 +9,7 @@ import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
 import CardFrame from "../components/CardFrame";
+import AchievementIcon, { ACHIEVEMENT_PRESETS } from "../components/AchievementIcon";
 
 export default function AdminView({ db, appId, currentProfile, setProfile, reloadSettings, cardsCatalog, packsCatalog, setCardsCatalog, setPacksCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView, bosses, setBosses }) {
     const [activeTab, setActiveTab] = useState("users");
@@ -1162,8 +1163,22 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                 <input type="text" placeholder="Зібрати всі картки Базового Паку" value={achievementForm.description} onChange={(e) => setAchievementForm({ ...achievementForm, description: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">URL іконки:</label>
-                                <input type="text" placeholder="https://..." value={achievementForm.iconUrl} onChange={(e) => setAchievementForm({ ...achievementForm, iconUrl: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" required />
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Іконка (URL або Пресет):</label>
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="https://... або пресет" value={achievementForm.iconUrl} onChange={(e) => setAchievementForm({ ...achievementForm, iconUrl: e.target.value })} className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white" />
+                                    <div className="relative group">
+                                        <button type="button" className="bg-neutral-800 p-2 rounded-xl border border-neutral-700 hover:bg-neutral-700 transition">
+                                            <AchievementIcon iconUrl={achievementForm.iconUrl} className="w-8 h-8 rounded-md" size={18} />
+                                        </button>
+                                        <div className="absolute top-14 right-0 bg-neutral-900 border border-neutral-700 rounded-xl p-3 shadow-2xl z-50 hidden group-hover:flex flex-wrap gap-2 w-64">
+                                            {Object.keys(ACHIEVEMENT_PRESETS).map(key => (
+                                                <button type="button" key={key} onClick={() => setAchievementForm({ ...achievementForm, iconUrl: key })} className={`p-1.5 rounded-lg transition-colors ${achievementForm.iconUrl === key ? 'bg-yellow-900/50' : 'hover:bg-neutral-800'}`} title={key}>
+                                                    <AchievementIcon iconUrl={key} className="w-8 h-8 rounded-md" size={18} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Пак для ачівки:</label>
@@ -1190,7 +1205,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                         <button onClick={() => { setEditingAchievement(a); setAchievementForm(a); }} className="text-blue-500 hover:bg-blue-900/30 p-1.5 rounded-lg transition-colors"><Edit2 size={16} /></button>
                                         <button onClick={() => deleteAchievement(a.id)} className="text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={16} /></button>
                                     </div>
-                                    <img src={a.iconUrl} alt="achievement" className="w-16 h-16 object-cover rounded-lg shrink-0 border border-neutral-700" loading="lazy" />
+                                    <AchievementIcon iconUrl={a.iconUrl} className="w-16 h-16 rounded-lg shrink-0" size={32} />
                                     <div className="flex-1 pr-16">
                                         <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-1">{pack ? pack.name : "Невідомий пак"}</div>
                                         <div className="font-bold text-white mb-1">{a.name}</div>
