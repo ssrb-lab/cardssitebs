@@ -634,13 +634,13 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                 {(currentProfile.isAdmin || currentProfile.isSuperAdmin) && (
                     <>
                         <button onClick={() => setActiveTab("achievements")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "achievements" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Trophy size={18} /> Ачівки</button>
-                        <button onClick={() => setActiveTab("bosses")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "bosses" ? "bg-red-600/20 text-red-500 border border-red-500/50" : "text-neutral-400 hover:bg-neutral-800"}`}>
+                        <button onClick={() => setActiveTab("bosses")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "bosses" ? "bg-red-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}>
                             <Swords size={18} /> Боси
                         </button>
                         <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
                         <button onClick={() => setActiveTab("premiumShop")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "premiumShop" ? "bg-fuchsia-600 text-white" : "text-fuchsia-400/70 hover:bg-neutral-800"}`}><Gem size={18} /> Прем Товари</button>
                         <button onClick={() => setActiveTab("settings")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "settings" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Settings size={18} /> Налаштування</button>
-                        <button onClick={() => setActiveTab("logs")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "logs" ? "bg-red-900/80 text-white border border-red-500" : "text-red-400 hover:bg-neutral-800"}`}><ScrollText size={18} /> Логи</button>
+                        <button onClick={() => setActiveTab("logs")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "logs" ? "bg-red-900 text-white" : "text-red-400 hover:bg-neutral-800"}`}><ScrollText size={18} /> Логи</button>
                     </>
                 )}
             </div>
