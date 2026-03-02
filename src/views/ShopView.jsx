@@ -12,13 +12,20 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
   useEffect(() => {
     if (isRouletteSpinning) {
-      setRoulettePos(0);
-      setRouletteOffset(Math.floor(Math.random() * 100) - 50);
+      // Avoid calling setState synchronously during render by using setTimeout
+      const initTimer = setTimeout(() => {
+        setRoulettePos(0);
+        setRouletteOffset(Math.floor(Math.random() * 100) - 50);
+      }, 0);
 
-      const timer = setTimeout(() => {
+      const animTimer = setTimeout(() => {
         setRoulettePos(1);
       }, 50);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(initTimer);
+        clearTimeout(animTimer);
+      };
     }
   }, [isRouletteSpinning]);
 
@@ -170,6 +177,8 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
       .filter((c) => c.packId === selectedPackId)
       .sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
 
+    const maxPacksAffordable = profile?.coins && selectedPack?.cost ? Math.floor(profile.coins / selectedPack.cost) : 0;
+
     return (
       <div className="pb-10 animate-in fade-in slide-in-from-right-8 duration-500">
         <button onClick={() => setSelectedPackId(null)} className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold px-4 py-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 w-fit border border-neutral-800">
@@ -201,6 +210,9 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
             <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-orange-950" />
             <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-red-950" />
             <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-purple-600 hover:bg-purple-500 text-white" />
+            {maxPacksAffordable > 0 && (
+              <OpenButton amount={maxPacksAffordable} cost={selectedPack.cost} label={`На всі (${maxPacksAffordable}x)`} onClick={() => { if (window.confirm(`Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`)) { openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable) } }} opening={openingPackId === selectedPack.id || isProcessing} color="bg-green-600 hover:bg-green-500 text-white" />
+            )}
           </div>
 
           {selectedPack.isPremiumOnly && !isPremiumActive && (
@@ -322,7 +334,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 }
 
 // Допоміжний компонент для кнопки відкриття
-function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-yellow-950" }) {
+function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-yellow-950", label }) {
   const disabled = opening;
   return (
     <button
@@ -331,7 +343,7 @@ function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hov
       className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${disabled ? "bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70" : `${color} transform hover:-translate-y-1`
         }`}
     >
-      Відкрити {amount}x
+      {label ? label : `Відкрити ${amount}x`}
       <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">
         {cost * amount} <Coins size={14} className="ml-1" />
       </span>
