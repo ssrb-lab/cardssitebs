@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Sparkles, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
+import { Search, Filter, Sparkles, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart, Bookmark } from "lucide-react";
 import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import { SELL_PRICE } from "../config/constants";
 import CardFrame from "../components/CardFrame";
@@ -250,6 +250,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               const effectClass = card.effect ? `effect-${card.effect}` : '';
               const maxSup = Number(card.maxSupply) || 0;
               const isSoldOut = maxSup > 0 && (cardStats[card.id] || 0) >= maxSup;
+              const hasCard = profile?.inventory?.some(item => item.cardId === card.id || item.id === card.id);
 
               return (
                 <div key={card.id} className={`flex flex-col items-center group ${isSoldOut ? "opacity-50 grayscale" : "cursor-pointer"}`} onClick={() => !isSoldOut && setViewingCard({ card })}>
@@ -274,6 +275,14 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                         </button>
                       )
                     }
+                    {hasCard && (
+                      <div className={`absolute bottom-1 ${card.soundUrl ? 'right-9' : 'right-1'} text-yellow-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] z-20`} title="Вже є в інвентарі">
+                        <Bookmark size={22} fill="currentColor" />
+                        <div className="absolute inset-0 flex items-center justify-center top-[-1px] text-yellow-950">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                      </div>
+                    )}
                   </div >
                   <div className="text-center px-1 w-full">
                     <div className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${style.text}`}>{card.rarity}</div>
