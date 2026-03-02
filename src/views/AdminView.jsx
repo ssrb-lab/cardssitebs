@@ -5,13 +5,13 @@ import {
     Eye, CheckCircle2, CalendarDays, Gift, Zap, Trophy, Mail
 } from "lucide-react";
 import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest, fetchAdminAchievements, saveAchievementSettingsRequest, deleteAchievementSettingsRequest, sendAdminNotification } from "../config/api";
-import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
+import { formatDate, getCardStyle } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
 import CardFrame from "../components/CardFrame";
 import AchievementIcon, { ACHIEVEMENT_PRESETS } from "../components/AchievementIcon";
 
-export default function AdminView({ db, appId, currentProfile, setProfile, reloadSettings, cardsCatalog, packsCatalog, setCardsCatalog, setPacksCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView, bosses, setBosses }) {
+export default function AdminView({ db, appId, currentProfile, setProfile, reloadSettings, cardsCatalog, packsCatalog, setCardsCatalog, setPacksCatalog, rarities, showToast, addSystemLog, dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, premiumShopItems, setViewingPlayerProfile, setCurrentView, bosses }) {
     const [activeTab, setActiveTab] = useState("users");
     const [newBoss, setNewBoss] = useState({ id: "", level: "", cardId: "", maxHp: "", damagePerClick: "", rewardPerClick: "", killBonus: "", cooldownHours: "" });
     const [allUsers, setAllUsers] = useState([]);
@@ -84,7 +84,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             const users = await fetchAdminUsers(getToken());
             setAllUsers(users || []);
-        } catch (e) { console.error("Помилка завантаження гравців"); }
+        } catch { console.error("Помилка завантаження гравців"); }
     };
 
     useEffect(() => {
@@ -135,7 +135,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             showToast(`Гравця ${userToDelete.nickname} видалено.`, "success");
             addSystemLog("Адмін", `Видалено акаунт: ${userToDelete.nickname}`);
             loadUsers();
-        } catch (e) { showToast("Помилка під час видалення."); }
+        } catch { showToast("Помилка під час видалення."); }
     };
 
     const handleInspectUser = async (uid) => {
@@ -146,7 +146,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             const items = await fetchAdminUserInventory(getToken(), uid);
             setUserInventory(items || []);
-        } catch (e) { showToast("Помилка доступу до інвентарю."); }
+        } catch { showToast("Помилка доступу до інвентарю."); }
         setLoadingUserInv(false);
     };
 
@@ -163,14 +163,14 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await adminUserActionRequest(getToken(), 'ban', banModalUser.uid, { reason: banReason, until: banUntil });
             showToast(`Гравця заблоковано.`, "success");
             setBanModalUser(null); loadUsers();
-        } catch (e) { showToast("Помилка блокування.", "error"); }
+        } catch { showToast("Помилка блокування.", "error"); }
     };
 
     const handleUnban = async (uid) => {
         try {
             await adminUserActionRequest(getToken(), 'unban', uid);
             showToast("Розблоковано.", "success"); loadUsers();
-        } catch (e) { showToast("Помилка розблокування.", "error"); }
+        } catch { showToast("Помилка розблокування.", "error"); }
     };
 
     const toggleAdminStatus = async (userObj) => {
@@ -178,7 +178,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             await adminUserActionRequest(getToken(), 'toggleAdmin', userObj.uid);
             showToast("Статус змінено.", "success"); loadUsers();
-        } catch (e) { showToast("Помилка зміни прав.", "error"); }
+        } catch { showToast("Помилка зміни прав.", "error"); }
     };
 
     const changeUserNickname = async () => {
@@ -196,7 +196,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setProfile(data.profile); // <--- Ось ця магія миттєво оновить баланс у верхньому меню!
             showToast(`Видано собі ${amount} монет!`, "success");
             loadUsers();
-        } catch (e) { showToast("Помилка нарахування.", "error"); }
+        } catch { showToast("Помилка нарахування.", "error"); }
     };
 
     const giveCoinsToUser = async () => {
@@ -206,7 +206,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
             showToast("Баланс змінено.", "success");
             setViewingUser(data.profile); setAdminAddCoinsAmount(100); loadUsers();
-        } catch (e) { showToast("Помилка монет.", "error"); }
+        } catch { showToast("Помилка монет.", "error"); }
     };
 
     const setExactCoinsToUser = async () => {
@@ -216,7 +216,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
             showToast("Точний баланс встановлено.", "success");
             setViewingUser(data.profile); loadUsers();
-        } catch (e) { showToast("Помилка балансу.", "error"); }
+        } catch { showToast("Помилка балансу.", "error"); }
     };
 
     const resetPlayerCooldown = async (targetUid, targetNickname) => {
@@ -224,7 +224,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             await adminResetCdRequest(getToken(), targetUid, 1000);
             showToast("Кулдаун скинуто!", "success");
-        } catch (e) { showToast("Помилка скидання КД.", "error"); }
+        } catch { showToast("Помилка скидання КД.", "error"); }
     };
 
     const setPlayerFarmLevel = async () => {
@@ -234,7 +234,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             const data = await adminUserActionRequest(getToken(), 'farmLevel', viewingUser.uid, { level: val });
             showToast("Рівень Фарму змінено!", "success");
             setViewingUser(data.profile); loadUsers();
-        } catch (e) { showToast("Помилка встановлення рівня.", "error"); }
+        } catch { showToast("Помилка встановлення рівня.", "error"); }
     };
 
     const giveCardToUser = async () => {
@@ -243,7 +243,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await adminUserActionRequest(getToken(), 'giveCard', viewingUser.uid, { cardId: adminAddCardId, amount: adminAddCardAmount });
             showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, "success");
             handleInspectUser(viewingUser.uid); loadUsers();
-        } catch (e) { showToast("Помилка картки.", "error"); }
+        } catch { showToast("Помилка картки.", "error"); }
     };
 
     const removeCardFromUser = async (cardId, currentAmount) => {
@@ -259,7 +259,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, { cardId, amount: amountToRemove });
             showToast(`Успішно вилучено ${amountToRemove} шт.`, "success");
             handleInspectUser(viewingUser.uid); loadUsers();
-        } catch (e) { showToast("Помилка вилучення.", "error"); }
+        } catch { showToast("Помилка вилучення.", "error"); }
     };
 
     const handlePremiumAction = async (e, action) => {
@@ -269,7 +269,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await adminUserActionRequest(getToken(), 'premium', premiumModalUser.uid, { revoke: action === "revoke", days: Number(premiumGiveDays) });
             showToast(action === "revoke" ? "Преміум забрано" : "Преміум видано!", "success");
             setPremiumModalUser(null); loadUsers();
-        } catch (err) { showToast("Помилка преміуму.", "error"); }
+        } catch { showToast("Помилка преміуму.", "error"); }
     };
 
     const resetBossForm = () => {
@@ -300,7 +300,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await reloadSettings();
             showToast(newBoss.id ? "Боса оновлено!" : `Боса ${bossData.level} рівня додано!`, "success");
             resetBossForm();
-        } catch (error) { showToast("Помилка збереження боса", "error"); }
+        } catch { showToast("Помилка збереження боса", "error"); }
         finally { setIsSyncing(false); }
     };
 
@@ -314,7 +314,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await saveSettingsRequest(getToken(), newSettings);
             await reloadSettings();
             showToast("Боса успішно видалено", "success");
-        } catch (error) { showToast("Помилка видалення", "error"); }
+        } catch { showToast("Помилка видалення", "error"); }
         finally { setIsSyncing(false); }
     };
 
@@ -340,7 +340,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setEditingPack(null);
             setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
             showToast("Пак збережено в MySQL!", "success");
-        } catch (error) {
+        } catch {
             showToast("Помилка збереження паку", "error");
         }
     };
@@ -353,7 +353,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setPacksCatalog(packsCatalog.filter((p) => p.id !== packId));
             addSystemLog("Адмін", `Видалено пак: ${pDef?.name}`);
             showToast("Пак видалено з MySQL!", "success");
-        } catch (error) {
+        } catch {
             showToast("Помилка видалення", "error");
         }
     };
@@ -385,7 +385,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setEditingCard(null);
             setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal" });
             showToast("Картку збережено в MySQL!", "success");
-        } catch (error) {
+        } catch {
             showToast("Помилка збереження картки", "error");
         }
     };
@@ -398,7 +398,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setCardsCatalog(cardsCatalog.filter((c) => c.id !== cardId));
             addSystemLog("Адмін", `Видалено картку: ${cDef?.name}`);
             showToast("Картку видалено з MySQL!", "success");
-        } catch (error) {
+        } catch {
             showToast("Помилка видалення", "error");
         }
     };
@@ -413,7 +413,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setPromoForm({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
             const data = await fetchPromosRequest(getToken());
             setAllPromos(data || []);
-        } catch (err) { showToast("Помилка створення промокоду", "error"); }
+        } catch { showToast("Помилка створення промокоду", "error"); }
     };
 
     const deletePromo = async (codeId) => {
@@ -422,7 +422,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await deletePromoRequest(getToken(), codeId);
             showToast("Промокод видалено.", "success");
             setAllPromos(allPromos.filter(p => p.code !== codeId));
-        } catch (err) { showToast("Помилка видалення.", "error"); }
+        } catch { showToast("Помилка видалення.", "error"); }
     };
 
     const saveSettings = async (e) => {
@@ -433,7 +433,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await reloadSettings();
             addSystemLog("Адмін", "Оновлено налаштування гри.");
             showToast("Налаштування оновлено!", "success");
-        } catch (err) { showToast("Помилка оновлення налаштувань.", "error"); }
+        } catch { showToast("Помилка оновлення налаштувань.", "error"); }
     };
 
     const addPremiumShopItem = async (e) => {
@@ -446,7 +446,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await reloadSettings();
             showToast("Товар додано!", "success");
             setShopItemForm({ type: "card", itemId: "", price: 500, description: "" });
-        } catch (err) { showToast("Помилка додавання товару.", "error"); }
+        } catch { showToast("Помилка додавання товару.", "error"); }
     };
 
     const deletePremiumShopItem = async (itemId) => {
@@ -457,7 +457,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await saveSettingsRequest(getToken(), newSettings);
             await reloadSettings();
             showToast("Товар видалено.", "success");
-        } catch (err) { showToast("Помилка видалення.", "error"); }
+        } catch { showToast("Помилка видалення.", "error"); }
     };
 
     const clearAdminLogs = async () => {
@@ -477,7 +477,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             await adminClearUserMarketHistoryRequest(getToken(), viewingUser.uid);
             showToast("Історію гравця очищено!", "success");
-        } catch (e) { showToast("Помилка.", "error"); }
+        } catch { showToast("Помилка.", "error"); }
     };
 
     const clearAllMarketHistory = async () => {
@@ -485,7 +485,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
         try {
             await adminClearAllMarketHistoryRequest(getToken());
             showToast("Глобальну історію очищено!", "success");
-        } catch (e) { showToast("Помилка.", "error"); }
+        } catch { showToast("Помилка.", "error"); }
     };
 
     const filteredPacks = packsCatalog.filter(p => p.name.toLowerCase().includes(packSearchTerm.toLowerCase()));
@@ -522,7 +522,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setEditingAchievement(null);
             const data = await fetchAdminAchievements(getToken());
             setAllAchievements(data || []);
-        } catch (err) {
+        } catch {
             showToast("Помилка збереження ачівки", "error");
         }
     };
@@ -533,7 +533,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             await deleteAchievementSettingsRequest(getToken(), id);
             showToast("Ачівку видалено.", "success");
             setAllAchievements(allAchievements.filter(a => a.id !== id));
-        } catch (err) {
+        } catch {
             showToast("Помилка видалення ачівки", "error");
         }
     }
