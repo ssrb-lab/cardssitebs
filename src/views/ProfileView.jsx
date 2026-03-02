@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy, Lock } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Gift, Ticket, Settings, LogOut, CalendarDays, Coins, LayoutGrid, PackageOpen, Zap, Star, Gem, Swords, Store, ArrowLeft, Trash2, Trophy, Lock, Upload, X } from "lucide-react";
+import Cropper from 'react-easy-crop';
 import PlayerAvatar from "../components/PlayerAvatar";
 import { formatDate, getCardStyle } from "../utils/helpers";
-import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
+import { getCroppedImg } from "../utils/cropImage";
+import { claimDailyRequest, fetchMarketHistoryRequest, clearMyMarketHistoryRequest, usePromoRequest, updateAvatarRequest, uploadAvatarRequest, getToken, fetchPublicProfileRequest, changePasswordRequest } from "../config/api";
 import CardFrame from "../components/CardFrame";
 import AchievementIcon from "../components/AchievementIcon";
 
@@ -17,6 +19,13 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
     const [marketHistory, setMarketHistory] = useState([]);
     const [activeTab, setActiveTab] = useState("main");
     const [liveStats, setLiveStats] = useState(null);
+
+    // Змінні для обрізки аватарки
+    const [selectedFileUrl, setSelectedFileUrl] = useState(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -82,6 +91,44 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
             setAvatarInput("");
         } catch (e) { showToast("Помилка оновлення аватару"); }
         finally { actionLock.current = false; setIsProcessing(false); }
+    };
+
+    const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
+
+    const handleFileSelect = (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const reader = new FileReader();
+            reader.readAsDataURL(e.target.files[0]);
+            reader.addEventListener("load", () => {
+                setSelectedFileUrl(reader.result);
+            });
+        }
+    };
+
+    const handleCropAndUpload = async () => {
+        if (actionLock.current || isProcessing || !selectedFileUrl || !croppedAreaPixels) return;
+        actionLock.current = true; setIsProcessing(true);
+        try {
+            // Отримуємо оброблене зображення як об'єкт File
+            const { file } = await getCroppedImg(selectedFileUrl, croppedAreaPixels);
+
+            // Відправляємо на сервер
+            const data = await uploadAvatarRequest(getToken(), file);
+
+            setProfile(prev => ({ ...prev, avatarUrl: data.avatarUrl }));
+            showToast("Аватар успішно завантажено!", "success");
+
+            // Закриваємо модалку
+            setSelectedFileUrl(null);
+        } catch (e) {
+            console.error(e);
+            showToast("Помилка при збереженні аватару", "error");
+        } finally {
+            actionLock.current = false;
+            setIsProcessing(false);
+        }
     };
 
     const redeemPromo = async (e) => {
@@ -164,20 +211,99 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
 
     if (activeTab === "settings") {
         return (
-            <div className="pb-10 animate-in fade-in slide-in-from-right-8 duration-300 max-w-4xl mx-auto">
+            <div className="pb-10 animate-in fade-in slide-in-from-right-8 duration-300 max-w-4xl mx-auto relative">
                 <button onClick={() => setActiveTab("main")} className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white font-bold transition-colors">
                     <ArrowLeft size={20} /> Назад до профілю
                 </button>
+
+                {/* Модалка обрізки */}
+                {selectedFileUrl && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative flex flex-col h-[80vh] max-h-[600px]">
+                            <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50 z-10">
+                                <h3 className="font-black text-white text-lg">Виберіть область (Квадрат)</h3>
+                                <button onClick={() => setSelectedFileUrl(null)} className="text-neutral-500 hover:text-white transition-colors">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div className="relative flex-1 bg-black">
+                                <Cropper
+                                    image={selectedFileUrl}
+                                    crop={crop}
+                                    zoom={zoom}
+                                    aspect={1}
+                                    onCropChange={setCrop}
+                                    onCropComplete={onCropComplete}
+                                    onZoomChange={setZoom}
+                                    cropShape="rect"
+                                    showGrid={false}
+                                />
+                            </div>
+                            <div className="p-6 bg-neutral-900 border-t border-neutral-800 z-10 space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-neutral-400 mb-2 block uppercase">Масштаб</label>
+                                    <input
+                                        type="range"
+                                        value={zoom}
+                                        min={1}
+                                        max={3}
+                                        step={0.1}
+                                        aria-labelledby="Zoom"
+                                        onChange={(e) => setZoom(e.target.value)}
+                                        className="w-full accent-blue-500 h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleCropAndUpload}
+                                    disabled={isProcessing}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-4 rounded-xl transition-colors shadow-[0_0_15px_rgba(37,99,235,0.3)] shadow-blue-500/20"
+                                >
+                                    {isProcessing ? "Завантаження..." : "Застосувати та Зберегти"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
                     <h3 className="text-xl font-black text-white mb-6 flex items-center gap-2"><Settings className="text-blue-500" /> Налаштування</h3>
                     <div className="flex flex-col gap-6">
                         <div className="flex flex-col md:flex-row gap-6">
                             <div className="flex-1 bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50">
                                 <label className="block text-sm font-bold text-neutral-400 mb-3">Оновлення Аватарки</label>
-                                <form onSubmit={handleAvatarUpdate} className="flex flex-col gap-3 relative z-10">
-                                    <input type="text" value={avatarInput} onChange={(e) => setAvatarInput(e.target.value)} placeholder="URL зображення (https://...)" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" />
-                                    <button type="submit" disabled={isProcessing} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm w-full">Зберегти аватар</button>
-                                </form>
+
+                                <div className="space-y-4">
+                                    {/* Завантаження з пристрою */}
+                                    <div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            ref={fileInputRef}
+                                            onChange={handleFileSelect}
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isProcessing}
+                                            className="w-full bg-neutral-900 border border-neutral-700 hover:border-blue-500 hover:text-white text-neutral-300 font-bold px-4 py-4 rounded-xl transition-colors text-sm flex items-center justify-center gap-2 group"
+                                        >
+                                            <Upload size={18} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                                            Завантажити фото
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-px bg-neutral-800 flex-1"></div>
+                                        <span className="text-neutral-500 text-xs font-bold uppercase">або за посиланням</span>
+                                        <div className="h-px bg-neutral-800 flex-1"></div>
+                                    </div>
+
+                                    {/* Звичайне посилання */}
+                                    <form onSubmit={handleAvatarUpdate} className="flex flex-col gap-3 relative z-10">
+                                        <input type="text" value={avatarInput} onChange={(e) => setAvatarInput(e.target.value)} placeholder="URL зображення (https://...)" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" />
+                                        <button type="submit" disabled={isProcessing || !avatarInput.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm w-full">Зберегти URL аватар</button>
+                                    </form>
+                                </div>
                             </div>
                             <div className="flex-1 bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50">
                                 <label className="block text-sm font-bold text-neutral-400 mb-3">Безпека (Зміна пароля)</label>

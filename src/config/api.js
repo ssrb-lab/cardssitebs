@@ -279,6 +279,20 @@ export const updateAvatarRequest = async (token, url) => {
     return res.json();
 };
 
+export const uploadAvatarRequest = async (token, file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const res = await fetch(`${API_URL}/profile/upload-avatar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
 export const fetchLeaderboard = async () => {
     const res = await fetch(`${API_URL}/game/leaderboard`);
     const data = await res.json();

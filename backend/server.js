@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { OAuth2Client } = require('google-auth-library');
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const authenticate = require('./middleware/auth');
@@ -12,11 +15,36 @@ const authenticate = require('./middleware/auth');
 const prisma = new PrismaClient();
 const app = express();
 
+// Налаштування Multer для збереження аватарок
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'uploads', 'avatars');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `avatar-${req.user?.uid || Date.now()}-${Date.now()}${ext}`);
+  }
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Дозволені лише зображення'));
+  }
+});
+
 // SSE Clients for real-time game status updates
 let gameClients = [];
 
 app.use(cors());
 app.use(express.json());
+
+// Роздача статичних файлів (аватарки)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Мідлвар для перевірки прав адміністратора
 const checkAdmin = async (req, res, next) => {
@@ -1575,7 +1603,7 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
 });
 
 // ----------------------------------------
-// ОНОВЛЕННЯ АВАТАРА
+// ОНОВЛЕННЯ АВАТАРА ТА ФАЙЛИ
 // ----------------------------------------
 app.post('/api/profile/update-avatar', authenticate, async (req, res) => {
   const { avatarUrl } = req.body;
@@ -1595,6 +1623,39 @@ app.post('/api/profile/update-avatar', authenticate, async (req, res) => {
   } catch (error) {
     console.error("Помилка при оновленні аватара:", error);
     res.status(500).json({ error: "Помилка оновлення аватара на сервері." });
+  }
+});
+
+app.post('/api/profile/upload-avatar', authenticate, uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Файл не завантажено." });
+    }
+
+    const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // Видаляємо стару аватарку, якщо вона локальна
+    if (user && user.avatarUrl && user.avatarUrl.startsWith('/uploads/avatars/')) {
+      const oldPath = path.join(__dirname, user.avatarUrl);
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (err) {
+          console.error("Помилка видалення старого аватара:", err);
+        }
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: { avatarUrl: newAvatarUrl }
+    });
+
+    res.json({ success: true, profile: updatedUser, avatarUrl: newAvatarUrl });
+  } catch (error) {
+    console.error("Помилка при завантаженні аватара:", error);
+    res.status(500).json({ error: error.message || "Помилка завантаження аватара." });
   }
 });
 
