@@ -572,8 +572,22 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
                         <span className="text-lg">Забрати {score * 6} монет</span>
                     </button>
 
-                    <button onClick={startGame} className="mt-4 text-neutral-400 hover:text-white font-bold underline px-4 py-2 opacity-80 hover:opacity-100">
-                        Грати заново
+                    <button onClick={async () => {
+                        if (score >= 50) {
+                            setIsProcessing(true);
+                            try {
+                                const data = await claimTetrisRewardRequest(getToken(), score);
+                                setProfile(data.profile);
+                                showToast(`Ви отримали ${data.earned} монет за гру!`, "success");
+                            } catch (e) {
+                                showToast(e.message || "Помилка отримання нагороди.");
+                                setIsProcessing(false);
+                                return;
+                            }
+                        }
+                        startGame();
+                    }} disabled={isProcessing} className="mt-4 text-neutral-400 hover:text-white font-bold underline px-4 py-2 opacity-80 hover:opacity-100">
+                        Зберегти та грати заново
                     </button>
                 </div>
             )}

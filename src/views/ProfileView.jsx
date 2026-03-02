@@ -13,6 +13,7 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
     const [promoInput, setPromoInput] = useState("");
     const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const actionLock = useRef(false);
 
@@ -146,13 +147,18 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
 
     const handleChangePassword = async (e) => {
         e.preventDefault();
-        if (actionLock.current || isProcessing || !oldPassword.trim() || !newPassword.trim()) return;
+        if (actionLock.current || isProcessing || !oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) return;
+        if (newPassword !== confirmPassword) {
+            showToast("Новий пароль та підтвердження не збігаються", "error");
+            return;
+        }
         actionLock.current = true; setIsProcessing(true);
         try {
             await changePasswordRequest(getToken(), oldPassword, newPassword);
             showToast("Мій лорд, пароль успішно змінено!", "success");
             setOldPassword("");
             setNewPassword("");
+            setConfirmPassword("");
         } catch (e) {
             showToast(e.message || "Помилка зміни пароля", "error");
         }
@@ -311,7 +317,8 @@ export default function ProfileView({ profile, setProfile, handleLogout, showToa
                                     <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Поточний пароль" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" />
                                     <div className="flex flex-col sm:flex-row gap-3">
                                         <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Новий пароль" className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" />
-                                        <button type="submit" disabled={isProcessing || !oldPassword || !newPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm whitespace-nowrap">Оновити</button>
+                                        <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Підтвердіть новий пароль" className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none text-sm transition-colors" />
+                                        <button type="submit" disabled={isProcessing || !oldPassword || !newPassword || !confirmPassword} className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm whitespace-nowrap">Оновити</button>
                                     </div>
                                 </form>
                             </div>

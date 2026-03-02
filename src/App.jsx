@@ -127,6 +127,10 @@ export default function App() {
 
         if (res.ok) {
           const userData = await res.json();
+          const autoSound = localStorage.getItem("autoSoundEnabled");
+          if (autoSound !== null) {
+            userData.autoSoundEnabled = autoSound === "true";
+          }
           setUser({ uid: userData.uid, email: userData.email });
           setProfile(userData);
           if (userData.inventory) {
@@ -255,11 +259,15 @@ export default function App() {
         if (!nickname) throw new Error("Введіть нікнейм!");
         const data = await registerUser(nickname, email, password);
         setToken(data.token);
+        const autoSound = localStorage.getItem("autoSoundEnabled");
+        if (autoSound !== null) data.user.autoSoundEnabled = autoSound === "true";
         setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
       } else {
         const data = await loginUser(email, password);
         setToken(data.token);
+        const autoSound = localStorage.getItem("autoSoundEnabled");
+        if (autoSound !== null) data.user.autoSoundEnabled = autoSound === "true";
         setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
       }
@@ -274,6 +282,7 @@ export default function App() {
     if (!user || actionLock.current) return;
     const newValue = profile?.autoSoundEnabled === false ? true : false;
     setProfile(prev => ({ ...prev, autoSoundEnabled: newValue }));
+    localStorage.setItem("autoSoundEnabled", newValue);
     showToast(newValue ? "Автозвук увімкнено" : "Автозвук вимкнено", "success");
   };
 
@@ -309,6 +318,8 @@ export default function App() {
       });
       if (res.ok) {
         const userData = await res.json();
+        const autoSound = localStorage.getItem("autoSoundEnabled");
+        if (autoSound !== null) userData.autoSoundEnabled = autoSound === "true";
         setProfile(userData);
         if (userData.inventory) {
           setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
@@ -643,11 +654,11 @@ export default function App() {
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 font-sans text-neutral-100 relative overflow-hidden">
         <div className="bg-neutral-900 p-8 rounded-3xl max-w-md w-full relative z-10">
           <h1 className="text-3xl font-black mb-6 text-center text-white">{authMode === "login" ? "Вхід" : "Реєстрація"}</h1>
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <form id="auth-form" onSubmit={handleAuthSubmit} className="space-y-4">
             {authMode === "register" && <input type="text" name="nickname" required placeholder="Нікнейм" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none" />}
             <input type="email" name="email" required placeholder="Електронна пошта" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none" />
-            <input type="password" name="password" required placeholder="Пароль" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none" minLength="6" />
-            <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-4 rounded-xl mt-4">{authMode === "login" ? "Увійти в гру" : "Створити акаунт"}</button>
+            <input type="password" name="password" required placeholder="Пароль" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none" minLength="6" onKeyDown={(e) => { if (e.key === 'Enter') document.getElementById('auth-submit-btn').click(); }} />
+            <button id="auth-submit-btn" type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-4 rounded-xl mt-4">{authMode === "login" ? "Увійти в гру" : "Створити акаунт"}</button>
           </form>
           <div className="mt-4 flex justify-center w-full">
             <GoogleLogin
@@ -656,6 +667,8 @@ export default function App() {
                 try {
                   const data = await googleLoginRequest(credentialResponse.credential);
                   setToken(data.token);
+                  const autoSound = localStorage.getItem("autoSoundEnabled");
+                  if (autoSound !== null) data.user.autoSoundEnabled = autoSound === "true";
                   setUser({ uid: data.user.uid, email: data.user.email });
                   setProfile(data.user);
                   setNeedsRegistration(false);

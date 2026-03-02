@@ -152,6 +152,47 @@ app.delete('/api/admin/achievements/:id', authenticate, checkAdmin, async (req, 
   }
 });
 
+function getPenaltyTime(baseTimeStr, count) {
+  const parts = baseTimeStr.split(' ');
+  const h = parseInt(parts[0]) || 0;
+  const m = parseInt(parts[2]) || 0;
+  const totalMins = Math.round((h * 60 + m) * Math.pow(1.5, count - 1));
+  const newH = Math.floor(totalMins / 60);
+  const newM = totalMins % 60;
+  return `${newH} г ${newM} хв`;
+}
+
+// Хелпер: Очищення вітрин при зменшенні кількості карток
+async function sanitizeShowcases(tx, userUid, cardId, newAmount) {
+  const showcases = await tx.showcase.findMany({ where: { userId: userUid } });
+  let totalInShowcases = 0;
+  for (const s of showcases) {
+    if (Array.isArray(s.cardIds)) {
+      totalInShowcases += s.cardIds.filter(id => id === cardId).length;
+    }
+  }
+
+  if (totalInShowcases > newAmount) {
+    let toRemove = totalInShowcases - newAmount;
+    for (const s of showcases) {
+      if (toRemove <= 0) break;
+      if (Array.isArray(s.cardIds)) {
+        let newCardIds = [...s.cardIds];
+        while (newCardIds.includes(cardId) && toRemove > 0) {
+          newCardIds.splice(newCardIds.lastIndexOf(cardId), 1);
+          toRemove--;
+        }
+        if (newCardIds.length !== s.cardIds.length) {
+          await tx.showcase.update({
+            where: { id: s.id },
+            data: { cardIds: newCardIds }
+          });
+        }
+      }
+    }
+  }
+}
+
 // ----------------------------------------
 // АВТОРИЗАЦІЯ ТА РЕЄСТРАЦІЯ
 // ----------------------------------------
@@ -729,8 +770,10 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
     await prisma.$transaction(async (tx) => {
       if (invItem.amount === 1) {
         await tx.inventoryItem.delete({ where: { userId_cardId: { userId: user.uid, cardId } } });
+        await sanitizeShowcases(tx, user.uid, cardId, 0);
       } else {
         await tx.inventoryItem.update({ where: { userId_cardId: { userId: user.uid, cardId } }, data: { amount: { decrement: 1 } } });
+        await sanitizeShowcases(tx, user.uid, cardId, invItem.amount - 1);
       }
       await tx.user.update({ where: { uid: user.uid }, data: { totalCards: { decrement: 1 } } });
       await tx.marketListing.create({
@@ -1935,11 +1978,13 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
             await tx.inventoryItem.delete({
               where: { userId_cardId: { userId: user.uid, cardId: item.cardId } }
             });
+            await sanitizeShowcases(tx, user.uid, item.cardId, 0);
           } else {
             await tx.inventoryItem.update({
               where: { userId_cardId: { userId: user.uid, cardId: item.cardId } },
               data: { amount: { decrement: item.amount } }
             });
+            await sanitizeShowcases(tx, user.uid, item.cardId, invItem.amount - item.amount);
           }
           totalEarned += earn;
           totalCardsRemoved += item.amount;

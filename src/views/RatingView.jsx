@@ -9,16 +9,22 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
   const [loading, setLoading] = useState(true);
   const [ratingSort, setRatingSort] = useState("cards");
 
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const loadLeaderboard = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const data = await fetchLeaderboard();
+      setAllProfiles(data || []);
+    } catch (e) {
+      console.error("Помилка завантаження бази гравців", e);
+      setErrorMsg("Не вдалося завантажити Зал Слави. Можливо, помилка підключення.");
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const loadLeaderboard = async () => {
-      try {
-        const data = await fetchLeaderboard();
-        setAllProfiles(data || []);
-      } catch (e) {
-        console.error("Помилка завантаження бази гравців", e);
-      }
-      setLoading(false);
-    };
     loadLeaderboard();
   }, []);
 
@@ -32,6 +38,12 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
     : sortedProfiles.filter(p => p.nickname?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   if (loading) return <div className="text-center py-20 text-neutral-500"><Loader2 className="animate-spin mx-auto mb-4 w-12 h-12" /> Завантаження Залу Слави...</div>;
+  if (errorMsg) return (
+    <div className="text-center py-20 text-neutral-500">
+      <p className="mb-4">{errorMsg}</p>
+      <button onClick={loadLeaderboard} className="px-4 py-2 bg-neutral-800 rounded-xl hover:bg-neutral-700 text-white transition-colors">Спробувати ще раз</button>
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -73,9 +85,9 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
             >
               <div className="flex items-center gap-4">
                 <div className={`w-10 h-10 flex items-center justify-center font-black text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${realRank === 1 ? "bg-yellow-500 text-yellow-950 border-yellow-400" :
-                    realRank === 2 ? "bg-gray-300 text-gray-800 border-gray-100" :
-                      realRank === 3 ? "bg-amber-700 text-orange-100 border-amber-600" :
-                        "bg-neutral-950 text-neutral-500 border-neutral-800"
+                  realRank === 2 ? "bg-gray-300 text-gray-800 border-gray-100" :
+                    realRank === 3 ? "bg-amber-700 text-orange-100 border-amber-600" :
+                      "bg-neutral-950 text-neutral-500 border-neutral-800"
                   }`}>
                   {realRank}
                 </div>
