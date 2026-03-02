@@ -128,6 +128,17 @@ app.delete('/api/admin/achievements/:id', authenticate, checkAdmin, async (req, 
 // АВТОРИЗАЦІЯ ТА РЕЄСТРАЦІЯ
 // ----------------------------------------
 
+const checkAndUnbanUser = async (user) => {
+  if (user && user.isBanned && user.banUntil && new Date() > new Date(user.banUntil)) {
+    await prisma.user.update({
+      where: { uid: user.uid },
+      data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null }
+    });
+    return { ...user, isBanned: false, banReason: null, banUntil: null, bannedBy: null };
+  }
+  return user;
+};
+
 app.post('/api/auth/google', async (req, res) => {
   const { credential } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -245,6 +256,8 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ error: "Користувача не знайдено." });
+
+    user = await checkAndUnbanUser(user);
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) return res.status(401).json({ error: "Неправильний пароль." });
@@ -368,7 +381,7 @@ app.post('/api/profile/change-password', authenticate, async (req, res) => {
 
 app.get('/api/profile', authenticate, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
       include: {
         inventory: true,
@@ -378,6 +391,8 @@ app.get('/api/profile', authenticate, async (req, res) => {
     });
 
     if (!user) return res.status(404).json({ error: "Гравець не знайдений" });
+
+    user = await checkAndUnbanUser(user);
 
     // Отримуємо ачівки користувача з деталями (назва, іконка з AchievementSettings)
     const userAchievements = await prisma.userAchievement.findMany({
@@ -402,7 +417,7 @@ app.get('/api/profile', authenticate, async (req, res) => {
 // Публічний профіль гравця (для рейтингу)
 app.get('/api/profile/public/:uid', async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { uid: req.params.uid },
       select: {
         uid: true, nickname: true, avatarUrl: true, coins: true,
@@ -410,12 +425,14 @@ app.get('/api/profile/public/:uid', async (req, res) => {
         packsOpened: true,
         coinsSpentOnPacks: true,
         coinsEarnedFromPacks: true,
-        farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
+        farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, banUntil: true, bannedBy: true, banReason: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
         _count: { select: { inventory: true } } // Динамічно рахуємо унікальні картки
       }
     });
 
     if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
+
+    user = await checkAndUnbanUser(user);
 
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId: user.uid },
@@ -726,6 +743,15 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
         where: { id: listingId },
         data: { status: 'sold', soldAt: new Date(), buyerId: buyer.uid, buyerNickname: buyer.nickname }
       });
+      // Сповіщення про продаж
+      await tx.notification.create({
+        data: {
+          userId: listing.sellerId,
+          type: 'sale',
+          title: 'Картку продано на ринку!',
+          message: `Ваш лот був куплений гравцем ${buyer.nickname} за ${listing.price} монет.`
+        }
+      });
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
@@ -993,13 +1019,15 @@ app.get('/api/game/market/notifications', authenticate, async (req, res) => {
   const serverTime = Date.now();
 
   try {
-    const currentUser = await prisma.user.findUnique({
+    let currentUser = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      select: { isBanned: true }
+      select: { uid: true, isBanned: true, banUntil: true, bannedBy: true, banReason: true }
     });
 
+    currentUser = await checkAndUnbanUser(currentUser);
+
     if (currentUser?.isBanned) {
-      return res.json({ isBanned: true, serverTime });
+      return res.json({ isBanned: true, serverTime, profile: currentUser });
     }
 
     if (!lastCheck || lastCheck === 'null') {
@@ -1467,12 +1495,17 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
   const { action, targetUid, payload } = req.body;
   try {
     let updatedUser;
+
+    // Отримуємо адміна для запису в bannedBy
+    const adminUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, select: { nickname: true } });
+
     switch (action) {
       case 'ban':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: true, banReason: payload.reason, banUntil: payload.until } });
+        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: true, banReason: payload.reason, banUntil: payload.until, bannedBy: adminUser?.nickname || "Адміністратор" } });
+        await prisma.notification.create({ data: { userId: targetUid, type: 'punishment', title: 'Бан акаунту', message: `Вас забанено адміністратором ${adminUser?.nickname || "Адміністратор"}. Причина: ${payload.reason}. Термін дії: ${payload.until ? new Date(payload.until).toLocaleString() : 'Назавжди'}` } });
         break;
       case 'unban':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: false, banReason: null, banUntil: null } });
+        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null } });
         break;
       case 'toggleAdmin':
         const userToToggle = await prisma.user.findUnique({ where: { uid: targetUid } });
@@ -1485,6 +1518,7 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
         break;
       case 'coins':
         updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { coins: payload.exact ? payload.amount : { increment: payload.amount } } });
+        await prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Зміна балансу', message: `Адміністратор змінив ваш баланс монет. ${payload.exact ? 'Новий баланс: ' + payload.amount : 'Різниця: ' + payload.amount}` } });
         break;
       case 'farmLevel':
         updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { farmLevel: payload.level } });
@@ -1511,7 +1545,8 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
             update: { amount: { increment: payload.amount } },
             create: { userId: targetUid, cardId: payload.cardId, amount: payload.amount }
           }),
-          prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { increment: payload.amount } } })
+          prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { increment: payload.amount } } }),
+          prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Отримано картки', message: `Адміністратор видав вам картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.` } })
         ]);
         break;
       case 'removeCard':
@@ -1519,12 +1554,14 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
         if (invItem && invItem.amount <= payload.amount) {
           await prisma.$transaction([
             prisma.inventoryItem.delete({ where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } } }),
-            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: invItem.amount } } })
+            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: invItem.amount } } }),
+            prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Вилучено картки', message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${invItem.amount} шт.` } })
           ]);
         } else if (invItem) {
           await prisma.$transaction([
             prisma.inventoryItem.update({ where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } }, data: { amount: { decrement: payload.amount } } }),
-            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: payload.amount } } })
+            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: payload.amount } } }),
+            prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Вилучено картки', message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.` } })
           ]);
         }
         break;
@@ -1636,6 +1673,91 @@ app.delete('/api/admin/logs', authenticate, checkAdmin, async (req, res) => {
     await prisma.adminLog.deleteMany({});
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Помилка очищення логів." }); }
+});
+
+// ----------------------------------------
+// СПОВІЩЕННЯ (NOTIFICATIONS)
+// ----------------------------------------
+
+app.get('/api/notifications', authenticate, async (req, res) => {
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { userId: req.user.uid },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(notifications);
+  } catch (err) {
+    res.status(500).json({ error: "Помилка завантаження сповіщень." });
+  }
+});
+
+app.put('/api/notifications/:id/read', authenticate, async (req, res) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { id: req.params.id, userId: req.user.uid },
+      data: { isRead: true }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Помилка оновлення сповіщення." });
+  }
+});
+
+app.post('/api/notifications/:id/claim', authenticate, async (req, res) => {
+  try {
+    const notif = await prisma.notification.findUnique({ where: { id: req.params.id } });
+    if (!notif || notif.userId !== req.user.uid) return res.status(404).json({ error: "Сповіщення не знайдено." });
+    if (notif.type !== 'gift' || notif.isClaimed) return res.status(400).json({ error: "Подарунок вже забрано або він відсутній." });
+
+    await prisma.$transaction(async (tx) => {
+      // Відмічаємо як забране
+      await tx.notification.update({ where: { id: notif.id }, data: { isClaimed: true, isRead: true } });
+
+      // Надаємо монети
+      if (notif.attachedCoins > 0) {
+        await tx.user.update({ where: { uid: req.user.uid }, data: { coins: { increment: notif.attachedCoins } } });
+      }
+
+      // Надаємо картки
+      if (notif.attachedCardId && notif.attachedCardAmount > 0) {
+        await tx.inventoryItem.upsert({
+          where: { userId_cardId: { userId: req.user.uid, cardId: notif.attachedCardId } },
+          update: { amount: { increment: notif.attachedCardAmount } },
+          create: { userId: req.user.uid, cardId: notif.attachedCardId, amount: notif.attachedCardAmount }
+        });
+        await tx.user.update({ where: { uid: req.user.uid }, data: { totalCards: { increment: notif.attachedCardAmount } } });
+      }
+    });
+
+    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true, showcases: true, farmState: true } });
+    res.json({ success: true, profile: updatedUser });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Помилка отримання подарунку." });
+  }
+});
+
+app.post('/api/admin/notifications', authenticate, checkAdmin, async (req, res) => {
+  const { targetUid, type, title, message, attachedCoins, attachedCardId, attachedCardAmount } = req.body;
+  // type: 'update' (site update) or 'gift'
+  // targetUid: 'ALL' or specific UID
+
+  try {
+    const dataObj = { type, title, message, attachedCoins: Number(attachedCoins) || 0, attachedCardId: attachedCardId || null, attachedCardAmount: Number(attachedCardAmount) || 0 };
+
+    if (targetUid === 'ALL') {
+      const users = await prisma.user.findMany({ select: { uid: true } });
+      const notificationsData = users.map(u => ({ ...dataObj, userId: u.uid }));
+      await prisma.notification.createMany({ data: notificationsData });
+    } else {
+      await prisma.notification.create({ data: { ...dataObj, userId: targetUid } });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Помилка надсилання сповіщень." });
+  }
 });
 
 app.listen(PORT, () => {

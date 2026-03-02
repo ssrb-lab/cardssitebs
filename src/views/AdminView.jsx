@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import {
     Users, Layers, LayoutGrid, Ticket, Settings, ScrollText, Bug, Edit2,
     Trash2, Ban, Database, Loader2, ArrowLeft, Coins, Gem, Swords, Search, Filter, User,
-    Eye, CheckCircle2, CalendarDays, Gift, Zap, Trophy // <-- ДОДАНО Trophy (Досягнення)
+    Eye, CheckCircle2, CalendarDays, Gift, Zap, Trophy, Mail
 } from "lucide-react";
-import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest, fetchAdminAchievements, saveAchievementSettingsRequest, deleteAchievementSettingsRequest } from "../config/api";
+import { fetchPromosRequest, savePromoRequest, adminClearUserMarketHistoryRequest, adminClearAllMarketHistoryRequest, deletePromoRequest, saveSettingsRequest, getToken, adminResetCdRequest, savePackToDb, deletePackFromDb, saveCardToDb, deleteCardFromDb, fetchAdminUsers, fetchAdminUserInventory, adminUserActionRequest, fetchAdminLogsRequest, clearAdminLogsRequest, fetchAdminAchievements, saveAchievementSettingsRequest, deleteAchievementSettingsRequest, sendAdminNotification } from "../config/api";
 import { formatDate, getCardStyle, playCardSound } from "../utils/helpers";
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from "../config/constants";
 import PlayerAvatar from "../components/PlayerAvatar";
@@ -49,6 +49,8 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
 
     const [allPromos, setAllPromos] = useState([]);
     const [promoForm, setPromoForm] = useState({ code: "", reward: 100, maxGlobalUses: 0, maxUserUses: 1 });
+
+    const [notifForm, setNotifForm] = useState({ targetUid: "ALL", type: "update", title: "", message: "", attachedCoins: 0, attachedCardId: "", attachedCardAmount: 1 });
 
     const [packSearchTerm, setPackSearchTerm] = useState("");
     const [cardSearchTerm, setCardSearchTerm] = useState("");
@@ -500,6 +502,17 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             return wA - wB;
         });
 
+    const handleSendNotification = async (e) => {
+        e.preventDefault();
+        try {
+            await sendAdminNotification(getToken(), notifForm);
+            showToast("Сповіщення успішно надіслано!", "success");
+            setNotifForm({ targetUid: "ALL", type: "update", title: "", message: "", attachedCoins: 0, attachedCardId: "", attachedCardAmount: 1 });
+        } catch (err) {
+            showToast(err.message || "Помилка надсилання сповіщення.", "error");
+        }
+    };
+
     const saveAchievement = async (e) => {
         e.preventDefault();
         try {
@@ -638,6 +651,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                             <Swords size={18} /> Боси
                         </button>
                         <button onClick={() => setActiveTab("promos")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "promos" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Ticket size={18} /> Коди</button>
+                        <button onClick={() => setActiveTab("notifications")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "notifications" ? "bg-blue-600 text-white" : "text-blue-400/70 hover:bg-neutral-800"}`}><Mail size={18} /> Сповіщення</button>
                         <button onClick={() => setActiveTab("premiumShop")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "premiumShop" ? "bg-fuchsia-600 text-white" : "text-fuchsia-400/70 hover:bg-neutral-800"}`}><Gem size={18} /> Прем Товари</button>
                         <button onClick={() => setActiveTab("settings")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "settings" ? "bg-purple-600 text-white" : "text-neutral-400 hover:bg-neutral-800"}`}><Settings size={18} /> Налаштування</button>
                         <button onClick={() => setActiveTab("logs")} className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === "logs" ? "bg-red-900 text-white" : "text-red-400 hover:bg-neutral-800"}`}><ScrollText size={18} /> Логи</button>
@@ -806,7 +820,11 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                                     >
                                                         {u.nickname}
                                                         {isUserPremium && <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400 shrink-0" title="Преміум" />}
-                                                        {u.isBanned && <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest shrink-0">Бан</span>}
+                                                        {u.isBanned && (
+                                                            <span className="text-[10px] bg-red-900/50 text-red-400 px-2 py-0.5 rounded border border-red-800 uppercase font-black tracking-widest shrink-0 ml-1" title={u.banUntil ? `Забанено до: ${new Date(u.banUntil).toLocaleString()}` : "Бан назавжди"}>
+                                                                Бан {u.banUntil ? `до ${new Date(u.banUntil).toLocaleDateString()}` : "навсіди"}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-neutral-500 truncate">{u.email || "Приховано (Google)"}</div>
                                                 </div>
@@ -1461,6 +1479,91 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                         })}
                         {filteredCards.length === 0 && <p className="col-span-full text-center text-neutral-500 py-10">Карток не знайдено.</p>}
                     </div>
+                </div>
+            )}
+
+            {/* --- Вкладка: СПОВІЩЕННЯ --- */}
+            {activeTab === "notifications" && (
+                <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 animate-in fade-in slide-in-from-bottom-4">
+                    <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
+                        <Mail className="text-blue-500" /> Надіслати Сповіщення
+                    </h2>
+
+                    <form onSubmit={handleSendNotification} className="space-y-4 max-w-xl mx-auto">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Отримувач (Нікнейм):</label>
+                                <input
+                                    list="notif-user-list"
+                                    value={notifForm.targetUid === "ALL" ? "Всі гравці (Глобальне)" : (allUsers.find(u => u.uid === notifForm.targetUid)?.nickname || notifForm.targetUid)}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (val === "Всі гравці (Глобальне)" || val.toLowerCase() === "all" || val.toLowerCase() === "всі") {
+                                            setNotifForm({ ...notifForm, targetUid: "ALL" });
+                                        } else {
+                                            const foundUser = allUsers.find(u => u.nickname.toLowerCase() === val.toLowerCase());
+                                            if (foundUser) {
+                                                setNotifForm({ ...notifForm, targetUid: foundUser.uid });
+                                            } else {
+                                                setNotifForm({ ...notifForm, targetUid: val });
+                                            }
+                                        }
+                                    }}
+                                    placeholder="Введіть нікнейм..."
+                                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+                                />
+                                <datalist id="notif-user-list">
+                                    <option value="Всі гравці (Глобальне)" />
+                                    {allUsers.map(u => <option key={u.uid} value={u.nickname} />)}
+                                </datalist>
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Тип сповіщення:</label>
+                                <select value={notifForm.type} onChange={e => setNotifForm({ ...notifForm, type: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none">
+                                    <option value="update">Оновлення сайту</option>
+                                    <option value="gift">Подарунок</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Заголовок:</label>
+                            <input type="text" value={notifForm.title} onChange={e => setNotifForm({ ...notifForm, title: e.target.value })} required placeholder="Наприклад: Нове оновлення 1.2!" className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none" />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">Текст сповіщення:</label>
+                            <textarea value={notifForm.message} onChange={e => setNotifForm({ ...notifForm, message: e.target.value })} required placeholder="Детальний опис..." rows={4} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none resize-none"></textarea>
+                        </div>
+
+                        {notifForm.type === "gift" && (
+                            <div className="bg-green-900/10 border border-green-900/30 p-4 rounded-xl space-y-4">
+                                <h3 className="text-sm font-bold text-green-400 uppercase flex items-center gap-2"><Gift size={16} /> Вкладення до подарунку</h3>
+                                <div>
+                                    <label className="text-xs font-bold text-neutral-400 mb-1 block">Монети (за потреби):</label>
+                                    <input type="number" min="0" value={notifForm.attachedCoins} onChange={e => setNotifForm({ ...notifForm, attachedCoins: Number(e.target.value) })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-green-500 outline-none" />
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-neutral-400 mb-1 block">Картка (за потреби):</label>
+                                        <select value={notifForm.attachedCardId} onChange={e => setNotifForm({ ...notifForm, attachedCardId: e.target.value })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-green-500 outline-none">
+                                            <option value="">Без картки</option>
+                                            {cardsCatalog.map(c => <option key={c.id} value={c.id}>{c.name} ({c.rarity})</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="w-full sm:w-32">
+                                        <label className="text-xs font-bold text-neutral-400 mb-1 block">Кіл-ть карток:</label>
+                                        <input type="number" min="1" value={notifForm.attachedCardAmount} onChange={e => setNotifForm({ ...notifForm, attachedCardAmount: Number(e.target.value) })} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-green-500 outline-none" disabled={!notifForm.attachedCardId} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <button type="submit" className={`w-full font-black py-4 rounded-xl shadow-lg transition-transform transform active:scale-95 flex items-center justify-center gap-2 ${notifForm.type === 'gift' ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+                            {notifForm.type === 'gift' ? <Gift size={20} /> : <Mail size={20} />}
+                            Надіслати {notifForm.type === 'gift' ? 'Подарунок' : 'Сповіщення'}
+                        </button>
+                    </form>
                 </div>
             )}
 

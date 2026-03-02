@@ -26,6 +26,7 @@ model User {
   isBanned             Boolean  @default(false)
   banReason            String?
   banUntil             DateTime?
+  bannedBy             String?
   isPremium            Boolean  @default(false)
   premiumUntil         DateTime?
   avatarUrl            String?  @db.Text
@@ -45,6 +46,7 @@ model User {
   showcases      Showcase[]
   farmState      FarmState?
   achievements   UserAchievement[]
+  notifications  Notification[]
 }
 
 model AchievementSettings {
@@ -172,4 +174,22 @@ model AdminLog {
   userUid      String
   userNickname String
   timestamp    DateTime @default(now())
+}
+
+model Notification {
+  id                 String   @id @default(uuid())
+  type               String   // 'punishment', 'update', 'sale', 'admin_action', 'gift'
+  title              String
+  message            String   @db.Text
+  isRead             Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  
+  // Fields for gifts
+  attachedCoins      Int?     @default(0)
+  attachedCardId     String?
+  attachedCardAmount Int?     @default(0)
+  isClaimed          Boolean  @default(false)
+
+  userId             String
+  user               User     @relation(fields: [userId], references: [uid], onDelete: Cascade)
 }

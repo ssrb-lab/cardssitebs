@@ -4,7 +4,8 @@ import {
   CheckCircle2, Shield, KeyRound, Trophy, Store, Hexagon, Gem, Swords, Gift, Volume2, VolumeX
 } from "lucide-react";
 
-import { loginUser, createAdminLogRequest, registerUser, googleLoginRequest, setToken, removeToken, setMainShowcaseRequest, fetchCatalog, openPackRequest, getToken, sellCardsRequest, fetchMarket, listCardRequest, buyCardRequest, cancelListingRequest, fetchSettings, createShowcaseRequest, deleteShowcaseRequest, saveShowcaseCardsRequest } from "./config/api";
+import { loginUser, createAdminLogRequest, registerUser, googleLoginRequest, setToken, removeToken, setMainShowcaseRequest, fetchCatalog, openPackRequest, getToken, sellCardsRequest, fetchMarket, listCardRequest, buyCardRequest, cancelListingRequest, fetchSettings, createShowcaseRequest, deleteShowcaseRequest, saveShowcaseCardsRequest, fetchNotifications } from "./config/api";
+import NotificationsModal from "./components/NotificationsModal";
 import { GoogleLogin } from '@react-oauth/google';
 import { getGlobalTime, isToday } from "./utils/helpers";
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from "./config/constants";
@@ -75,6 +76,10 @@ export default function App() {
   const [listingCard, setListingCard] = useState(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
 
@@ -199,7 +204,8 @@ export default function App() {
           const data = await res.json();
 
           if (data.isBanned) {
-            setProfile(prev => ({ ...prev, isBanned: true }));
+            console.log("MARKET NOTIFICATION: BANNED=TRUE, merging data.profile", data.profile);
+            setProfile(prev => ({ ...prev, ...data.profile }));
             return;
           }
 
@@ -220,6 +226,12 @@ export default function App() {
             }
           }
         }
+
+        try {
+          const notifs = await fetchNotifications(getToken());
+          setNotifications(notifs);
+        } catch (err) { }
+
       } catch (e) {
         console.error("Помилка фонового опитування:", e);
       }
@@ -535,10 +547,28 @@ export default function App() {
 
   if (profile?.isBanned) return (
     <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center text-white">
-      <div className="bg-red-950/30 border-2 border-red-900/50 p-10 rounded-3xl max-w-md w-full">
+      <div className="bg-red-950/30 border-2 border-red-900/50 p-10 rounded-3xl max-w-md w-full animate-in zoom-in-95">
         <h1 className="text-4xl font-black mb-2 text-white">ВИ ЗАБАНЕНІ</h1>
-        <p className="text-red-400 font-bold uppercase mb-8 text-sm">Доступ обмежено</p>
-        <button onClick={handleLogout} className="w-full bg-neutral-900 text-white font-bold py-4 rounded-xl">Вийти з акаунту</button>
+        <p className="text-red-400 font-bold uppercase mb-6 text-sm">Доступ обмежено</p>
+
+        <div className="bg-black/40 rounded-xl p-4 mb-8 text-left space-y-3">
+          <div>
+            <span className="text-xs text-neutral-500 font-bold block uppercase mb-0.5">Причина блокування:</span>
+            <span className="text-white font-medium">{profile.banReason || "Причина не вказана"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs text-neutral-500 font-bold block uppercase mb-0.5">Адміністратор:</span>
+              <span className="text-white font-medium">{profile.bannedBy || "Адміністратор"}</span>
+            </div>
+            <div>
+              <span className="text-xs text-neutral-500 font-bold block uppercase mb-0.5">Бан діє до:</span>
+              <span className="text-white font-medium">{profile.banUntil ? new Date(profile.banUntil).toLocaleString() : "Назавжди"}</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleLogout} className="w-full bg-neutral-900 hover:bg-neutral-800 transition-colors text-white font-bold py-4 rounded-xl border border-neutral-800">Вийти з акаунту</button>
       </div>
     </div>
   );
@@ -618,6 +648,15 @@ export default function App() {
                 <button onClick={() => setCurrentView("profile")} className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl border border-orange-500/30"><Gift size={20} /></button>
               )}
 
+              <button onClick={() => setShowNotifications(true)} className="relative bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors" title="Сповіщення">
+                <Mail size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border border-neutral-900 shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
               <button onClick={toggleAutoSound} className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors" title={profile?.autoSoundEnabled !== false ? "Вимкнути автозвук карток" : "Увімкнути автозвук карток"}>
                 {profile?.autoSoundEnabled !== false ? <Volume2 size={20} /> : <VolumeX size={20} />}
               </button>
@@ -695,6 +734,16 @@ export default function App() {
 
       {viewingCard && <CardModal viewingCard={viewingCard} setViewingCard={setViewingCard} rarities={rarities} />}
       {listingCard && <ListingModal listingCard={listingCard} setListingCard={setListingCard} isProcessing={isProcessing} listOnMarket={listOnMarket} />}
+      {showNotifications && (
+        <NotificationsModal
+          notifications={notifications}
+          setNotifications={setNotifications}
+          onClose={() => setShowNotifications(false)}
+          getToken={getToken}
+          reloadProfile={reloadProfile}
+          showToast={showToast}
+        />
+      )}
 
       <nav className="fixed bottom-0 w-full bg-neutral-900 border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
         <div className="min-w-max mx-auto flex justify-center sm:gap-2">

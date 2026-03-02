@@ -38,6 +38,43 @@ export const setToken = (token) => localStorage.setItem('token', token);
 export const getToken = () => localStorage.getItem('token');
 export const removeToken = () => localStorage.removeItem('token');
 
+// --- СПОВІЩЕННЯ ---
+export const fetchNotifications = async (token) => {
+    const res = await fetch(`${API_URL}/notifications`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const markNotificationRead = async (token, notifId) => {
+    const res = await fetch(`${API_URL}/notifications/${notifId}/read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.json();
+};
+
+export const claimNotificationGift = async (token, notifId) => {
+    const res = await fetch(`${API_URL}/notifications/${notifId}/claim`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const sendAdminNotification = async (token, notificationData) => {
+    const res = await fetch(`${API_URL}/admin/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(notificationData)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
 // --- КАТАЛОГ ТА АДМІНКА ---
 export const fetchCatalog = async () => {
     const res = await fetch(`${API_URL}/catalog`);
