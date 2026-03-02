@@ -225,8 +225,8 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
           <div className="flex flex-wrap justify-center gap-3 w-full">
             <OpenButton amount={1} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)} opening={openingPackId === selectedPack.id || isProcessing} />
-            <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-orange-950" />
-            <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-red-950" />
+            <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-white" />
+            <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-white" />
             <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-purple-600 hover:bg-purple-500 text-white" />
             {maxPacksAffordable > 0 && (
               <OpenButton amount={maxPacksAffordable} cost={selectedPack.cost} label={`На всі (${maxPacksAffordable}x)`} onClick={() => { if (window.confirm(`Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`)) { openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable) } }} opening={openingPackId === selectedPack.id || isProcessing} color="bg-green-600 hover:bg-green-500 text-white" />
@@ -352,7 +352,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 }
 
 // Допоміжний компонент для кнопки відкриття
-function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-yellow-950", label }) {
+function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-white", label }) {
   const disabled = opening;
   return (
     <button
