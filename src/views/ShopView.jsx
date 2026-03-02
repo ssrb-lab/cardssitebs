@@ -4,7 +4,7 @@ import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import { SELL_PRICE } from "../config/constants";
 import CardFrame from "../components/CardFrame";
 
-export default function ShopView({ profile, packs, cardsCatalog, cardStats, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing, isPremiumActive }) {
+export default function ShopView({ profile, packs, cardsCatalog, cardStats, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, sellSinglePulledCard, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing, isPremiumActive }) {
 
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
@@ -148,6 +148,13 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                       {cardStats[card.id] || 0} / {card.maxSupply}
                     </div>
                   )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); sellSinglePulledCard(card); }}
+                    className="absolute top-2 left-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
+                    title="Продати картку"
+                  >
+                    <Coins size={14} className="sm:w-4 sm:h-4 w-[14px] h-[14px]" />
+                  </button>
                   {card.soundUrl && (
                     <button
                       onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}

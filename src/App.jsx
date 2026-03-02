@@ -7,7 +7,7 @@ import {
 import { loginUser, createAdminLogRequest, registerUser, googleLoginRequest, setToken, removeToken, setMainShowcaseRequest, fetchCatalog, openPackRequest, getToken, sellCardsRequest, fetchMarket, listCardRequest, buyCardRequest, cancelListingRequest, fetchSettings, createShowcaseRequest, deleteShowcaseRequest, saveShowcaseCardsRequest, fetchNotifications } from "./config/api";
 import NotificationsModal from "./components/NotificationsModal";
 import { GoogleLogin } from '@react-oauth/google';
-import { getGlobalTime, isToday } from "./utils/helpers";
+import { getGlobalTime, isToday, getCardWeight } from "./utils/helpers";
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from "./config/constants";
 
 import logo1 from "./assets/logo1.png";
@@ -388,7 +388,8 @@ export default function App() {
 
           setTimeout(() => {
             setIsRouletteSpinning(false);
-            setPulledCards(results);
+            const sortedResults = [...results].sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
+            setPulledCards(sortedResults);
             setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
             setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
             if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
@@ -400,7 +401,8 @@ export default function App() {
           }, 5000);
         } else {
           setOpeningPackId(null);
-          setPulledCards(results);
+          const sortedResults = [...results].sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
+          setPulledCards(sortedResults);
           setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
           setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
           if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
@@ -468,6 +470,39 @@ export default function App() {
       showToast(e.message || "Помилка продажу карток.");
     }
     finally { actionLock.current = false; setIsProcessing(false); }
+  };
+
+  const sellSinglePulledCard = async (card) => {
+    if (actionLock.current) return;
+
+    const countInPack = pulledCards.filter(c => c.id === card.id).length;
+    const invItem = dbInventory.find(i => i.id === card.id || i.cardId === card.id);
+    const invAmount = invItem ? invItem.amount : 0;
+
+    if (invAmount <= 1) {
+      if (!window.confirm(`Ви намагаєтесь продати картку "${card.name}", якої ще немає у вашій колекції. Продати її?`)) {
+        return;
+      }
+    }
+
+    actionLock.current = true; setIsProcessing(true);
+    try {
+      const data = await sellCardsRequest(getToken(), [{ cardId: card.id, amount: 1 }]);
+      setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      showToast(`Продано за ${data.earned} монет!`, "success");
+
+      const index = pulledCards.findIndex(c => c.id === card.id);
+      if (index !== -1) {
+        const newPulled = [...pulledCards];
+        newPulled.splice(index, 1);
+        setPulledCards(newPulled);
+      }
+    } catch (e) {
+      showToast(e.message || "Помилка продажу.");
+    } finally {
+      actionLock.current = false; setIsProcessing(false);
+    }
   };
 
   const sellDuplicate = async (cardId) => {
@@ -709,7 +744,7 @@ export default function App() {
 
       <main className="max-w-5xl w-full mx-auto p-4 mt-4 flex-grow">
         {currentView === "farm" && <FarmView profile={profile} setProfile={setProfile} cardsCatalog={cardsCatalog} showToast={showToast} bosses={bosses} rarities={rarities} />}
-        {currentView === "shop" && <ShopView profile={profile} cardStats={cardStats} packs={packsCatalog} cardsCatalog={cardsCatalog} rarities={rarities} openPack={openPack} openingPackId={openingPackId} isRouletteSpinning={isRouletteSpinning} rouletteItems={rouletteItems} pulledCards={pulledCards} setPulledCards={setPulledCards} sellPulledCards={sellPulledCards} selectedPackId={selectedPackId} setSelectedPackId={setSelectedPackId} setViewingCard={setViewingCard} isPremiumActive={isPremiumActive} isAdmin={profile?.isAdmin} isProcessing={isProcessing} />}
+        {currentView === "shop" && <ShopView profile={profile} cardStats={cardStats} packs={packsCatalog} cardsCatalog={cardsCatalog} rarities={rarities} openPack={openPack} openingPackId={openingPackId} isRouletteSpinning={isRouletteSpinning} rouletteItems={rouletteItems} pulledCards={pulledCards} setPulledCards={setPulledCards} sellPulledCards={sellPulledCards} sellSinglePulledCard={sellSinglePulledCard} selectedPackId={selectedPackId} setSelectedPackId={setSelectedPackId} setViewingCard={setViewingCard} isPremiumActive={isPremiumActive} isAdmin={profile?.isAdmin} isProcessing={isProcessing} />}
         {currentView === "premium" && <PremiumShopView profile={profile} setProfile={setProfile} user={user} premiumPrice={premiumPrice} premiumDurationDays={premiumDurationDays} premiumShopItems={premiumShopItems} showToast={showToast} isProcessing={isProcessing} setIsProcessing={setIsProcessing} addSystemLog={addSystemLog} isPremiumActive={isPremiumActive} cardsCatalog={cardsCatalog} setViewingCard={setViewingCard} rarities={rarities} cardStats={cardStats} />}
         {currentView === "inventory" && <InventoryView inventory={fullInventory} rarities={rarities} catalogTotal={cardsCatalog.length} setViewingCard={setViewingCard} setListingCard={setListingCard} packsCatalog={packsCatalog} showcases={showcases} profile={profile} cardsCatalog={cardsCatalog} cardStats={cardStats} sellDuplicate={sellDuplicate} sellAllDuplicates={sellAllDuplicates} sellEveryDuplicate={sellEveryDuplicate} sellPrice={SELL_PRICE} createShowcase={createShowcase} deleteShowcase={deleteShowcase} setMainShowcase={setMainShowcase} saveShowcaseCards={saveShowcaseCards} />}
         {currentView === "market" && <MarketView marketListings={marketListings} cardsCatalog={cardsCatalog} rarities={rarities} currentUserUid={user.uid} setViewingCard={setViewingCard} isAdmin={profile?.isAdmin} buyFromMarket={buyFromMarket} cancelMarketListing={cancelMarketListing} reloadMarket={reloadMarket} />}
