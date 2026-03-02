@@ -81,10 +81,10 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
             <div
               key={leader.uid}
               onClick={() => setViewingPlayerProfile(leader.uid)}
-              className={`flex items-center justify-between p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group ${leader.uid === currentUid ? "bg-yellow-900/10" : "hover:bg-neutral-800/80"} ${leader.isBanned ? "opacity-50" : ""}`}
+              className={`flex items-center justify-between p-2 sm:p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group ${leader.uid === currentUid ? "bg-yellow-900/10" : "hover:bg-neutral-800/80"} ${leader.isBanned ? "opacity-50" : ""}`}
             >
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 flex items-center justify-center font-black text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${realRank === 1 ? "bg-yellow-500 text-yellow-950 border-yellow-400" :
+              <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center font-black text-sm sm:text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${realRank === 1 ? "bg-yellow-500 text-yellow-950 border-yellow-400" :
                   realRank === 2 ? "bg-gray-300 text-gray-800 border-gray-100" :
                     realRank === 3 ? "bg-amber-700 text-orange-100 border-amber-600" :
                       "bg-neutral-950 text-neutral-500 border-neutral-800"
@@ -92,34 +92,34 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
                   {realRank}
                 </div>
 
-                <PlayerAvatar profile={leader} className="w-10 h-10 rounded-full shrink-0" iconSize={18} />
+                <PlayerAvatar profile={leader} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full shrink-0" iconSize={16} />
 
-                <div className="min-w-0">
-                  <div className="font-bold text-white flex items-center gap-2 text-base sm:text-lg truncate">
-                    {leader.nickname}
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-white flex items-center gap-1 sm:gap-2 text-sm sm:text-lg">
+                    <span className="truncate">{leader.nickname}</span>
 
                     {/* ДОДАЄМО ФІОЛЕТОВИЙ ДІАМАНТ ДЛЯ АДМІНІВ */}
                     {(leader.isAdmin || leader.isSuperAdmin) && (
-                      <Gem size={16} className="text-purple-500 fill-purple-500 shrink-0" title="Адміністратор" />
+                      <Gem size={14} className="text-purple-500 fill-purple-500 shrink-0 sm:w-4 sm:h-4" title="Адміністратор" />
                     )}
 
                     {/* ДОДАЄМО ІКОНКУ ДЛЯ ПРЕМІУМ АКАУНТІВ */}
                     {isUserPremium && (
-                      <Gem size={16} className="text-fuchsia-400 fill-fuchsia-400 shrink-0" title="Преміум" />
+                      <Gem size={14} className="text-fuchsia-400 fill-fuchsia-400 shrink-0 sm:w-4 sm:h-4" title="Преміум" />
                     )}
 
-                    <span className="bg-red-900/40 text-red-400 text-xs px-2 py-0.5 rounded-lg border border-red-800 flex items-center gap-1 shrink-0" title={`Рівень мисливця: ${leader.farmLevel || 1}`}>
+                    <span className="bg-red-900/40 text-red-400 text-[10px] sm:text-xs px-1 sm:px-2 py-0.5 rounded-lg border border-red-800 flex items-center gap-1 shrink-0" title={`Рівень мисливця: ${leader.farmLevel || 1}`}>
                       <Swords size={12} /> {leader.farmLevel || 1}
                     </span>
                     {leader.isBanned && <Ban size={14} className="text-red-600 shrink-0" title="Забанений" />}
-                    {leader.uid === currentUid && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full shrink-0">ВИ</span>}
+                    {leader.uid === currentUid && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full shrink-0 hidden sm:inline-block">ВИ</span>}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0 pl-2">
                 <div className="text-right">
-                  <div className="text-xs text-neutral-500 font-bold uppercase">{ratingSort === "cards" ? "Унікальні карти" : "Монети"}</div>
-                  <div className={`text-xl font-black ${ratingSort === "cards" ? "text-blue-400" : "text-yellow-500"}`}>
+                  <div className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase">{ratingSort === "cards" ? "Унікальні карти" : "Монети"}</div>
+                  <div className={`text-base sm:text-xl font-black ${ratingSort === "cards" ? "text-blue-400" : "text-yellow-500"}`}>
                     {ratingSort === "cards" ? (leader.uniqueCardsCount || 0) : (leader.coins || 0)}
                   </div>
                 </div>
