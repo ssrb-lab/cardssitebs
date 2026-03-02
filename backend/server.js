@@ -963,6 +963,80 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
   }
 });
 
+app.post('/api/game/fuse/start', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const now = new Date();
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: {
+        lastFusePlayDate: now
+      }
+    });
+
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера при старті гри Fuse Repair." });
+  }
+});
+
+app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
+  const { score } = req.body;
+
+  if (score < 1) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const now = new Date();
+    let currentDailyFarm = user.dailyFarmAmount || 0;
+
+    // Скидання денного фарму
+    if (user.lastFarmDate) {
+      const lastFarm = new Date(user.lastFarmDate);
+      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+        lastFarm.getUTCMonth() !== now.getUTCMonth() ||
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        currentDailyFarm = 0;
+      }
+    }
+
+    if (currentDailyFarm >= 500000) {
+      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+    }
+
+    // Курс: 1 поїнт рахунку (рівень) = 10 монети
+    let coinsToGive = score * 10;
+
+    if (currentDailyFarm + coinsToGive > 500000) {
+      coinsToGive = 500000 - currentDailyFarm;
+    }
+
+    const newPoints = (user.fuseRepairedPoints || 0) + score;
+    let newLevel = 1;
+    if (newPoints >= 30000) newLevel = 5;
+    else if (newPoints >= 15000) newLevel = 4;
+    else if (newPoints >= 5000) newLevel = 3;
+    else if (newPoints >= 2000) newLevel = 2;
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: {
+        coins: { increment: coinsToGive },
+        dailyFarmAmount: currentDailyFarm + coinsToGive,
+        lastFarmDate: now,
+        fuseRepairedPoints: newPoints,
+        fuseLevel: newLevel
+      }
+    });
+    res.json({ success: true, earned: coinsToGive, profile: updatedUser });
+  } catch (error) {
+    res.status(500).json({ error: "Помилка нарахування монет за Fuse Repair." });
+  }
+});
+
 
 // ----------------------------------------
 // GAME BLOCKED STATUS & SSE (Admin feature)

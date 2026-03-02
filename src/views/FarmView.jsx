@@ -3,6 +3,7 @@ import { Swords, Coins, Zap, Loader2, Timer, Lock, Unlock, Skull, ArrowLeft, Gam
 import { fetchFarmState, syncFarmHitRequest, claimFarmRewardRequest, adminResetCdRequest, getToken, fetchGameStatuses, adminToggleGameStatus } from "../config/api";
 import Game2048 from "../components/Game2048";
 import GameTetris from "../components/GameTetris";
+import GameFuse from "../components/GameFuse";
 
 export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
     const playerLevel = profile?.farmLevel || 1;
@@ -239,6 +240,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                             <button onClick={() => adminToggleBlock('boss')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('boss') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>Битва босів</button>
                             <button onClick={() => adminToggleBlock('2048')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('2048') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>2048</button>
                             <button onClick={() => adminToggleBlock('tetris')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('tetris') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>Тетріс</button>
+                            <button onClick={() => adminToggleBlock('fuse')} className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('fuse') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}>Запобіжники</button>
                         </div>
                     </div>
                 )}
@@ -289,6 +291,21 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
                         )}
                     </div>
 
+                    <div onClick={() => blockedGames.includes('fuse') ? null : setActiveGame('fuse')} className={`bg-neutral-900 border ${blockedGames.includes('fuse') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-orange-900/50 hover:border-orange-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}>
+                        <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Zap size={120} className={blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-orange-500'} />
+                        </div>
+                        <h3 className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-white'}`}>
+                            <Zap className={blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-orange-500'} /> Запобіжники
+                        </h3>
+                        <p className="text-neutral-400 text-sm mb-6 relative z-10">Шукайте пошкоджені запобіжники на платах та заробляйте монети за кожен рівень!</p>
+                        {blockedGames.includes('fuse') ? (
+                            <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2"><Lock size={16} /> Тимчасово недоступна</div>
+                        ) : (
+                            <button className="bg-orange-600/20 text-orange-400 group-hover:bg-orange-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">Ремонтувати</button>
+                        )}
+                    </div>
+
                 </div>
             </div>
         );
@@ -302,6 +319,9 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
     }
     if (activeGame === 'tetris') {
         return <GameTetris profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
+    }
+    if (activeGame === 'fuse') {
+        return <GameFuse profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;
     }
     if (activeGame === 'runner') {
         return <GameRunner profile={profile} setProfile={setProfile} goBack={() => setActiveGame(null)} showToast={showToast} />;

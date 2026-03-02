@@ -476,7 +476,26 @@ export const startTetrisGameRequest = async (token) => {
     return data;
 };
 
+export const claimFuseRewardRequest = async (token, score) => {
+    const res = await fetch(`${API_URL}/game/fuse/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ score })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
 
+export const startFuseGameRequest = async (token) => {
+    const res = await fetch(`${API_URL}/game/fuse/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
 
 export const fetchMarketHistoryRequest = async (token) => {
     const res = await fetch(`${API_URL}/profile/market-history`, {

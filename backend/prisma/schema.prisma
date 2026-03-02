@@ -40,6 +40,10 @@ model User {
   last2048PlayDate     DateTime?
   dailyTetrisAttempts  Int      @default(0)
   lastTetrisPlayDate   DateTime?
+  dailyFuseAttempts    Int      @default(0)
+  lastFusePlayDate     DateTime?
+  fuseLevel            Int      @default(1)
+  fuseRepairedPoints   Int      @default(0)
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
