@@ -88,7 +88,25 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
   }
 
   if (pulledCards && pulledCards.length > 0) {
-    const totalSellPrice = pulledCards.reduce((acc, c) => acc + (c.sellPrice ? Number(c.sellPrice) : SELL_PRICE), 0);
+    const countsMap = {};
+    pulledCards.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
+
+    let duplicateSellPrice = 0;
+    let hasDuplicates = false;
+
+    Object.entries(countsMap).forEach(([id, pulledAmount]) => {
+      const invItem = profile?.inventory?.find(i => i.cardId === id || i.id === id);
+      const invAmount = invItem ? invItem.amount : 0;
+      const duplicateCount = Math.max(0, invAmount - 1);
+      const sellAmount = Math.min(pulledAmount, duplicateCount);
+
+      if (sellAmount > 0) {
+        hasDuplicates = true;
+        const cardDef = pulledCards.find(c => c.id === id);
+        const price = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
+        duplicateSellPrice += price * sellAmount;
+      }
+    });
 
     return (
       <div className="flex flex-col items-center min-h-[65vh] animate-in zoom-in-95 duration-700 w-full pb-10">
@@ -160,10 +178,10 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
           </button>
           <button
             onClick={sellPulledCards}
-            disabled={isProcessing}
+            disabled={isProcessing || !hasDuplicates}
             className="px-8 py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2"
           >
-            Продати всі (+{totalSellPrice} <Coins size={16} />)
+            Продати дублікати (+{duplicateSellPrice} <Coins size={16} />)
           </button>
         </div>
       </div>

@@ -423,21 +423,49 @@ export default function App() {
     if (actionLock.current || pulledCards.length === 0) return;
     actionLock.current = true; setIsProcessing(true);
 
-    const cardsToSell = [...pulledCards];
-    setPulledCards([]);
-
     const countsMap = {};
-    cardsToSell.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
-    const itemsToSell = Object.entries(countsMap).map(([id, amount]) => ({ cardId: id, amount }));
+    pulledCards.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
+
+    const itemsToSell = [];
+
+    for (const [id, pulledAmount] of Object.entries(countsMap)) {
+      const invItem = dbInventory.find(i => i.id === id || i.cardId === id);
+      const invAmount = invItem ? invItem.amount : 0;
+
+      const duplicateCount = Math.max(0, invAmount - 1);
+      const sellAmount = Math.min(pulledAmount, duplicateCount);
+
+      if (sellAmount > 0) {
+        itemsToSell.push({ cardId: id, amount: sellAmount });
+      }
+    }
+
+    if (itemsToSell.length === 0) {
+      showToast("Серед отриманих карток немає дублікатів!", "error");
+      actionLock.current = false; setIsProcessing(false);
+      return;
+    }
 
     try {
       const data = await sellCardsRequest(getToken(), itemsToSell);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
-      showToast(`Успішно продано всі отримані картки! Отримано ${data.earned} монет.`, "success");
+      showToast(`Успішно продано дублікати! Отримано ${data.earned} монет.`, "success");
+
+      const newPulledCards = [];
+      const soldMap = {};
+      itemsToSell.forEach(item => { soldMap[item.cardId] = item.amount; });
+
+      pulledCards.forEach(c => {
+        if (soldMap[c.id] > 0) {
+          soldMap[c.id]--;
+        } else {
+          newPulledCards.push(c);
+        }
+      });
+      setPulledCards(newPulledCards);
     } catch (e) {
       showToast(e.message || "Помилка продажу карток.");
-      setPulledCards(cardsToSell);
     }
     finally { actionLock.current = false; setIsProcessing(false); }
   };
