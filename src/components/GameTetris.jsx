@@ -427,34 +427,34 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
     const renderBoard = getRenderBoard();
 
     return (
-        <div className="pb-4 sm:pb-10 animate-in fade-in zoom-in-95 w-full h-full max-w-lg mx-auto flex flex-col items-center justify-center relative select-none">
-            <div className="flex w-full justify-between items-center mb-2 sm:mb-4 px-2 sm:px-0">
-                <button onClick={goBack} disabled={isProcessing} className="flex items-center gap-1 sm:gap-2 text-neutral-400 hover:text-white font-bold transition-colors text-sm sm:text-base">
-                    <ArrowLeft size={18} /> Покинути
+        <div className="pb-1 sm:pb-10 animate-in fade-in zoom-in-95 w-full h-full max-w-lg mx-auto flex flex-col items-center justify-start sm:justify-center relative select-none pt-1 sm:pt-0">
+            <div className="flex w-full justify-between items-center mb-1 sm:mb-4 px-1 sm:px-0">
+                <button onClick={goBack} disabled={isProcessing} className="flex items-center gap-1 sm:gap-2 text-neutral-400 hover:text-white font-bold transition-colors text-xs sm:text-base">
+                    <ArrowLeft size={16} className="sm:w-5 sm:h-5" /> Покинути
                 </button>
                 <div className="flex gap-1 sm:gap-2">
-                    <button onClick={() => setIsPaused(!isPaused)} disabled={gameOver || isProcessing} className="flex items-center gap-1 sm:gap-2 text-yellow-400 hover:text-yellow-300 font-bold transition-colors bg-yellow-900/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-yellow-900/50 text-xs sm:text-base">
+                    <button onClick={() => setIsPaused(!isPaused)} disabled={gameOver || isProcessing} className="flex items-center gap-1 sm:gap-2 text-yellow-400 hover:text-yellow-300 font-bold transition-colors bg-yellow-900/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-yellow-900/50 text-[10px] sm:text-base">
                         {isPaused ? "Продовжити" : "Пауза"}
                     </button>
-                    <button onClick={startGame} disabled={isProcessing} className="flex items-center gap-1 sm:gap-2 text-blue-400 hover:text-blue-300 font-bold transition-colors bg-blue-900/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-blue-900/50 text-xs sm:text-base">
-                        <RotateCcw size={14} /> Рестарт
+                    <button onClick={startGame} disabled={isProcessing} className="flex items-center gap-1 sm:gap-2 text-blue-400 hover:text-blue-300 font-bold transition-colors bg-blue-900/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-blue-900/50 text-[10px] sm:text-base">
+                        <RotateCcw size={12} className="sm:w-4 sm:h-4" /> Рестарт
                     </button>
                 </div>
             </div>
 
-            <div className="flex w-full justify-between items-center mb-4 sm:mb-6 bg-neutral-900 border border-neutral-800 p-2 sm:p-4 rounded-2xl px-4">
+            <div className="flex w-full justify-between items-center mb-2 sm:mb-6 bg-neutral-900 border border-neutral-800 p-1.5 sm:p-4 rounded-xl sm:rounded-2xl px-2 sm:px-4">
                 <div>
-                    <div className="text-[10px] sm:text-xs text-neutral-500 uppercase font-bold mb-0.5 sm:mb-1">Рахунок</div>
-                    <div className="text-xl sm:text-2xl font-black text-white glow-text glow-blue">{score}</div>
+                    <div className="text-[9px] sm:text-xs text-neutral-500 uppercase font-bold mb-0 sm:mb-1">Рахунок</div>
+                    <div className="text-base sm:text-2xl font-black text-white glow-text glow-blue leading-none">{score}</div>
                 </div>
                 <div className="text-center">
-                    <div className="text-[10px] sm:text-xs text-neutral-500 uppercase font-bold mb-0.5 sm:mb-1">Час грає</div>
-                    <div className="text-lg sm:text-xl font-bold text-neutral-300 font-mono tracking-wider">{formatTime(timeElapsed)}</div>
+                    <div className="text-[9px] sm:text-xs text-neutral-500 uppercase font-bold mb-0 sm:mb-1">Час грає</div>
+                    <div className="text-sm sm:text-xl font-bold text-neutral-300 font-mono tracking-wider leading-none">{formatTime(timeElapsed)}</div>
                 </div>
                 <div className="text-right">
-                    <div className="text-[10px] sm:text-xs text-neutral-500 uppercase font-bold mb-0.5 sm:mb-1">Нагорода</div>
-                    <div className="text-lg sm:text-xl font-black text-yellow-500 flex items-center gap-1 justify-end glow-text glow-yellow">
-                        {score * 6} <Coins size={16} />
+                    <div className="text-[9px] sm:text-xs text-neutral-500 uppercase font-bold mb-0 sm:mb-1">Нагорода</div>
+                    <div className="text-sm sm:text-xl font-black text-yellow-500 flex items-center gap-1 justify-end glow-text glow-yellow leading-none">
+                        {score * 6} <Coins size={12} className="sm:w-4 sm:h-4" />
                     </div>
                 </div>
             </div>
@@ -483,8 +483,8 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
                             style={{
                                 gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
                                 gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
-                                width: 'min(50vh, 85vw, 300px)',
-                                height: 'min(100vh, 170vw, 600px)', // aspect ratio 1:2
+                                width: 'min(40vh, 85vw, 300px)',
+                                height: 'min(80vh, 170vw, 600px)', // aspect ratio 1:2
                                 gap: '1px' // This gap perfectly aligns with the background grid
                             }}
                         >
@@ -517,43 +517,43 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
                 </div>
             </div>
 
-            <div className="mt-4 sm:mt-8 mb-2 sm:mb-4 px-4 w-full max-w-[280px] sm:max-w-xs mx-auto">
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 touch-manipulation">
+            <div className="mt-2 sm:mt-8 mb-1 sm:mb-4 px-2 w-full max-w-[240px] sm:max-w-xs mx-auto">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-3 touch-manipulation">
                     <div className="col-start-2">
                         <button
                             onPointerDown={tryRotate}
-                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
+                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-lg sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
                             style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                            <ArrowUp size={24} className="sm:w-8 sm:h-8" />
+                            <ArrowUp size={20} className="sm:w-8 sm:h-8" />
                         </button>
                     </div>
 
                     <div className="col-start-1 row-start-2">
                         <button
                             onPointerDown={moveLeft}
-                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
+                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-lg sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
                             style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                            <LeftIcon size={24} className="sm:w-8 sm:h-8" />
+                            <LeftIcon size={20} className="sm:w-8 sm:h-8" />
                         </button>
                     </div>
                     <div className="col-start-2 row-start-2">
                         <button
                             onPointerDown={moveDown}
-                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
+                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-lg sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
                             style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                            <ArrowDown size={24} className="sm:w-8 sm:h-8" />
+                            <ArrowDown size={20} className="sm:w-8 sm:h-8" />
                         </button>
                     </div>
                     <div className="col-start-3 row-start-2">
                         <button
                             onPointerDown={moveRight}
-                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
+                            className="w-full aspect-square bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 rounded-lg sm:rounded-2xl flex items-center justify-center text-white shadow-lg active:scale-95 transition-all outline-none"
                             style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
-                            <RightIcon size={24} className="sm:w-8 sm:h-8" />
+                            <RightIcon size={20} className="sm:w-8 sm:h-8" />
                         </button>
                     </div>
                 </div>
