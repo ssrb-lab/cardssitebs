@@ -92,6 +92,7 @@ model CardCatalog {
   soundVolume Float    @default(0.5)
   weight      Float?
   frame       String?  @default("normal")
+  isGame      Boolean  @default(false)
 
   inventoryItems InventoryItem[]
   marketListings MarketListing[]
@@ -105,12 +106,14 @@ model PackCatalog {
   image         String  @db.Text
   isHidden      Boolean @default(false)
   isPremiumOnly Boolean @default(false)
-  customWeights Json?   
+  customWeights Json?
+  isGame        Boolean @default(false)
 }
 
 model InventoryItem {
   id     String @id @default(uuid())
   amount Int    @default(1)
+  gameStats Json? @default("[]")
   
   userId String
   user   User   @relation(fields: [userId], references: [uid], onDelete: Cascade)
@@ -127,6 +130,7 @@ model MarketListing {
   status    String   @default("active")
   createdAt DateTime @default(now())
   soldAt    DateTime?
+  power     Int?
 
   sellerId  String
   seller    User     @relation(fields: [sellerId], references: [uid], onDelete: Cascade)

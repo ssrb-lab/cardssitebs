@@ -89,6 +89,12 @@ export default function MarketView({ marketListings, cardsCatalog, rarities, cur
                               <User size={10} /> {listing.sellerNickname}
                            </div>
 
+                           {listing.power && (
+                              <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 mb-2 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-green-400">
+                                 Сила: {listing.power}
+                              </div>
+                           )}
+
                            {isMine ? (
                               <button onClick={() => cancelMarketListing(listing)} className="w-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold py-2 rounded-lg transition-colors border border-red-800">
                                  Зняти з продажу

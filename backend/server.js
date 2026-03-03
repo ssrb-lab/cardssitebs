@@ -568,7 +568,7 @@ app.post('/api/admin/cards', authenticate, checkAdmin, async (req, res) => {
     const data = req.body;
 
     // Переконуємося, що frame передається правильно (fallback на "normal")
-    const cardData = { ...data, frame: data.frame || "normal" };
+    const cardData = { ...data, frame: data.frame || "normal", isGame: Boolean(data.isGame) };
 
     const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
     let card;
@@ -598,12 +598,13 @@ app.delete('/api/admin/cards/:id', authenticate, checkAdmin, async (req, res) =>
 app.post('/api/admin/packs', authenticate, checkAdmin, async (req, res) => {
   try {
     const data = req.body;
-    const existing = await prisma.packCatalog.findUnique({ where: { id: data.id } });
+    const packData = { ...data, isGame: Boolean(data.isGame) };
+    const existing = await prisma.packCatalog.findUnique({ where: { id: packData.id } });
     let pack;
     if (existing) {
-      pack = await prisma.packCatalog.update({ where: { id: data.id }, data });
+      pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
     } else {
-      pack = await prisma.packCatalog.create({ data });
+      pack = await prisma.packCatalog.create({ data: packData });
     }
     res.json(pack);
   } catch (error) {
@@ -660,6 +661,21 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     let localPulledCounts = {};
     availableCards.forEach(c => localPulledCounts[c.id] = c.pulledCount || 0);
 
+    const generatePower = (rarity) => {
+      let min = 0, max = 0;
+      switch (rarity) {
+        case "Унікальна": min = 100; max = 150; break;
+        case "Легендарна": min = 50; max = 125; break;
+        case "Епічна": min = 25; max = 100; break;
+        case "Рідкісна": min = 10; max = 80; break;
+        case "Звичайна": min = 5; max = 50; break;
+        default: return null;
+      }
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+
+    let cardStatsToAdd = {}; // { cardId: [power1, power2, ...] }
+
     for (let i = 0; i < amount; i++) {
       if (availableCards.length === 0) break; // Якщо всі картки закінчились під час відкриття
 
@@ -693,8 +709,18 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         if (rand <= sum) { newCard = item.card; break; }
       }
 
-      results.push(newCard);
+      let generatedPower = null;
+      if (pack.isGame || newCard.isGame) {
+        generatedPower = generatePower(newCard.rarity);
+      }
+
+      results.push({ ...newCard, generatedPower });
       countsMap[newCard.id] = (countsMap[newCard.id] || 0) + 1;
+      if (generatedPower !== null) {
+        if (!cardStatsToAdd[newCard.id]) cardStatsToAdd[newCard.id] = [];
+        cardStatsToAdd[newCard.id].push(generatedPower);
+      }
+
       localPulledCounts[newCard.id] += 1;
       totalEarnedCoins += (newCard.sellPrice || 15);
 
@@ -718,10 +744,23 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       });
 
       for (const [cardId, count] of Object.entries(countsMap)) {
+        const existingInv = await tx.inventoryItem.findUnique({
+          where: { userId_cardId: { userId: user.uid, cardId: cardId } }
+        });
+
+        let currentStats = [];
+        if (existingInv && existingInv.gameStats) {
+          currentStats = typeof existingInv.gameStats === 'string' ? JSON.parse(existingInv.gameStats) : existingInv.gameStats;
+        }
+
+        if (cardStatsToAdd[cardId]) {
+          currentStats = [...currentStats, ...cardStatsToAdd[cardId]];
+        }
+
         await tx.inventoryItem.upsert({
           where: { userId_cardId: { userId: user.uid, cardId: cardId } },
-          update: { amount: { increment: count } },
-          create: { userId: user.uid, cardId: cardId, amount: count }
+          update: { amount: { increment: count }, gameStats: currentStats },
+          create: { userId: user.uid, cardId: cardId, amount: count, gameStats: currentStats }
         });
         await tx.cardCatalog.update({
           where: { id: cardId },
@@ -771,7 +810,8 @@ app.get('/api/game/market', async (req, res) => {
       status: l.status,
       createdAt: l.createdAt,
       sellerUid: l.sellerId,
-      sellerNickname: l.seller.nickname
+      sellerNickname: l.seller.nickname,
+      power: l.power
     }));
     res.json(formatted);
   } catch (error) {
@@ -781,7 +821,7 @@ app.get('/api/game/market', async (req, res) => {
 
 // 2. Виставити картку на продаж
 app.post('/api/game/market/list', authenticate, async (req, res) => {
-  const { cardId, price } = req.body;
+  const { cardId, price, power } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     const invItem = await prisma.inventoryItem.findUnique({ where: { userId_cardId: { userId: user.uid, cardId } } });
@@ -790,23 +830,46 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
     if (price < 1 || !Number.isInteger(price)) return res.status(400).json({ error: "Невірна ціна!" });
 
     await prisma.$transaction(async (tx) => {
+      let statsArray = [];
+      if (invItem.gameStats) {
+        statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+      }
+
+      let removedPower = null;
+      if (power !== undefined && power !== null) {
+        const parsedPower = Number(power);
+        const powerIndex = statsArray.findIndex(p => Number(p) === parsedPower);
+        if (powerIndex > -1) {
+          removedPower = statsArray.splice(powerIndex, 1)[0];
+        } else if (statsArray.length > 0) {
+          // Fallback: power not found exactly (possible data mismatch), remove closest
+          statsArray.sort((a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower));
+          removedPower = statsArray.splice(0, 1)[0];
+        } else {
+          removedPower = power; // no stats tracked, just use provided value
+        }
+      } else if (statsArray.length > 0) {
+        statsArray.sort((a, b) => Number(b) - Number(a)); // від найсильнішої до найслабшої
+        removedPower = statsArray.splice(statsArray.length - 1, 1)[0]; // забираємо найслабшу
+      }
+
       if (invItem.amount === 1) {
         await tx.inventoryItem.delete({ where: { userId_cardId: { userId: user.uid, cardId } } });
         await sanitizeShowcases(tx, user.uid, cardId, 0);
       } else {
-        await tx.inventoryItem.update({ where: { userId_cardId: { userId: user.uid, cardId } }, data: { amount: { decrement: 1 } } });
+        await tx.inventoryItem.update({ where: { userId_cardId: { userId: user.uid, cardId } }, data: { amount: { decrement: 1 }, gameStats: statsArray } });
         await sanitizeShowcases(tx, user.uid, cardId, invItem.amount - 1);
       }
       await tx.user.update({ where: { uid: user.uid }, data: { totalCards: { decrement: 1 } } });
       await tx.marketListing.create({
-        data: { price: Number(price), sellerId: user.uid, cardId: cardId, status: "active" }
+        data: { price: Number(price), sellerId: user.uid, cardId: cardId, status: "active", power: removedPower }
       });
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка виставлення на ринок." });
+    res.status(500).json({ error: error.message || "Помилка виставлення на ринок." });
   }
 });
 
@@ -824,10 +887,21 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
     await prisma.$transaction(async (tx) => {
       // Покупець: -монети, +картка, +totalCards
       await tx.user.update({ where: { uid: buyer.uid }, data: { coins: { decrement: listing.price }, totalCards: { increment: 1 } } });
+
+      const buyerInv = await tx.inventoryItem.findUnique({ where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } } });
+      let currentStats = [];
+      if (buyerInv && buyerInv.gameStats) {
+        currentStats = typeof buyerInv.gameStats === 'string' ? JSON.parse(buyerInv.gameStats) : buyerInv.gameStats;
+      }
+
+      if (listing.power !== null) {
+        currentStats.push(listing.power);
+      }
+
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } },
-        update: { amount: { increment: 1 } },
-        create: { userId: buyer.uid, cardId: listing.cardId, amount: 1 }
+        update: { amount: { increment: 1 }, gameStats: currentStats },
+        create: { userId: buyer.uid, cardId: listing.cardId, amount: 1, gameStats: currentStats }
       });
       // Продавець: +монети
       await tx.user.update({ where: { uid: listing.sellerId }, data: { coins: { increment: listing.price } } });
@@ -879,10 +953,21 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
     await prisma.$transaction(async (tx) => {
       await tx.marketListing.delete({ where: { id: listingId } });
       await tx.user.update({ where: { uid: listing.sellerId }, data: { totalCards: { increment: 1 } } });
+
+      const sellerInv = await tx.inventoryItem.findUnique({ where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } } });
+      let currentStats = [];
+      if (sellerInv && sellerInv.gameStats) {
+        currentStats = typeof sellerInv.gameStats === 'string' ? JSON.parse(sellerInv.gameStats) : sellerInv.gameStats;
+      }
+
+      if (listing.power !== null) {
+        currentStats.push(listing.power);
+      }
+
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
-        update: { amount: { increment: 1 } },
-        create: { userId: listing.sellerId, cardId: listing.cardId, amount: 1 }
+        update: { amount: { increment: 1 }, gameStats: currentStats },
+        create: { userId: listing.sellerId, cardId: listing.cardId, amount: 1, gameStats: currentStats }
       });
     });
 
@@ -2051,6 +2136,38 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
         });
 
         if (invItem && invItem.amount >= item.amount) {
+          let statsArray = [];
+          if (invItem.gameStats) {
+            statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+          }
+
+          // If a specific power is requested to sell
+          if (item.power !== undefined && item.power !== null) {
+            const parsedPower = Number(item.power);
+            const powerIndex = statsArray.findIndex(p => Number(p) === parsedPower);
+            if (powerIndex > -1) {
+              statsArray.splice(powerIndex, 1);
+            } else if (statsArray.length > 0) {
+              // Fallback: power not found (data mismatch), remove closest match
+              statsArray.sort((a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower));
+              statsArray.splice(0, 1);
+            }
+            // else: no gameStats tracked, skip
+          } else {
+            // Продати без конкретної сили: залишити найсильнішу (якщо після продажу залишається >= 1 картка)
+            if (statsArray.length > 0) {
+              const remainingAmount = invItem.amount - item.amount; // скільки карток лишається
+              if (remainingAmount <= 0) {
+                // Продаємо всі — очищуємо gameStats
+                statsArray.splice(0, statsArray.length);
+              } else {
+                // Залишаємо remainingAmount найсильніших, видаляємо слабші
+                statsArray.sort((a, b) => Number(b) - Number(a)); // від найсильнішої до найслабшої
+                statsArray.splice(remainingAmount); // видаляємо все після remainingAmount
+              }
+            }
+          }
+
           if (invItem.amount === item.amount) {
             await tx.inventoryItem.delete({
               where: { userId_cardId: { userId: user.uid, cardId: item.cardId } }
@@ -2059,7 +2176,7 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
           } else {
             await tx.inventoryItem.update({
               where: { userId_cardId: { userId: user.uid, cardId: item.cardId } },
-              data: { amount: { decrement: item.amount } }
+              data: { amount: { decrement: item.amount }, gameStats: statsArray }
             });
             await sanitizeShowcases(tx, user.uid, item.cardId, invItem.amount - item.amount);
           }

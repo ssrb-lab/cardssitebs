@@ -3,6 +3,30 @@ import { LayoutGrid, Star, Zap, Coins, PackageOpen, Trash2, GripHorizontal, Arro
 import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import CardFrame from "../components/CardFrame";
 
+// Мінімальна сила за рідкістю для старих карток без записаної сили
+const RARITY_MIN_POWER = {
+  "Унікальна": 100,
+  "Легендарна": 50,
+  "Епічна": 25,
+  "Рідкісна": 10,
+  "Звичайна": 5,
+};
+
+// Повертає масив об'єктів { value, isRecorded } для картки.
+// isRecorded=false: сила не записана в БД (мінімальний заповнювач).
+function getEffectivePowers(item, packsCatalog = []) {
+  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map(Number) : [];
+  const pack = packsCatalog.find(p => p.id === item.card.packId);
+  const isGameCard = item.card.isGame || (pack && pack.isGame) || recorded.length > 0;
+  if (!isGameCard) return [];
+  const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
+  const powers = recorded.map(v => ({ value: v, isRecorded: true }));
+  while (powers.length < item.amount) {
+    powers.push({ value: minPower, isRecorded: false });
+  }
+  return powers;
+}
+
 export default function InventoryView({
   inventory, rarities, sellDuplicate, sellAllDuplicates, sellEveryDuplicate,
   sellPrice, catalogTotal, setViewingCard, setListingCard, packsCatalog,
@@ -19,6 +43,9 @@ export default function InventoryView({
   const [selectedShowcaseId, setSelectedShowcaseId] = useState(null);
   const [builderCards, setBuilderCards] = useState([]);
 
+  // Стейт для вікна дублікатів ігрових карток
+  const [viewingGameCard, setViewingGameCard] = useState(null);
+
   const categories = ["all", ...new Set(packsCatalog.map(p => p.category || "Базові"))];
   const relevantPacks = filterCategory === "all" ? packsCatalog : packsCatalog.filter(p => (p.category || "Базові") === filterCategory);
 
@@ -32,6 +59,13 @@ export default function InventoryView({
   });
 
   filteredInventory.sort((a, b) => {
+    if (sortBy === "power") {
+      const getPower = (item) => {
+        const powers = getEffectivePowers(item, packsCatalog) || [];
+        return powers.length > 0 ? Math.max(...powers) : 0;
+      };
+      return getPower(b) - getPower(a);
+    }
     if (sortBy === "rarity") return getCardWeight(a.card.rarity, rarities) - getCardWeight(b.card.rarity, rarities);
     if (sortBy === "amount") return b.amount - a.amount;
     if (sortBy === "name") return a.card.name.localeCompare(b.card.name);
@@ -158,6 +192,7 @@ export default function InventoryView({
 
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-neutral-950 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800 h-full">
                 <option value="rarity">За Рідкістю</option>
+                <option value="power">За Силою</option>
                 <option value="pack">За Паком</option>
                 <option value="amount">За Дублікатами</option>
                 <option value="name">За Алфавітом</option>
@@ -177,75 +212,95 @@ export default function InventoryView({
                 const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
                 const currentSellPrice = item.card.sellPrice ? Number(item.card.sellPrice) : sellPrice;
 
-                return (
-                  <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}>
-                    <div onClick={() => setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border}`}>
-                      {Number(item.card.maxSupply) > 0 && (
-                        <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
-                          {item.card.maxSupply}
-                        </div>
-                      )}
-                      {item.amount > 1 && (
-                        <div className="absolute top-2 right-2 bg-neutral-950/90 backdrop-blur text-white font-black text-xs px-3 py-1.5 rounded-full z-10 border border-neutral-700 shadow-xl">
-                          x{item.amount}
-                        </div>
-                      )}
-                      <CardFrame frame={item.card.frame}>
-                        <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                      </CardFrame>
-                      {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
+                return (() => {
+                  const powers = getEffectivePowers(item, packsCatalog);
+                  const isGameItem = powers.length > 0;
+                  const powerValues = powers.map(p => p.value);
+                  return (
+                    <div key={item.card.id} className="flex flex-col items-center group cursor-pointer animate-in fade-in zoom-in-95 duration-500" style={{ animationDelay: `${index * 15}ms`, fillMode: "backwards" }}>
+                      <div onClick={() => isGameItem ? setViewingGameCard({ ...item, _effectivePowers: powerValues }) : setViewingCard({ card: item.card, amount: item.amount })} className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border}`}>
+                        {Number(item.card.maxSupply) > 0 && (
+                          <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
+                            {item.card.maxSupply}
+                          </div>
+                        )}
+                        {item.amount > 1 && (
+                          <div className="absolute top-2 right-2 bg-neutral-950/90 backdrop-blur text-white font-black text-xs px-3 py-1.5 rounded-full z-10 border border-neutral-700 shadow-xl">
+                            x{item.amount}
+                          </div>
+                        )}
+                        <CardFrame frame={item.card.frame}>
+                          <img src={item.card.image} alt={item.card.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                        </CardFrame>
+                        {item.card.effect && <div className={`${item.card.effect} pointer-events-none z-10`} />}
 
-                      {item.card.soundUrl && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); playCardSound(item.card.soundUrl, item.card.soundVolume); }}
-                          className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
-                          title="Відтворити звук"
-                        >
-                          <Volume2 size={12} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="w-full flex flex-col items-center text-center px-1">
-                      <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${style.text}`}>{item.card.rarity}</div>
-                      <div className="font-bold text-sm leading-tight text-white mb-3 line-clamp-1 w-full group-hover:text-yellow-100 transition-colors" title={item.card.name}>{item.card.name}</div>
+                        {item.card.soundUrl && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); playCardSound(item.card.soundUrl, item.card.soundVolume); }}
+                            className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                            title="Відтворити звук"
+                          >
+                            <Volume2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="w-full flex flex-col items-center text-center px-1">
+                        <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${style.text}`}>{item.card.rarity}</div>
+                        <div className="font-bold text-sm leading-tight text-white mb-1 line-clamp-1 w-full group-hover:text-yellow-100 transition-colors" title={item.card.name}>{item.card.name}</div>
 
-                      {item.amount > 1 ? (
-                        <div className="w-full flex flex-col gap-1.5">
-                          {Number(item.card.maxSupply) === 0 ? (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); sellDuplicate(item.card.id); }} className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-neutral-200 font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                                Продати (+{currentSellPrice} <Coins size={10} className="inline text-yellow-500" />)
-                              </button>
-                              <div className="flex gap-1.5 w-full">
+                        {isGameItem && (
+                          <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-green-400 mb-2 mt-0.5">
+                            <Zap size={10} />
+                            {powers.length === 1
+                              ? `Сила: ${powers[0].value}`
+                              : `Сила: ${Math.min(...powers.map(p => p.value))}–${Math.max(...powers.map(p => p.value))}`
+                            }
+                          </div>
+                        )}
+
+                        {item.amount > 1 ? (
+                          <div className="w-full flex flex-col gap-1.5">
+                            {!isGameItem ? (
+                              <>
+                                <button onClick={(e) => { e.stopPropagation(); sellDuplicate(item.card.id); }} className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-neutral-200 font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                                  Продати (+{currentSellPrice} <Coins size={10} className="inline text-yellow-500" />)
+                                </button>
+                                <div className="flex gap-1.5 w-full">
+                                  {item.amount > 2 && (
+                                    <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
+                                      Всі (-1)
+                                    </button>
+                                  )}
+                                  <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-[10px] py-1.5 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                                    На Ринок
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 w-full">
+                                <button onClick={(e) => { e.stopPropagation(); setViewingGameCard({ ...item, _effectivePowers: powers }); }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-[10px] py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                                  Управління (Ігрова)
+                                </button>
                                 {item.amount > 2 && (
-                                  <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Залишити лише 1">
-                                    Всі (-1)
+                                  <button onClick={(e) => { e.stopPropagation(); sellAllDuplicates(item.card.id); }} className="w-full bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50" title="Продати всі дублікати, залишити найсильнішу">
+                                    Всі (-1) 🗡
                                   </button>
                                 )}
-                                <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-[10px] py-1.5 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
-                                  На Ринок
-                                </button>
                               </div>
-                            </>
-                          ) : (
-                            <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-[10px] py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
-                              На Ринок
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-full flex flex-col gap-1.5">
-                          <div className="w-full text-xs py-1.5 text-neutral-500 font-medium">
-                            Один екземпляр
+                            )}
                           </div>
-                          <button onClick={(e) => { e.stopPropagation(); setListingCard(item.card); }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
-                            Виставити на Ринок
-                          </button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full flex flex-col gap-1.5">
+                            <div className="w-full text-xs py-1.5 text-neutral-500 font-medium">Один екземпляр</div>
+                            <button onClick={(e) => { e.stopPropagation(); isGameItem ? setViewingGameCard({ ...item, _effectivePowers: powers }) : setListingCard(item.card); }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                              {isGameItem ? "Управління (Ігрова)" : "Виставити на Ринок"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                })();
               })}
             </div>
           )}
@@ -391,6 +446,64 @@ export default function InventoryView({
         </div>
       )}
 
-    </div>
+      {/* Модал дублікатів ігрових карток */}
+      {viewingGameCard && (() => {
+        const powers = getEffectivePowers(viewingGameCard, packsCatalog);
+        const price = viewingGameCard.card.sellPrice ? Number(viewingGameCard.card.sellPrice) : sellPrice;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => setViewingGameCard(null)}>
+            <div className="bg-neutral-900 border border-neutral-700 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b border-neutral-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
+                <h3 className="text-xl font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                  <Zap className="text-green-500" /> {viewingGameCard.card.name} ({viewingGameCard.amount} шт.)
+                </h3>
+                <button onClick={() => setViewingGameCard(null)} className="text-neutral-500 hover:text-white transition-colors p-2 text-xl">✕</button>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {powers.map((powerObj, idx) => {
+                    const powerVal = powerObj.value;
+                    const isRec = powerObj.isRecorded;
+                    return (
+                      <div key={idx} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center text-center">
+                        <div className="text-4xl font-black text-green-400 mb-1 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]">
+                          {powerVal}
+                        </div>
+                        <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest mb-4">
+                          {isRec ? 'Сила Картки' : 'Сила (базова)'}
+                        </div>
+                        <div className="flex flex-col gap-2 w-full mt-auto">
+                          <button onClick={() => {
+                            sellDuplicate(viewingGameCard.card.id, isRec ? powerVal : undefined);
+                            const newPowers = [...powers];
+                            newPowers.splice(idx, 1);
+                            if (viewingGameCard.amount <= 1) {
+                              setViewingGameCard(null);
+                            } else {
+                              setViewingGameCard({ ...viewingGameCard, amount: viewingGameCard.amount - 1, gameStats: newPowers.filter(p => p.isRecorded).map(p => p.value) });
+                            }
+                          }} className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-white font-bold transition-all">
+                            Продати (+{price} <Coins size={10} className="inline text-yellow-500" />)
+                          </button>
+                          <button onClick={() => {
+                            setListingCard({ ...viewingGameCard.card, targetPowerToSell: isRec ? powerVal : null });
+                            setViewingGameCard(null);
+                          }} className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50">
+                            На Ринок
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()
+      }
+
+    </div >
   );
 }

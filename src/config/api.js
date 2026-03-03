@@ -147,11 +147,11 @@ export const fetchMarket = async () => {
     return data;
 };
 
-export const listCardRequest = async (token, cardId, price) => {
+export const listCardRequest = async (token, cardId, price, power = null) => {
     const res = await fetch(`${API_URL}/game/market/list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ cardId, price })
+        body: JSON.stringify({ cardId, price, power })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);

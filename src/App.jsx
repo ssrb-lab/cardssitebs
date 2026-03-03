@@ -134,7 +134,7 @@ export default function App() {
           setUser({ uid: userData.uid, email: userData.email });
           setProfile(userData);
           if (userData.inventory) {
-            setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+            setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats || [] })));
           }
           if (userData.showcases) {
             setShowcases(userData.showcases);
@@ -225,7 +225,7 @@ export default function App() {
             if (data.profile) {
               setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
               if (data.profile.inventory) {
-                setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+                setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
               }
             }
           }
@@ -322,7 +322,7 @@ export default function App() {
         if (autoSound !== null) userData.autoSoundEnabled = autoSound === "true";
         setProfile(userData);
         if (userData.inventory) {
-          setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+          setDbInventory(userData.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats || [] })));
         }
         if (userData.showcases) {
           setShowcases(userData.showcases);
@@ -335,9 +335,10 @@ export default function App() {
     if (actionLock.current) return;
     actionLock.current = true; setIsProcessing(true);
     try {
-      const data = await listCardRequest(getToken(), cardId, price);
+      const power = listingCard?.targetPowerToSell || null;
+      const data = await listCardRequest(getToken(), cardId, price, power);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast("Картку успішно виставлено на Ринок!", "success");
       setListingCard(null);
       await reloadMarket();
@@ -352,7 +353,7 @@ export default function App() {
     try {
       const data = await buyCardRequest(getToken(), listing.id);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Картку успішно придбано за ${listing.price} монет!`, "success");
       await reloadMarket();
     } catch (e) {
@@ -366,7 +367,7 @@ export default function App() {
     try {
       const data = await cancelListingRequest(getToken(), listing.id);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(listing.sellerUid === user.uid ? "Лот знято з продажу." : "Лот примусово видалено.", "success");
       await reloadMarket();
     } catch (e) {
@@ -402,7 +403,7 @@ export default function App() {
             const sortedResults = [...results].sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
             setPulledCards(sortedResults);
             setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-            setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+            setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
             if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
               data.unlockedAchievements.forEach(ach => {
                 showToast(`🏆 Досягнення розблоковано: ${ach.name}!`, "success");
@@ -415,7 +416,7 @@ export default function App() {
           const sortedResults = [...results].sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
           setPulledCards(sortedResults);
           setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+          setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
           if (data.unlockedAchievements && data.unlockedAchievements.length > 0) {
             data.unlockedAchievements.forEach(ach => {
               showToast(`🏆 Досягнення розблоковано: ${ach.name}!`, "success");
@@ -462,7 +463,7 @@ export default function App() {
     try {
       const data = await sellCardsRequest(getToken(), itemsToSell);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Успішно продано дублікати! Отримано ${data.earned} монет.`, "success");
 
       const newPulledCards = [];
@@ -500,7 +501,7 @@ export default function App() {
     try {
       const data = await sellCardsRequest(getToken(), [{ cardId: card.id, amount: 1 }]);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Продано за ${data.earned} монет!`, "success");
 
       const index = pulledCards.findIndex(c => c.id === card.id);
@@ -516,14 +517,18 @@ export default function App() {
     }
   };
 
-  const sellDuplicate = async (cardId) => {
+  const sellDuplicate = async (cardId, power = undefined) => {
     if (actionLock.current) return;
     actionLock.current = true; setIsProcessing(true);
 
     try {
-      const data = await sellCardsRequest(getToken(), [{ cardId, amount: 1 }]);
+      const payload = { cardId, amount: 1 };
+      if (power !== undefined) {
+        payload.power = power;
+      }
+      const data = await sellCardsRequest(getToken(), [payload]);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Продано за ${data.earned} монет!`, "success");
     } catch (e) { showToast(e.message || "Помилка під час продажу."); }
     finally { actionLock.current = false; setIsProcessing(false); }
@@ -540,7 +545,7 @@ export default function App() {
       const sellCount = existing.amount - 1;
       const data = await sellCardsRequest(getToken(), [{ cardId, amount: sellCount }]);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Продано ${sellCount} шт. за ${data.earned} монет!`, "success");
     } catch (e) { showToast(e.message || "Помилка під час масового продажу."); }
     finally { actionLock.current = false; setIsProcessing(false); }
@@ -563,7 +568,7 @@ export default function App() {
 
       const data = await sellCardsRequest(getToken(), itemsToSell);
       setProfile(prev => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
-      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount })));
+      setDbInventory(data.profile.inventory.map(i => ({ id: i.cardId, amount: i.amount, gameStats: i.gameStats })));
       showToast(`Продано всі дублікати! Отримано ${data.earned} монет.`, "success");
     } catch (e) { showToast(e.message || "Помилка під час масового продажу інвентарю."); }
     finally { actionLock.current = false; setIsProcessing(false); }
@@ -695,7 +700,7 @@ export default function App() {
 
   const fullInventory = dbInventory.map((item) => {
     const cardData = cardsCatalog.find((c) => c.id === item.id);
-    return cardData && item.amount > 0 ? { card: cardData, amount: item.amount } : null;
+    return cardData && item.amount > 0 ? { card: cardData, amount: item.amount, gameStats: item.gameStats || [] } : null;
   }).filter(Boolean);
 
   return (

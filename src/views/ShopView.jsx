@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Sparkles, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart, Bookmark } from "lucide-react";
+import { Search, Filter, Sparkles, Zap, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart, Bookmark } from "lucide-react";
 import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
 import { SELL_PRICE } from "../config/constants";
 import CardFrame from "../components/CardFrame";
@@ -169,6 +169,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                   <div className={`text-[10px] sm:text-xs font-black uppercase tracking-widest flex justify-center items-center gap-1 ${style.text}`}>
                     <Sparkles size={12} /> {card.rarity}
                   </div>
+                  {card.generatedPower && (
+                    <div className="text-xs sm:text-sm font-bold text-green-400 uppercase flex items-center justify-center gap-1 mt-1 mb-1 shadow-sm">
+                      <Zap size={14} /> Сила: {card.generatedPower}
+                    </div>
+                  )}
                   <h3 className="font-bold text-white text-xs sm:text-sm truncate w-full group-hover:text-yellow-100 transition-colors">{card.name}</h3>
                 </div>
               </div>
@@ -214,6 +219,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
           {selectedPack.isPremiumOnly && (
             <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
               <Gem size={14} /> Преміум Пак
+            </div>
+          )}
+          {selectedPack.isGame && (
+            <div className="bg-green-900/50 text-green-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-green-500/30">
+              Ігровий Пак (Дає сили)
             </div>
           )}
           <h2 className="text-3xl font-black mb-6 text-white text-center">{selectedPack.name}</h2>
@@ -341,6 +351,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
             {pack.isPremiumOnly && (
               <div className="absolute top-3 right-3 bg-fuchsia-900 text-fuchsia-100 text-[10px] px-2 py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
                 <Gem size={10} /> Преміум
+              </div>
+            )}
+            {pack.isGame && (
+              <div className={`absolute ${pack.isHidden ? 'top-10' : 'top-3'} left-3 bg-green-900 text-green-100 text-[10px] px-2 py-1 rounded border border-green-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1`}>
+                ⚔ Ігровий
               </div>
             )}
 

@@ -39,9 +39,9 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
     const [adminSetCoinsAmount, setAdminSetCoinsAmount] = useState(0);
 
     const [editingCard, setEditingCard] = useState(null);
-    const [cardForm, setCardForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal" });
+    const [cardForm, setCardForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal", isGame: false });
     const [editingPack, setEditingPack] = useState(null);
-    const [packForm, setPackForm] = useState({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+    const [packForm, setPackForm] = useState({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false, isGame: false });
 
     const [allAchievements, setAllAchievements] = useState([]);
     const [achievementForm, setAchievementForm] = useState({ id: "", packId: packsCatalog[0]?.id || "", name: "", description: "", iconUrl: "" });
@@ -326,6 +326,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             cost: Number(packForm.cost),
             isHidden: !!packForm.isHidden,
             isPremiumOnly: !!packForm.isPremiumOnly,
+            isGame: !!packForm.isGame,
             category: packForm.category || "Базові"
         };
 
@@ -338,7 +339,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setPacksCatalog(updatedPacks);
             addSystemLog("Адмін", `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
             setEditingPack(null);
-            setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false });
+            setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false, isGame: false });
             showToast("Пак збережено в MySQL!", "success");
         } catch {
             showToast("Помилка збереження паку", "error");
@@ -371,6 +372,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             soundUrl: cardForm.soundUrl || "",
             soundVolume: cardForm.soundVolume !== undefined ? Number(cardForm.soundVolume) : 0.5,
             frame: cardForm.frame || "normal",
+            isGame: !!cardForm.isGame,
             pulledCount: editingCard ? (editingCard.pulledCount || 0) : 0
         };
 
@@ -383,7 +385,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
             setCardsCatalog(updatedCatalog);
             addSystemLog("Адмін", `${editingCard ? 'Оновлено' : 'Створено'} картку: ${cardForm.name}`);
             setEditingCard(null);
-            setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal" });
+            setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal", isGame: false });
             showToast("Картку збережено в MySQL!", "success");
         } catch {
             showToast("Помилка збереження картки", "error");
@@ -1285,7 +1287,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                 </div>
                             </div>
 
-                            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
                                 <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800">
                                     <input type="checkbox" checked={packForm.isHidden || false} onChange={e => setPackForm({ ...packForm, isHidden: e.target.checked })} className="w-5 h-5 accent-purple-600" />
                                     Приховати пак від гравців (не видаляти)
@@ -1294,6 +1296,10 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                     <input type="checkbox" checked={packForm.isPremiumOnly || false} onChange={e => setPackForm({ ...packForm, isPremiumOnly: e.target.checked })} className="w-5 h-5 accent-fuchsia-600" />
                                     <Gem size={18} /> Тільки для Преміум гравців
                                 </label>
+                                <label className="flex items-center gap-2 text-green-400 font-bold cursor-pointer bg-green-950/20 p-4 rounded-xl border border-green-900/50">
+                                    <input type="checkbox" checked={packForm.isGame || false} onChange={e => setPackForm({ ...packForm, isGame: e.target.checked })} className="w-5 h-5 accent-green-600" />
+                                    Ігровий Пак (Дає сили карткам)
+                                </label>
                             </div>
 
                         </div>
@@ -1301,7 +1307,7 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                         <div className="flex gap-3">
                             <button type="submit" className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-xl">Зберегти Пак</button>
                             {editingPack && (
-                                <button type="button" onClick={() => { setEditingPack(null); setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
+                                <button type="button" onClick={() => { setEditingPack(null); setPackForm({ id: "", name: "", category: "Базові", cost: 50, image: "", customWeights: {}, isHidden: false, isPremiumOnly: false, isGame: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
                             )}
                         </div>
                     </form>
@@ -1383,12 +1389,19 @@ export default function AdminView({ db, appId, currentProfile, setProfile, reloa
                                     </div>
                                 )}
                             </div>
+
+                            <div className="md:col-span-4 mt-2">
+                                <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800 w-full md:w-1/3">
+                                    <input type="checkbox" checked={cardForm.isGame || false} onChange={e => setCardForm({ ...cardForm, isGame: e.target.checked })} className="w-5 h-5 accent-green-600" />
+                                    Ігрова картка (Отримує силу при випадінні)
+                                </label>
+                            </div>
                         </div>
 
                         <div className="flex gap-3">
                             <button type="submit" disabled={!cardForm.packId} className="flex-1 bg-purple-600 disabled:bg-neutral-700 text-white font-bold py-3 rounded-xl">Зберегти картку</button>
                             {editingCard && (
-                                <button type="button" onClick={() => { setEditingCard(null); setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal" }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
+                                <button type="button" onClick={() => { setEditingCard(null); setCardForm({ id: "", packId: packsCatalog[0]?.id || "", name: "", rarity: rarities[0]?.name || "Звичайна", image: "", dropAnim: "", maxSupply: "", weight: "", sellPrice: "", effect: "", soundUrl: "", soundVolume: 0.5, frame: "normal", isGame: false }); }} className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl">Скасувати</button>
                             )}
                         </div>
                     </form>
