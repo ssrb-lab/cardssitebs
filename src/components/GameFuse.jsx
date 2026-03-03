@@ -109,19 +109,43 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
     }
   }, [phase, timeLeft, gameOver, isPaused]);
 
-  const startGame = async () => {
+  const startGame = async (forceNew = false) => {
     setIsProcessing(true);
     try {
+      let savedState = null;
+      if (!forceNew) {
+        try {
+          const savedStr = localStorage.getItem('fuseGameSave');
+          if (savedStr) {
+            savedState = JSON.parse(savedStr);
+          }
+        } catch (err) {
+          console.error('Error parsing save', err);
+        }
+      }
+
       await startFuseGameRequest(getToken());
-      setScore(0);
-      setLives(INITIAL_LIVES);
-      setGameOver(false);
-      setPhase('memorize');
-      const randomTarget = Math.floor(Math.random() * (15 - 7 + 1)) + 7;
-      setNextHeartScore(randomTarget);
-      setIsPaused(false);
-      generateLevel();
-      setIsInitialized(true);
+
+      if (savedState && savedState.score !== undefined) {
+        setScore(savedState.score);
+        setLives(savedState.lives ?? INITIAL_LIVES);
+        setNextHeartScore(savedState.nextHeartScore ?? 7);
+        setGameOver(false);
+        setPhase('memorize');
+        setIsPaused(true);
+        generateLevel();
+        setIsInitialized(true);
+      } else {
+        setScore(0);
+        setLives(INITIAL_LIVES);
+        setGameOver(false);
+        setPhase('memorize');
+        const randomTarget = Math.floor(Math.random() * (15 - 7 + 1)) + 7;
+        setNextHeartScore(randomTarget);
+        setIsPaused(false);
+        generateLevel();
+        setIsInitialized(true);
+      }
     } catch (e) {
       showToast(e.message || 'Не вдалося почати гру.', 'error');
       goBack();
@@ -134,6 +158,14 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
     startGame();
     // eslint-disable-next-line
   }, []);
+
+  // Save progress dynamically
+  useEffect(() => {
+    if (isInitialized && !gameOver) {
+      const saveData = { score, lives, nextHeartScore };
+      localStorage.setItem('fuseGameSave', JSON.stringify(saveData));
+    }
+  }, [score, lives, nextHeartScore, isInitialized, gameOver]);
 
   const handleTileClick = (index) => {
     if (gameOver || isProcessing || phase === 'memorize' || isPaused) return;
@@ -194,12 +226,14 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         setGameOver(true);
         // Reveal all
         setBoard(board.map((t) => ({ ...t, memoryFlipped: true })));
+        localStorage.removeItem('fuseGameSave');
       }
     }
   };
 
   const restartGame = () => {
-    startGame();
+    localStorage.removeItem('fuseGameSave');
+    startGame(true);
   };
 
   const claimReward = async () => {
@@ -214,6 +248,7 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         setProfile(data.profile);
       }
       showToast(`Ви отримали ${data.earned} монет за ремонт!`, 'success');
+      localStorage.removeItem('fuseGameSave');
       goBack();
     } catch (e) {
       showToast(e.message || 'Помилка отримання нагороди.');
