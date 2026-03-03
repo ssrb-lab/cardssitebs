@@ -66,6 +66,28 @@ const checkAdmin = async (req, res, next) => {
   }
 };
 
+// Мідлвар для перевірки прав тестера
+const checkTester = async (req, res, next) => {
+  if (!req.user || !req.user.uid) {
+    return res.status(403).json({ error: "Доступ заборонено." });
+  }
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    // Адміни також мають права тестера за замовчуванням
+    if (!user || (!user.isTester && !user.isAdmin && !user.isSuperAdmin)) {
+      return res.status(403).json({ error: "Доступ заборонено. Тільки для Тестерів." });
+    }
+    // Оновлюємо права в req.user для наступних мідлварів/роутів
+    req.user.isTester = user.isTester;
+    req.user.isAdmin = user.isAdmin;
+    req.user.isSuperAdmin = user.isSuperAdmin;
+    next();
+  } catch (error) {
+    console.error("Помилка перевірки прав тестера:", error);
+    return res.status(500).json({ error: "Помилка сервера при перевірці прав." });
+  }
+};
+
 
 // ----------------------------------------
 // ДОСЯГНЕННЯ (ACHIEVEMENTS)

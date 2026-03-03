@@ -23,6 +23,7 @@ model User {
   createdAt            DateTime @default(now())
   isAdmin              Boolean  @default(false)
   isSuperAdmin         Boolean  @default(false)
+  isTester             Boolean  @default(false)
   isBanned             Boolean  @default(false)
   banReason            String?
   banUntil             DateTime?
