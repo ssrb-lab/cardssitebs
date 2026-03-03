@@ -13,6 +13,7 @@ import {
   Blocks,
   ShieldAlert,
   Dices,
+  Trophy,
 } from 'lucide-react';
 import {
   fetchFarmState,
@@ -27,6 +28,7 @@ import Game2048 from '../components/Game2048';
 import GameTetris from '../components/GameTetris';
 import GameFuse from '../components/GameFuse';
 import GameBlackjack from '../components/GameBlackjack';
+import GameArena from '../components/GameArena';
 
 export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
   const playerLevel = profile?.farmLevel || 1;
@@ -80,7 +82,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         } else if (data.type === 'GAME_UNBLOCKED') {
           setBlockedGames((prev) => prev.filter((g) => g !== data.game));
         }
-      } catch (e) {}
+      } catch (e) { }
     };
 
     return () => {
@@ -315,9 +317,55 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
               >
                 Блекджек
               </button>
+              <button
+                onClick={() => adminToggleBlock('arena')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('arena') ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}
+              >
+                Арена
+              </button>
             </div>
           </div>
         )}
+
+        {/* Арена (Виділена окремо) */}
+        <div className="mb-8 px-2 w-full">
+          <div className={`bg-gradient-to-r ${blockedGames.includes('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}>
+            <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
+              <Trophy size={200} className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'} />
+            </div>
+
+            <div className="relative z-10 flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-3 rounded-2xl border flex-shrink-0 ${blockedGames.includes('arena') ? 'bg-neutral-800 border-neutral-700' : 'bg-indigo-500/20 border-indigo-500/30'}`}>
+                  <Swords size={32} className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'} />
+                </div>
+                <h3 className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${blockedGames.includes('arena') ? 'text-neutral-500' : 'text-white'}`}>
+                  Арена
+                </h3>
+              </div>
+              <p className={`${blockedGames.includes('arena') ? 'text-neutral-600' : 'text-indigo-200'} text-sm sm:text-base max-w-xl leading-relaxed`}>
+                Доведіть свою перевагу в епічних PvP битвах проти інших гравців! Здобувайте славу, унікальні нагороди та піднімайтеся на вершину рейтингу.
+              </p>
+            </div>
+
+            <div className="relative z-10 w-full md:w-auto">
+              <div className="bg-neutral-950/80 backdrop-blur-md border border-neutral-800 rounded-2xl p-4 text-center">
+                {blockedGames.includes('arena') ? (
+                  <div className="w-full text-red-400 font-bold py-3 px-8 rounded-xl bg-red-900/20 text-center flex items-center justify-center gap-2">
+                    <Lock size={20} /> Тимчасово недоступна
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setActiveGame('arena')}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl uppercase tracking-wider text-sm transition-colors shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center justify-center gap-2"
+                  >
+                    Увійти на Арену
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 px-2">
           <div
@@ -497,6 +545,17 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
   if (!currentBoss || !bossCard)
     return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
 
+  if (activeGame === 'arena') {
+    return (
+      <GameArena
+        profile={profile}
+        cardsCatalog={cardsCatalog}
+        goBack={() => setActiveGame(null)}
+        showToast={showToast}
+      />
+    );
+  }
+
   if (activeGame === '2048') {
     return (
       <Game2048
@@ -633,11 +692,10 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         <button
           onClick={claimRewards}
           disabled={hp > 0 || isProcessing}
-          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${
-            hp <= 0
-              ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
-              : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-          }`}
+          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
+            ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
+            : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+            }`}
         >
           {isProcessing ? (
             <Loader2 size={18} className="animate-spin" />

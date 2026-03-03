@@ -202,3 +202,13 @@ model Notification {
   userId             String
   user               User     @relation(fields: [userId], references: [uid], onDelete: Cascade)
 }
+
+model ArenaPoint {
+  id        String   @id @default(uuid())
+  x         Float
+  y         Float
+  name      String   @default("Точка Арени")
+  icon      String   @default("castle")
+  color     String   @default("#4f46e5")
+  createdAt DateTime @default(now())
+}

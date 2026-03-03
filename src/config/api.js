@@ -628,3 +628,34 @@ export const deleteAchievementSettingsRequest = async (token, id) => {
   });
   return res.json();
 };
+
+// --- ARENA MAP POINTS ---
+export const fetchArenaPointsRequest = async (token) => {
+  const res = await fetch(`${API_URL}/game/arena/points`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const createArenaPointRequest = async (token, pointData) => {
+  const res = await fetch(`${API_URL}/admin/arena/points`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(pointData),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const deleteArenaPointRequest = async (token, pointId) => {
+  const res = await fetch(`${API_URL}/admin/arena/points/${pointId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};

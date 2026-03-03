@@ -1366,8 +1366,46 @@ app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
 });
 
 // ----------------------------------------
-// GAME BLOCKED STATUS & SSE (Admin feature)
+// GAME BLOCKED STATUS & SSE (Admin feature) & ARENA
 // ----------------------------------------
+
+app.get('/api/game/arena/points', authenticate, async (req, res) => {
+  try {
+    const points = await prisma.arenaPoint.findMany();
+    res.json(points);
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження точок Арени.' });
+  }
+});
+
+app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) => {
+  const { x, y, name, icon, color } = req.body;
+  try {
+    const newPoint = await prisma.arenaPoint.create({
+      data: {
+        x: Number(x),
+        y: Number(y),
+        name: name || 'Точка Арени',
+        icon: icon || 'castle',
+        color: color || '#4f46e5'
+      }
+    });
+    res.json({ success: true, point: newPoint });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка створення точки.' });
+  }
+});
+
+app.delete('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.arenaPoint.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка видалення точки.' });
+  }
+});
+
 
 app.get('/api/games/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
