@@ -497,6 +497,28 @@ export const startFuseGameRequest = async (token) => {
     return data;
 };
 
+export const startBlackjackGameRequest = async (token, betAmount) => {
+    const res = await fetch(`${API_URL}/game/blackjack/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ betAmount })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
+export const claimBlackjackRewardRequest = async (token, result, betAmount) => {
+    const res = await fetch(`${API_URL}/game/blackjack/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ result, betAmount })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+};
+
 export const fetchMarketHistoryRequest = async (token) => {
     const res = await fetch(`${API_URL}/profile/market-history`, {
         headers: { 'Authorization': `Bearer ${token}` }

@@ -1082,6 +1082,61 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
 
 
 // ----------------------------------------
+// BLACKJACK
+// ----------------------------------------
+app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
+  const { betAmount } = req.body;
+
+  const parsedBet = parseInt(betAmount, 10);
+  if (isNaN(parsedBet) || parsedBet < 10) return res.status(400).json({ error: "Мінімальна ставка 10 монет." });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (user.coins < parsedBet) return res.status(400).json({ error: "Недостатньо монет!" });
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: { coins: { decrement: parsedBet } }
+    });
+
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера." });
+  }
+});
+
+app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
+  const { result, betAmount } = req.body;
+
+  const parsedBet = parseInt(betAmount, 10);
+  if (isNaN(parsedBet) || parsedBet < 10) return res.status(400).json({ error: "Неправильна ставка." });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    let coinsToGive = 0;
+    if (result === 'win') coinsToGive = parsedBet * 2;
+    if (result === 'blackjack') coinsToGive = Math.floor(parsedBet * 2.5);
+    if (result === 'push') coinsToGive = Math.floor(parsedBet);
+
+    if (coinsToGive > 0) {
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { coins: { increment: coinsToGive } }
+      });
+      res.json({ success: true, earned: coinsToGive, profile: updatedUser });
+    } else {
+      res.json({ success: true, earned: 0, profile: user });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Помилка сервера." });
+  }
+});
+
+
+// ----------------------------------------
 // GAME BLOCKED STATUS & SSE (Admin feature)
 // ----------------------------------------
 
