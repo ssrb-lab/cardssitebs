@@ -720,23 +720,25 @@ export default function InventoryView({
                           </div>
                           <div className="flex flex-col gap-2 w-full mt-auto">
                             <button
-                              onClick={() => {
-                                sellDuplicate(
+                              onClick={async () => {
+                                const success = await sellDuplicate(
                                   viewingGameCard.card.id,
                                   isRec ? powerVal : undefined
                                 );
-                                const newPowers = [...powers];
-                                newPowers.splice(idx, 1);
-                                if (viewingGameCard.amount <= 1) {
-                                  setViewingGameCard(null);
-                                } else {
-                                  setViewingGameCard({
-                                    ...viewingGameCard,
-                                    amount: viewingGameCard.amount - 1,
-                                    gameStats: newPowers
-                                      .filter((p) => p.isRecorded)
-                                      .map((p) => p.value),
-                                  });
+                                if (success) {
+                                  const newPowers = [...powers];
+                                  newPowers.splice(idx, 1);
+                                  if (viewingGameCard.amount <= 1) {
+                                    setViewingGameCard(null);
+                                  } else {
+                                    setViewingGameCard({
+                                      ...viewingGameCard,
+                                      amount: viewingGameCard.amount - 1,
+                                      gameStats: newPowers
+                                        .filter((p) => p.isRecorded)
+                                        .map((p) => p.value),
+                                    });
+                                  }
                                 }
                               }}
                               className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-white font-bold transition-all"

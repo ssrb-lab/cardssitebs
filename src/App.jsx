@@ -687,7 +687,7 @@ export default function App() {
   };
 
   const sellDuplicate = async (cardId, power = undefined) => {
-    if (actionLock.current) return;
+    if (actionLock.current) return false;
     actionLock.current = true;
     setIsProcessing(true);
 
@@ -706,8 +706,10 @@ export default function App() {
         }))
       );
       showToast(`Продано за ${data.earned} монет!`, 'success');
+      return true;
     } catch (e) {
       showToast(e.message || 'Помилка під час продажу.');
+      return false;
     } finally {
       actionLock.current = false;
       setIsProcessing(false);
@@ -1005,8 +1007,12 @@ export default function App() {
   const fullInventory = dbInventory
     .map((item) => {
       const cardData = cardsCatalog.find((c) => c.id === item.id);
+      let parsedStats = item.gameStats || [];
+      if (typeof parsedStats === 'string') {
+        try { parsedStats = JSON.parse(parsedStats); } catch(e) { parsedStats = []; }
+      }
       return cardData && item.amount > 0
-        ? { card: cardData, amount: item.amount, gameStats: item.gameStats || [] }
+        ? { card: cardData, amount: item.amount, gameStats: parsedStats }
         : null;
     })
     .filter(Boolean);

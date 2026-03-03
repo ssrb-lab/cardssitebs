@@ -906,7 +906,7 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           );
           removedPower = statsArray.splice(0, 1)[0];
         } else {
-          removedPower = power; // no stats tracked, just use provided value
+          removedPower = parsedPower; // no stats tracked, just use provided value
         }
       } else if (statsArray.length > 0) {
         statsArray.sort((a, b) => Number(b) - Number(a)); // від найсильнішої до найслабшої
@@ -2510,6 +2510,9 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
           // If a specific power is requested to sell
           if (item.power !== undefined && item.power !== null) {
+            if (item.amount !== 1) {
+              throw new Error("Не можна продати більше 1 картки з конкретною силою за раз.");
+            }
             const parsedPower = Number(item.power);
             const powerIndex = statsArray.findIndex((p) => Number(p) === parsedPower);
             if (powerIndex > -1) {
