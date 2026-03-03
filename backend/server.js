@@ -25,7 +25,7 @@ const avatarStorage = multer.diskStorage({
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
     cb(null, `avatar-${req.user?.uid || Date.now()}-${Date.now()}${ext}`);
-  }
+  },
 });
 
 const uploadAvatar = multer({
@@ -34,7 +34,7 @@ const uploadAvatar = multer({
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Дозволені лише зображення'));
-  }
+  },
 });
 
 // SSE Clients for real-time game status updates
@@ -49,33 +49,33 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Мідлвар для перевірки прав адміністратора
 const checkAdmin = async (req, res, next) => {
   if (!req.user || !req.user.uid) {
-    return res.status(403).json({ error: "Доступ заборонено." });
+    return res.status(403).json({ error: 'Доступ заборонено.' });
   }
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
-      return res.status(403).json({ error: "Доступ заборонено. Тільки для Адмінів." });
+      return res.status(403).json({ error: 'Доступ заборонено. Тільки для Адмінів.' });
     }
     // Оновлюємо права в req.user для наступних мідлварів/роутів
     req.user.isAdmin = user.isAdmin;
     req.user.isSuperAdmin = user.isSuperAdmin;
     next();
   } catch (error) {
-    console.error("Помилка перевірки прав:", error);
-    return res.status(500).json({ error: "Помилка сервера при перевірці прав." });
+    console.error('Помилка перевірки прав:', error);
+    return res.status(500).json({ error: 'Помилка сервера при перевірці прав.' });
   }
 };
 
 // Мідлвар для перевірки прав тестера
 const checkTester = async (req, res, next) => {
   if (!req.user || !req.user.uid) {
-    return res.status(403).json({ error: "Доступ заборонено." });
+    return res.status(403).json({ error: 'Доступ заборонено.' });
   }
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     // Адміни також мають права тестера за замовчуванням
     if (!user || (!user.isTester && !user.isAdmin && !user.isSuperAdmin)) {
-      return res.status(403).json({ error: "Доступ заборонено. Тільки для Тестерів." });
+      return res.status(403).json({ error: 'Доступ заборонено. Тільки для Тестерів.' });
     }
     // Оновлюємо права в req.user для наступних мідлварів/роутів
     req.user.isTester = user.isTester;
@@ -83,11 +83,10 @@ const checkTester = async (req, res, next) => {
     req.user.isSuperAdmin = user.isSuperAdmin;
     next();
   } catch (error) {
-    console.error("Помилка перевірки прав тестера:", error);
-    return res.status(500).json({ error: "Помилка сервера при перевірці прав." });
+    console.error('Помилка перевірки прав тестера:', error);
+    return res.status(500).json({ error: 'Помилка сервера при перевірці прав.' });
   }
 };
-
 
 // ----------------------------------------
 // ДОСЯГНЕННЯ (ACHIEVEMENTS)
@@ -95,17 +94,17 @@ const checkTester = async (req, res, next) => {
 const checkAndAwardCollectionAchievement = async (userId, packId) => {
   try {
     const achievement = await prisma.achievementSettings.findUnique({
-      where: { packId: packId }
+      where: { packId: packId },
     });
     if (!achievement) return null;
 
     const existing = await prisma.userAchievement.findUnique({
-      where: { userId_achievementId: { userId, achievementId: achievement.id } }
+      where: { userId_achievementId: { userId, achievementId: achievement.id } },
     });
     if (existing) return null;
 
     const totalCardsInPack = await prisma.cardCatalog.count({
-      where: { packId: packId }
+      where: { packId: packId },
     });
     if (totalCardsInPack === 0) return null;
 
@@ -113,23 +112,23 @@ const checkAndAwardCollectionAchievement = async (userId, packId) => {
       where: {
         userId: userId,
         amount: { gt: 0 },
-        card: { packId: packId }
-      }
+        card: { packId: packId },
+      },
     });
 
     if (userCardsFromPack === totalCardsInPack) {
       const awarded = await prisma.userAchievement.create({
         data: {
           userId: userId,
-          achievementId: achievement.id
+          achievementId: achievement.id,
         },
-        include: { achievement: true }
+        include: { achievement: true },
       });
       return awarded;
     }
     return null;
   } catch (err) {
-    console.error("Помилка видачі досягнення:", err);
+    console.error('Помилка видачі досягнення:', err);
     return null;
   }
 };
@@ -139,7 +138,7 @@ app.get('/api/admin/achievements', authenticate, checkAdmin, async (req, res) =>
     const achievements = await prisma.achievementSettings.findMany();
     res.json(achievements);
   } catch (err) {
-    res.status(500).json({ error: "Помилка завантаження ачівок." });
+    res.status(500).json({ error: 'Помилка завантаження ачівок.' });
   }
 });
 
@@ -150,17 +149,17 @@ app.post('/api/admin/achievements', authenticate, checkAdmin, async (req, res) =
     if (id) {
       achievement = await prisma.achievementSettings.update({
         where: { id },
-        data: { name, description, iconUrl, packId }
+        data: { name, description, iconUrl, packId },
       });
     } else {
       achievement = await prisma.achievementSettings.create({
-        data: { name, description, iconUrl, packId }
+        data: { name, description, iconUrl, packId },
       });
     }
     res.json(achievement);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Помилка збереження ачівки. Можливо цей пак вже має ачівку?" });
+    res.status(500).json({ error: 'Помилка збереження ачівки. Можливо цей пак вже має ачівку?' });
   }
 });
 
@@ -170,7 +169,7 @@ app.delete('/api/admin/achievements/:id', authenticate, checkAdmin, async (req, 
     await prisma.achievementSettings.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: "Помилка видалення ачівки." });
+    res.status(500).json({ error: 'Помилка видалення ачівки.' });
   }
 });
 
@@ -190,7 +189,7 @@ async function sanitizeShowcases(tx, userUid, cardId, newAmount) {
   let totalInShowcases = 0;
   for (const s of showcases) {
     if (Array.isArray(s.cardIds)) {
-      totalInShowcases += s.cardIds.filter(id => id === cardId).length;
+      totalInShowcases += s.cardIds.filter((id) => id === cardId).length;
     }
   }
 
@@ -207,7 +206,7 @@ async function sanitizeShowcases(tx, userUid, cardId, newAmount) {
         if (newCardIds.length !== s.cardIds.length) {
           await tx.showcase.update({
             where: { id: s.id },
-            data: { cardIds: newCardIds }
+            data: { cardIds: newCardIds },
           });
         }
       }
@@ -223,7 +222,7 @@ const checkAndUnbanUser = async (user) => {
   if (user && user.isBanned && user.banUntil && new Date() > new Date(user.banUntil)) {
     await prisma.user.update({
       where: { uid: user.uid },
-      data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null }
+      data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null },
     });
     return { ...user, isBanned: false, banReason: null, banUntil: null, bannedBy: null };
   }
@@ -242,8 +241,8 @@ app.post('/api/auth/google', async (req, res) => {
 
     const payload = ticket.getPayload();
     const email = payload.email;
-    let nickname = payload.name.replace(/\s+/g, '_') || "Гравець";
-    const avatarUrl = payload.picture || "";
+    let nickname = payload.name.replace(/\s+/g, '_') || 'Гравець';
+    const avatarUrl = payload.picture || '';
 
     let user = await prisma.user.findUnique({ where: { email } });
 
@@ -255,15 +254,15 @@ app.post('/api/auth/google', async (req, res) => {
       const passwordHash = await bcrypt.hash(randomPassword, 10);
 
       user = await prisma.user.create({
-        data: { email, nickname, passwordHash, avatarUrl, coins: 200, lastIp: ip }
+        data: { email, nickname, passwordHash, avatarUrl, coins: 200, lastIp: ip },
       });
     } else {
       user = await prisma.user.update({
         where: { uid: user.uid },
         data: {
-          avatarUrl: (!user.avatarUrl && avatarUrl) ? avatarUrl : user.avatarUrl,
-          lastIp: ip
-        }
+          avatarUrl: !user.avatarUrl && avatarUrl ? avatarUrl : user.avatarUrl,
+          lastIp: ip,
+        },
       });
     }
 
@@ -271,27 +270,28 @@ app.post('/api/auth/google', async (req, res) => {
     if (ip) {
       const otherAccounts = await prisma.user.findMany({
         where: { lastIp: ip, uid: { not: user.uid } },
-        select: { nickname: true }
+        select: { nickname: true },
       });
       if (otherAccounts.length > 0) {
-        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        const otherNicks = otherAccounts.map((a) => a.nickname).join(', ');
         await prisma.adminLog.create({
           data: {
-            type: "Система",
+            type: 'Система',
             details: `⚠️ Підозра на мультиакаунт! Гравець зайшов з IP ${ip}, який також використовують: ${otherNicks}`,
             userUid: user.uid,
-            userNickname: user.nickname
-          }
+            userNickname: user.nickname,
+          },
         });
       }
     }
 
-    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
     res.json({ token, user });
-
   } catch (error) {
-    console.error("Помилка Google Auth:", error);
-    res.status(401).json({ error: "Помилка авторизації через Google." });
+    console.error('Помилка Google Auth:', error);
+    res.status(401).json({ error: 'Помилка авторизації через Google.' });
   }
 });
 
@@ -301,42 +301,44 @@ app.post('/api/auth/register', async (req, res) => {
 
   try {
     const existingUser = await prisma.user.findFirst({
-      where: { OR: [{ email }, { nickname }] }
+      where: { OR: [{ email }, { nickname }] },
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: "Користувач з таким email або нікнеймом вже існує." });
+      return res.status(400).json({ error: 'Користувач з таким email або нікнеймом вже існує.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { nickname, email, passwordHash, lastIp: ip }
+      data: { nickname, email, passwordHash, lastIp: ip },
     });
 
     // Перевірка на мультиаккаунт
     if (ip) {
       const otherAccounts = await prisma.user.findMany({
         where: { lastIp: ip, uid: { not: user.uid } },
-        select: { nickname: true }
+        select: { nickname: true },
       });
       if (otherAccounts.length > 0) {
-        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        const otherNicks = otherAccounts.map((a) => a.nickname).join(', ');
         await prisma.adminLog.create({
           data: {
-            type: "Система",
+            type: 'Система',
             details: `⚠️ Підозра на мультиакаунт! Новий гравець зареєструвався з IP ${ip}, який також використовують: ${otherNicks}`,
             userUid: user.uid,
-            userNickname: user.nickname
-          }
+            userNickname: user.nickname,
+          },
         });
       }
     }
 
-    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
     res.json({ token, user });
   } catch (error) {
-    console.error("Помилка реєстрації:", error);
-    res.status(500).json({ error: "Помилка сервера." });
+    console.error('Помилка реєстрації:', error);
+    res.status(500).json({ error: 'Помилка сервера.' });
   }
 });
 
@@ -346,18 +348,18 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     let user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ error: "Користувача не знайдено." });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено.' });
 
     user = await checkAndUnbanUser(user);
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) return res.status(401).json({ error: "Неправильний пароль." });
+    if (!isValid) return res.status(401).json({ error: 'Неправильний пароль.' });
 
     // Оновлюємо IP при логіні
     if (user.lastIp !== ip) {
       user = await prisma.user.update({
         where: { uid: user.uid },
-        data: { lastIp: ip }
+        data: { lastIp: ip },
       });
     }
 
@@ -365,26 +367,28 @@ app.post('/api/auth/login', async (req, res) => {
     if (ip) {
       const otherAccounts = await prisma.user.findMany({
         where: { lastIp: ip, uid: { not: user.uid } },
-        select: { nickname: true }
+        select: { nickname: true },
       });
       if (otherAccounts.length > 0) {
-        const otherNicks = otherAccounts.map(a => a.nickname).join(', ');
+        const otherNicks = otherAccounts.map((a) => a.nickname).join(', ');
         await prisma.adminLog.create({
           data: {
-            type: "Система",
+            type: 'Система',
             details: `⚠️ Підозра на мультиакаунт! Гравець зайшов з IP ${ip}, який також використовують: ${otherNicks}`,
             userUid: user.uid,
-            userNickname: user.nickname
-          }
+            userNickname: user.nickname,
+          },
         });
       }
     }
 
-    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ uid: user.uid, isAdmin: user.isAdmin }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
     res.json({ token, user });
   } catch (error) {
-    console.error("Помилка логіну:", error);
-    res.status(500).json({ error: "Помилка сервера." });
+    console.error('Помилка логіну:', error);
+    res.status(500).json({ error: 'Помилка сервера.' });
   }
 });
 
@@ -397,18 +401,15 @@ app.get('/api/profile/market-history', authenticate, async (req, res) => {
     const history = await prisma.marketListing.findMany({
       where: {
         status: 'sold',
-        OR: [
-          { sellerId: req.user.uid },
-          { buyerId: req.user.uid }
-        ]
+        OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }],
       },
       include: { card: true, seller: { select: { nickname: true } } },
       orderBy: { soldAt: 'desc' },
-      take: 30 // Показуємо останні 30 операцій
+      take: 30, // Показуємо останні 30 операцій
     });
     res.json(history);
   } catch (e) {
-    res.status(500).json({ error: "Помилка завантаження історії ринку." });
+    res.status(500).json({ error: 'Помилка завантаження історії ринку.' });
   }
 });
 
@@ -416,20 +417,24 @@ app.get('/api/profile/market-history', authenticate, async (req, res) => {
 app.delete('/api/profile/market-history', authenticate, async (req, res) => {
   try {
     await prisma.marketListing.deleteMany({
-      where: { status: 'sold', OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }] }
+      where: { status: 'sold', OR: [{ sellerId: req.user.uid }, { buyerId: req.user.uid }] },
     });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка.' });
+  }
 });
 
 // Видалити історію КОНКРЕТНОГО ГРАВЦЯ (Адмін)
 app.delete('/api/admin/users/:uid/market-history', authenticate, checkAdmin, async (req, res) => {
   try {
     await prisma.marketListing.deleteMany({
-      where: { status: 'sold', OR: [{ sellerId: req.params.uid }, { buyerId: req.params.uid }] }
+      where: { status: 'sold', OR: [{ sellerId: req.params.uid }, { buyerId: req.params.uid }] },
     });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка.' });
+  }
 });
 
 // Видалити ВСЮ ІСТОРІЮ РИНКУ всіх гравців (Адмін)
@@ -437,36 +442,38 @@ app.delete('/api/admin/market-history', authenticate, checkAdmin, async (req, re
   try {
     await prisma.marketListing.deleteMany({ where: { status: 'sold' } });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка.' });
+  }
 });
 
 app.post('/api/profile/change-password', authenticate, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
   if (!oldPassword || !newPassword) {
-    return res.status(400).json({ error: "Введіть всі поля." });
+    return res.status(400).json({ error: 'Введіть всі поля.' });
   }
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    if (!user) return res.status(404).json({ error: "Користувача не знайдено." });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено.' });
 
     // Перевірка старого пароля
     const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
-    if (!isValid) return res.status(401).json({ error: "Неправильний старий пароль." });
+    if (!isValid) return res.status(401).json({ error: 'Неправильний старий пароль.' });
 
     // Хешування та збереження нового пароля
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
     await prisma.user.update({
       where: { uid: req.user.uid },
-      data: { passwordHash: newPasswordHash }
+      data: { passwordHash: newPasswordHash },
     });
 
-    res.json({ success: true, message: "Пароль успішно змінено!" });
+    res.json({ success: true, message: 'Пароль успішно змінено!' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера при зміні пароля." });
+    res.status(500).json({ error: 'Помилка сервера при зміні пароля.' });
   }
 });
 
@@ -477,11 +484,11 @@ app.get('/api/profile', authenticate, async (req, res) => {
       include: {
         inventory: true,
         showcases: true,
-        _count: { select: { inventory: true } } // Рахуємо картки гравця
-      }
+        _count: { select: { inventory: true } }, // Рахуємо картки гравця
+      },
     });
 
-    if (!user) return res.status(404).json({ error: "Гравець не знайдений" });
+    if (!user) return res.status(404).json({ error: 'Гравець не знайдений' });
 
     user = await checkAndUnbanUser(user);
 
@@ -489,19 +496,19 @@ app.get('/api/profile', authenticate, async (req, res) => {
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId: user.uid },
       include: { achievement: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     // Додаємо підрахунок до профілю, щоб фронтенд його побачив
     const formattedUser = {
       ...user,
       uniqueCardsCount: user._count.inventory,
-      achievements: userAchievements
+      achievements: userAchievements,
     };
 
     res.json(formattedUser);
   } catch (error) {
-    res.status(500).json({ error: "Помилка завантаження профілю" });
+    res.status(500).json({ error: 'Помилка завантаження профілю' });
   }
 });
 
@@ -511,44 +518,57 @@ app.get('/api/profile/public/:uid', async (req, res) => {
     let user = await prisma.user.findUnique({
       where: { uid: req.params.uid },
       select: {
-        uid: true, nickname: true, avatarUrl: true, coins: true,
+        uid: true,
+        nickname: true,
+        avatarUrl: true,
+        coins: true,
         totalCards: true,
         packsOpened: true,
         coinsSpentOnPacks: true,
         coinsEarnedFromPacks: true,
-        farmLevel: true, createdAt: true, isPremium: true, premiumUntil: true, mainShowcaseId: true, isBanned: true, banUntil: true, bannedBy: true, banReason: true, isAdmin: true, isSuperAdmin: true, inventory: true, showcases: true,
-        _count: { select: { inventory: true } } // Динамічно рахуємо унікальні картки
-      }
+        farmLevel: true,
+        createdAt: true,
+        isPremium: true,
+        premiumUntil: true,
+        mainShowcaseId: true,
+        isBanned: true,
+        banUntil: true,
+        bannedBy: true,
+        banReason: true,
+        isAdmin: true,
+        isSuperAdmin: true,
+        inventory: true,
+        showcases: true,
+        _count: { select: { inventory: true } }, // Динамічно рахуємо унікальні картки
+      },
     });
 
-    if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
 
     user = await checkAndUnbanUser(user);
 
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId: user.uid },
       include: { achievement: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     // Форматуємо результат для фронтенду
     const formattedUser = {
       ...user,
       uniqueCardsCount: user._count.inventory,
-      achievements: userAchievements
+      achievements: userAchievements,
     };
 
     res.json(formattedUser);
   } catch (error) {
-    res.status(500).json({ error: "Помилка завантаження профілю." });
+    res.status(500).json({ error: 'Помилка завантаження профілю.' });
   }
 });
 
 // ----------------------------------------
 // ІГРОВІ ДАНІ ТА АДМІНКА (КАРТКИ ТА ПАКИ)
 // ----------------------------------------
-
-
 
 // Публічний роут для отримання всіх карток та паків
 app.get('/api/catalog', async (req, res) => {
@@ -558,7 +578,7 @@ app.get('/api/catalog', async (req, res) => {
     const achievements = await prisma.achievementSettings.findMany();
     res.json({ cards, packs, achievements });
   } catch (error) {
-    res.status(500).json({ error: "Помилка завантаження каталогу." });
+    res.status(500).json({ error: 'Помилка завантаження каталогу.' });
   }
 });
 
@@ -568,7 +588,7 @@ app.post('/api/admin/cards', authenticate, checkAdmin, async (req, res) => {
     const data = req.body;
 
     // Переконуємося, що frame передається правильно (fallback на "normal")
-    const cardData = { ...data, frame: data.frame || "normal", isGame: Boolean(data.isGame) };
+    const cardData = { ...data, frame: data.frame || 'normal', isGame: Boolean(data.isGame) };
 
     const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
     let card;
@@ -580,7 +600,7 @@ app.post('/api/admin/cards', authenticate, checkAdmin, async (req, res) => {
     res.json(card);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка збереження картки." });
+    res.status(500).json({ error: 'Помилка збереження картки.' });
   }
 });
 
@@ -590,7 +610,7 @@ app.delete('/api/admin/cards/:id', authenticate, checkAdmin, async (req, res) =>
     await prisma.cardCatalog.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: "Помилка видалення картки." });
+    res.status(500).json({ error: 'Помилка видалення картки.' });
   }
 });
 
@@ -609,7 +629,7 @@ app.post('/api/admin/packs', authenticate, checkAdmin, async (req, res) => {
     res.json(pack);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка збереження паку." });
+    res.status(500).json({ error: 'Помилка збереження паку.' });
   }
 });
 
@@ -619,7 +639,7 @@ app.delete('/api/admin/packs/:id', authenticate, checkAdmin, async (req, res) =>
     await prisma.packCatalog.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: "Помилка видалення паку." });
+    res.status(500).json({ error: 'Помилка видалення паку.' });
   }
 });
 
@@ -633,24 +653,28 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     const pack = await prisma.packCatalog.findUnique({ where: { id: packId } });
 
-    if (!pack) return res.status(404).json({ error: "Пак не знайдено" });
+    if (!pack) return res.status(404).json({ error: 'Пак не знайдено' });
 
     const totalCost = pack.cost * amount;
-    if (user.coins < totalCost) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (user.coins < totalCost) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     if (pack.isPremiumOnly && (!user.isPremium || new Date(user.premiumUntil) < new Date())) {
-      return res.status(403).json({ error: "Тільки для Преміум гравців!" });
+      return res.status(403).json({ error: 'Тільки для Преміум гравців!' });
     }
 
-    let availableCards = (await prisma.cardCatalog.findMany({ where: { packId: pack.id } }))
-      .filter(c => c.maxSupply === 0 || c.pulledCount < c.maxSupply);
+    let availableCards = (await prisma.cardCatalog.findMany({ where: { packId: pack.id } })).filter(
+      (c) => c.maxSupply === 0 || c.pulledCount < c.maxSupply
+    );
 
-    if (availableCards.length === 0) return res.status(400).json({ error: "У цьому паку закінчились картки." });
+    if (availableCards.length === 0)
+      return res.status(400).json({ error: 'У цьому паку закінчились картки.' });
 
     const DEFAULT_RARITIES = [
-      { name: "Звичайна", weight: 70 }, { name: "Рідкісна", weight: 25 },
-      { name: "Епічна", weight: 4 }, { name: "Легендарна", weight: 1 },
-      { name: "Унікальна", weight: 0.1 }
+      { name: 'Звичайна', weight: 70 },
+      { name: 'Рідкісна', weight: 25 },
+      { name: 'Епічна', weight: 4 },
+      { name: 'Легендарна', weight: 1 },
+      { name: 'Унікальна', weight: 0.1 },
     ];
 
     let results = [];
@@ -659,17 +683,34 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
     // Локальне відстеження для запобігання перевищенню ліміту у межах однієї транзакції
     let localPulledCounts = {};
-    availableCards.forEach(c => localPulledCounts[c.id] = c.pulledCount || 0);
+    availableCards.forEach((c) => (localPulledCounts[c.id] = c.pulledCount || 0));
 
     const generatePower = (rarity) => {
-      let min = 0, max = 0;
+      let min = 0,
+        max = 0;
       switch (rarity) {
-        case "Унікальна": min = 100; max = 150; break;
-        case "Легендарна": min = 50; max = 125; break;
-        case "Епічна": min = 25; max = 100; break;
-        case "Рідкісна": min = 10; max = 80; break;
-        case "Звичайна": min = 5; max = 50; break;
-        default: return null;
+        case 'Унікальна':
+          min = 100;
+          max = 150;
+          break;
+        case 'Легендарна':
+          min = 50;
+          max = 125;
+          break;
+        case 'Епічна':
+          min = 25;
+          max = 100;
+          break;
+        case 'Рідкісна':
+          min = 10;
+          max = 80;
+          break;
+        case 'Звичайна':
+          min = 5;
+          max = 50;
+          break;
+        default:
+          return null;
       }
       return Math.floor(Math.random() * (max - min + 1)) + min;
     };
@@ -684,16 +725,23 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
       for (const c of availableCards) {
         let w = 1;
-        const globalRObj = DEFAULT_RARITIES.find(r => r.name === c.rarity);
+        const globalRObj = DEFAULT_RARITIES.find((r) => r.name === c.rarity);
 
         // Жорстка перевірка: використовуємо шанс картки, тільки якщо він більший за 0
-        if (c.weight !== null && c.weight !== undefined && c.weight !== "" && Number(c.weight) > 0) {
+        if (
+          c.weight !== null &&
+          c.weight !== undefined &&
+          c.weight !== '' &&
+          Number(c.weight) > 0
+        ) {
           w = Number(c.weight);
-        }
-        else if (pack.customWeights && pack.customWeights[c.rarity] !== undefined && pack.customWeights[c.rarity] !== "") {
+        } else if (
+          pack.customWeights &&
+          pack.customWeights[c.rarity] !== undefined &&
+          pack.customWeights[c.rarity] !== ''
+        ) {
           w = Number(pack.customWeights[c.rarity]);
-        }
-        else if (globalRObj) {
+        } else if (globalRObj) {
           w = Number(globalRObj.weight);
         }
 
@@ -706,7 +754,10 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       let newCard = activeWeights[0].card;
       for (const item of activeWeights) {
         sum += item.weight;
-        if (rand <= sum) { newCard = item.card; break; }
+        if (rand <= sum) {
+          newCard = item.card;
+          break;
+        }
       }
 
       let generatedPower = null;
@@ -722,11 +773,11 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       }
 
       localPulledCounts[newCard.id] += 1;
-      totalEarnedCoins += (newCard.sellPrice || 15);
+      totalEarnedCoins += newCard.sellPrice || 15;
 
       // Якщо картка має ліміт і щойно досягла його - видаляємо її з пулу для наступних спроб
       if (newCard.maxSupply > 0 && localPulledCounts[newCard.id] >= newCard.maxSupply) {
-        availableCards = availableCards.filter(c => c.id !== newCard.id);
+        availableCards = availableCards.filter((c) => c.id !== newCard.id);
       }
     }
 
@@ -739,18 +790,21 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           totalCards: { increment: results.length },
           packsOpened: { increment: amount },
           coinsSpentOnPacks: { increment: totalCost },
-          coinsEarnedFromPacks: { increment: totalEarnedCoins }
-        }
+          coinsEarnedFromPacks: { increment: totalEarnedCoins },
+        },
       });
 
       for (const [cardId, count] of Object.entries(countsMap)) {
         const existingInv = await tx.inventoryItem.findUnique({
-          where: { userId_cardId: { userId: user.uid, cardId: cardId } }
+          where: { userId_cardId: { userId: user.uid, cardId: cardId } },
         });
 
         let currentStats = [];
         if (existingInv && existingInv.gameStats) {
-          currentStats = typeof existingInv.gameStats === 'string' ? JSON.parse(existingInv.gameStats) : existingInv.gameStats;
+          currentStats =
+            typeof existingInv.gameStats === 'string'
+              ? JSON.parse(existingInv.gameStats)
+              : existingInv.gameStats;
         }
 
         if (cardStatsToAdd[cardId]) {
@@ -760,11 +814,11 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         await tx.inventoryItem.upsert({
           where: { userId_cardId: { userId: user.uid, cardId: cardId } },
           update: { amount: { increment: count }, gameStats: currentStats },
-          create: { userId: user.uid, cardId: cardId, amount: count, gameStats: currentStats }
+          create: { userId: user.uid, cardId: cardId, amount: count, gameStats: currentStats },
         });
         await tx.cardCatalog.update({
           where: { id: cardId },
-          data: { pulledCount: { increment: count } }
+          data: { pulledCount: { increment: count } },
         });
       }
     });
@@ -772,7 +826,7 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     // Отримуємо оновлені дані гравця
     const updatedUser = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      include: { inventory: true, farmState: true }
+      include: { inventory: true, farmState: true },
     });
 
     // Перевірка ачівок для цього паку
@@ -783,10 +837,9 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     } else {
       res.json({ pulledCards: results, profile: updatedUser });
     }
-
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка відкриття паку." });
+    res.status(500).json({ error: 'Помилка відкриття паку.' });
   }
 });
 
@@ -800,10 +853,10 @@ app.get('/api/game/market', async (req, res) => {
     const listings = await prisma.marketListing.findMany({
       where: { status: 'active' },
       include: { seller: { select: { nickname: true } } },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     // Форматуємо під старий формат фронтенду
-    const formatted = listings.map(l => ({
+    const formatted = listings.map((l) => ({
       id: l.id,
       cardId: l.cardId,
       price: l.price,
@@ -811,11 +864,11 @@ app.get('/api/game/market', async (req, res) => {
       createdAt: l.createdAt,
       sellerUid: l.sellerId,
       sellerNickname: l.seller.nickname,
-      power: l.power
+      power: l.power,
     }));
     res.json(formatted);
   } catch (error) {
-    res.status(500).json({ error: "Помилка завантаження ринку." });
+    res.status(500).json({ error: 'Помилка завантаження ринку.' });
   }
 });
 
@@ -824,26 +877,33 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
   const { cardId, price, power } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    const invItem = await prisma.inventoryItem.findUnique({ where: { userId_cardId: { userId: user.uid, cardId } } });
+    const invItem = await prisma.inventoryItem.findUnique({
+      where: { userId_cardId: { userId: user.uid, cardId } },
+    });
 
-    if (!invItem || invItem.amount < 1) return res.status(400).json({ error: "У вас немає цієї картки!" });
-    if (price < 1 || !Number.isInteger(price)) return res.status(400).json({ error: "Невірна ціна!" });
+    if (!invItem || invItem.amount < 1)
+      return res.status(400).json({ error: 'У вас немає цієї картки!' });
+    if (price < 1 || !Number.isInteger(price))
+      return res.status(400).json({ error: 'Невірна ціна!' });
 
     await prisma.$transaction(async (tx) => {
       let statsArray = [];
       if (invItem.gameStats) {
-        statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+        statsArray =
+          typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
       }
 
       let removedPower = null;
       if (power !== undefined && power !== null) {
         const parsedPower = Number(power);
-        const powerIndex = statsArray.findIndex(p => Number(p) === parsedPower);
+        const powerIndex = statsArray.findIndex((p) => Number(p) === parsedPower);
         if (powerIndex > -1) {
           removedPower = statsArray.splice(powerIndex, 1)[0];
         } else if (statsArray.length > 0) {
           // Fallback: power not found exactly (possible data mismatch), remove closest
-          statsArray.sort((a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower));
+          statsArray.sort(
+            (a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower)
+          );
           removedPower = statsArray.splice(0, 1)[0];
         } else {
           removedPower = power; // no stats tracked, just use provided value
@@ -857,19 +917,31 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
         await tx.inventoryItem.delete({ where: { userId_cardId: { userId: user.uid, cardId } } });
         await sanitizeShowcases(tx, user.uid, cardId, 0);
       } else {
-        await tx.inventoryItem.update({ where: { userId_cardId: { userId: user.uid, cardId } }, data: { amount: { decrement: 1 }, gameStats: statsArray } });
+        await tx.inventoryItem.update({
+          where: { userId_cardId: { userId: user.uid, cardId } },
+          data: { amount: { decrement: 1 }, gameStats: statsArray },
+        });
         await sanitizeShowcases(tx, user.uid, cardId, invItem.amount - 1);
       }
       await tx.user.update({ where: { uid: user.uid }, data: { totalCards: { decrement: 1 } } });
       await tx.marketListing.create({
-        data: { price: Number(price), sellerId: user.uid, cardId: cardId, status: "active", power: removedPower }
+        data: {
+          price: Number(price),
+          sellerId: user.uid,
+          cardId: cardId,
+          status: 'active',
+          power: removedPower,
+        },
       });
     });
 
-    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Помилка виставлення на ринок." });
+    res.status(500).json({ error: error.message || 'Помилка виставлення на ринок.' });
   }
 });
 
@@ -880,18 +952,28 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
     const buyer = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     const listing = await prisma.marketListing.findUnique({ where: { id: listingId } });
 
-    if (!listing || listing.status !== 'active') return res.status(400).json({ error: "Лот вже продано або не існує." });
-    if (listing.sellerId === buyer.uid) return res.status(400).json({ error: "Не можна купити свій лот!" });
-    if (buyer.coins < listing.price) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (!listing || listing.status !== 'active')
+      return res.status(400).json({ error: 'Лот вже продано або не існує.' });
+    if (listing.sellerId === buyer.uid)
+      return res.status(400).json({ error: 'Не можна купити свій лот!' });
+    if (buyer.coins < listing.price) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     await prisma.$transaction(async (tx) => {
       // Покупець: -монети, +картка, +totalCards
-      await tx.user.update({ where: { uid: buyer.uid }, data: { coins: { decrement: listing.price }, totalCards: { increment: 1 } } });
+      await tx.user.update({
+        where: { uid: buyer.uid },
+        data: { coins: { decrement: listing.price }, totalCards: { increment: 1 } },
+      });
 
-      const buyerInv = await tx.inventoryItem.findUnique({ where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } } });
+      const buyerInv = await tx.inventoryItem.findUnique({
+        where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } },
+      });
       let currentStats = [];
       if (buyerInv && buyerInv.gameStats) {
-        currentStats = typeof buyerInv.gameStats === 'string' ? JSON.parse(buyerInv.gameStats) : buyerInv.gameStats;
+        currentStats =
+          typeof buyerInv.gameStats === 'string'
+            ? JSON.parse(buyerInv.gameStats)
+            : buyerInv.gameStats;
       }
 
       if (listing.power !== null) {
@@ -901,14 +983,22 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } },
         update: { amount: { increment: 1 }, gameStats: currentStats },
-        create: { userId: buyer.uid, cardId: listing.cardId, amount: 1, gameStats: currentStats }
+        create: { userId: buyer.uid, cardId: listing.cardId, amount: 1, gameStats: currentStats },
       });
       // Продавець: +монети
-      await tx.user.update({ where: { uid: listing.sellerId }, data: { coins: { increment: listing.price } } });
+      await tx.user.update({
+        where: { uid: listing.sellerId },
+        data: { coins: { increment: listing.price } },
+      });
       // Лот: статус змінено ТА ДОДАНО ПОКУПЦЯ
       await tx.marketListing.update({
         where: { id: listingId },
-        data: { status: 'sold', soldAt: new Date(), buyerId: buyer.uid, buyerNickname: buyer.nickname }
+        data: {
+          status: 'sold',
+          soldAt: new Date(),
+          buyerId: buyer.uid,
+          buyerNickname: buyer.nickname,
+        },
       });
       // Сповіщення про продаж
       await tx.notification.create({
@@ -916,12 +1006,15 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
           userId: listing.sellerId,
           type: 'sale',
           title: 'Картку продано на ринку!',
-          message: `Ваш лот був куплений гравцем ${buyer.nickname} за ${listing.price} монет.`
-        }
+          message: `Ваш лот був куплений гравцем ${buyer.nickname} за ${listing.price} монет.`,
+        },
       });
     });
 
-    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
 
     // Перевірка ачівки для паку купленої картки
     const boughtCard = await prisma.cardCatalog.findUnique({ where: { id: listing.cardId } });
@@ -936,7 +1029,7 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
       res.json({ success: true, profile: updatedUser });
     }
   } catch (error) {
-    res.status(500).json({ error: "Помилка покупки." });
+    res.status(500).json({ error: 'Помилка покупки.' });
   }
 });
 
@@ -947,17 +1040,27 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     const listing = await prisma.marketListing.findUnique({ where: { id: listingId } });
 
-    if (!listing || listing.status !== 'active') return res.status(400).json({ error: "Лот не активний або не існує." });
-    if (listing.sellerId !== user.uid && !user.isAdmin) return res.status(403).json({ error: "У вас немає прав зняти цей лот." });
+    if (!listing || listing.status !== 'active')
+      return res.status(400).json({ error: 'Лот не активний або не існує.' });
+    if (listing.sellerId !== user.uid && !user.isAdmin)
+      return res.status(403).json({ error: 'У вас немає прав зняти цей лот.' });
 
     await prisma.$transaction(async (tx) => {
       await tx.marketListing.delete({ where: { id: listingId } });
-      await tx.user.update({ where: { uid: listing.sellerId }, data: { totalCards: { increment: 1 } } });
+      await tx.user.update({
+        where: { uid: listing.sellerId },
+        data: { totalCards: { increment: 1 } },
+      });
 
-      const sellerInv = await tx.inventoryItem.findUnique({ where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } } });
+      const sellerInv = await tx.inventoryItem.findUnique({
+        where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
+      });
       let currentStats = [];
       if (sellerInv && sellerInv.gameStats) {
-        currentStats = typeof sellerInv.gameStats === 'string' ? JSON.parse(sellerInv.gameStats) : sellerInv.gameStats;
+        currentStats =
+          typeof sellerInv.gameStats === 'string'
+            ? JSON.parse(sellerInv.gameStats)
+            : sellerInv.gameStats;
       }
 
       if (listing.power !== null) {
@@ -967,14 +1070,22 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
         update: { amount: { increment: 1 }, gameStats: currentStats },
-        create: { userId: listing.sellerId, cardId: listing.cardId, amount: 1, gameStats: currentStats }
+        create: {
+          userId: listing.sellerId,
+          cardId: listing.cardId,
+          amount: 1,
+          gameStats: currentStats,
+        },
       });
     });
 
-    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка скасування лоту." });
+    res.status(500).json({ error: 'Помилка скасування лоту.' });
   }
 });
 
@@ -990,21 +1101,21 @@ app.post('/api/game/2048/start', authenticate, async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
-        last2048PlayDate: now
-      }
+        last2048PlayDate: now,
+      },
     });
 
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера при старті гри." });
+    res.status(500).json({ error: 'Помилка сервера при старті гри.' });
   }
 });
 
 app.post('/api/game/2048/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
-  if (score < 100) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+  if (score < 100) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
@@ -1015,15 +1126,17 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
     // Скидання денного фарму
     if (user.lastFarmDate) {
       const lastFarm = new Date(user.lastFarmDate);
-      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+      if (
+        lastFarm.getUTCDate() !== now.getUTCDate() ||
         lastFarm.getUTCMonth() !== now.getUTCMonth() ||
-        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()
+      ) {
         currentDailyFarm = 0;
       }
     }
 
     if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
     // Курс: 1 поїнт рахунку = 1 монета
@@ -1039,12 +1152,12 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
       data: {
         coins: { increment: coinsToGive },
         dailyFarmAmount: currentDailyFarm + coinsToGive,
-        lastFarmDate: now
-      }
+        lastFarmDate: now,
+      },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка нарахування монет за гру 2048." });
+    res.status(500).json({ error: 'Помилка нарахування монет за гру 2048.' });
   }
 });
 
@@ -1056,21 +1169,21 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
-        lastTetrisPlayDate: now
-      }
+        lastTetrisPlayDate: now,
+      },
     });
 
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера при старті гри Тетріс." });
+    res.status(500).json({ error: 'Помилка сервера при старті гри Тетріс.' });
   }
 });
 
 app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
-  if (score < 50) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+  if (score < 50) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
@@ -1081,15 +1194,17 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
     // Скидання денного фарму
     if (user.lastFarmDate) {
       const lastFarm = new Date(user.lastFarmDate);
-      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+      if (
+        lastFarm.getUTCDate() !== now.getUTCDate() ||
         lastFarm.getUTCMonth() !== now.getUTCMonth() ||
-        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()
+      ) {
         currentDailyFarm = 0;
       }
     }
 
     if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
     // Курс: 1 поїнт рахунку = 6 монети (було 3)
@@ -1104,12 +1219,12 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
       data: {
         coins: { increment: coinsToGive },
         dailyFarmAmount: currentDailyFarm + coinsToGive,
-        lastFarmDate: now
-      }
+        lastFarmDate: now,
+      },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка нарахування монет за Тетріс." });
+    res.status(500).json({ error: 'Помилка нарахування монет за Тетріс.' });
   }
 });
 
@@ -1121,21 +1236,21 @@ app.post('/api/game/fuse/start', authenticate, async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
-        lastFusePlayDate: now
-      }
+        lastFusePlayDate: now,
+      },
     });
 
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера при старті гри Fuse Repair." });
+    res.status(500).json({ error: 'Помилка сервера при старті гри Fuse Repair.' });
   }
 });
 
 app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
-  if (score < 1) return res.status(400).json({ error: "Занадто малий рахунок для обміну." });
+  if (score < 1) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
@@ -1146,15 +1261,17 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
     // Скидання денного фарму
     if (user.lastFarmDate) {
       const lastFarm = new Date(user.lastFarmDate);
-      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+      if (
+        lastFarm.getUTCDate() !== now.getUTCDate() ||
         lastFarm.getUTCMonth() !== now.getUTCMonth() ||
-        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()
+      ) {
         currentDailyFarm = 0;
       }
     }
 
     if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: "Досягнуто денний ліміт фарму (500,000 монет)!" });
+      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
     // Курс: 1 поїнт рахунку (рівень) = 10 монети
@@ -1178,15 +1295,14 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
         dailyFarmAmount: currentDailyFarm + coinsToGive,
         lastFarmDate: now,
         fuseRepairedPoints: newPoints,
-        fuseLevel: newLevel
-      }
+        fuseLevel: newLevel,
+      },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка нарахування монет за Fuse Repair." });
+    res.status(500).json({ error: 'Помилка нарахування монет за Fuse Repair.' });
   }
 });
-
 
 // ----------------------------------------
 // BLACKJACK
@@ -1195,21 +1311,22 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
   const { betAmount } = req.body;
 
   const parsedBet = parseInt(betAmount, 10);
-  if (isNaN(parsedBet) || parsedBet < 10) return res.status(400).json({ error: "Мінімальна ставка 10 монет." });
+  if (isNaN(parsedBet) || parsedBet < 10)
+    return res.status(400).json({ error: 'Мінімальна ставка 10 монет.' });
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    if (user.coins < parsedBet) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (user.coins < parsedBet) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
-      data: { coins: { decrement: parsedBet } }
+      data: { coins: { decrement: parsedBet } },
     });
 
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера." });
+    res.status(500).json({ error: 'Помилка сервера.' });
   }
 });
 
@@ -1217,7 +1334,8 @@ app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
   const { result, betAmount } = req.body;
 
   const parsedBet = parseInt(betAmount, 10);
-  if (isNaN(parsedBet) || parsedBet < 10) return res.status(400).json({ error: "Неправильна ставка." });
+  if (isNaN(parsedBet) || parsedBet < 10)
+    return res.status(400).json({ error: 'Неправильна ставка.' });
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
@@ -1230,7 +1348,7 @@ app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
     if (coinsToGive > 0) {
       const updatedUser = await prisma.user.update({
         where: { uid: req.user.uid },
-        data: { coins: { increment: coinsToGive } }
+        data: { coins: { increment: coinsToGive } },
       });
       res.json({ success: true, earned: coinsToGive, profile: updatedUser });
     } else {
@@ -1238,10 +1356,9 @@ app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка сервера." });
+    res.status(500).json({ error: 'Помилка сервера.' });
   }
 });
-
 
 // ----------------------------------------
 // GAME BLOCKED STATUS & SSE (Admin feature)
@@ -1257,30 +1374,30 @@ app.get('/api/games/stream', (req, res) => {
   gameClients.push(res);
 
   req.on('close', () => {
-    gameClients = gameClients.filter(client => client !== res);
+    gameClients = gameClients.filter((client) => client !== res);
   });
 });
 
 app.get('/api/games/status', async (req, res) => {
   try {
-    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     const blockedGames = settings?.data?.blockedGames || [];
     res.json({ blockedGames });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка завантаження статусів ігор." });
+    res.status(500).json({ error: 'Помилка завантаження статусів ігор.' });
   }
 });
 
 app.post('/api/admin/games/toggle', authenticate, checkAdmin, async (req, res) => {
   const { game } = req.body;
-  if (!game) return res.status(400).json({ error: "Не вказано гру." });
+  if (!game) return res.status(400).json({ error: 'Не вказано гру.' });
 
   try {
-    let settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    let settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     if (!settings) {
       settings = await prisma.gameSettings.create({
-        data: { id: "main", data: { blockedGames: [] } }
+        data: { id: 'main', data: { blockedGames: [] } },
       });
     }
 
@@ -1288,33 +1405,32 @@ app.post('/api/admin/games/toggle', authenticate, checkAdmin, async (req, res) =
 
     let isBlocked = false;
     if (blockedGames.includes(game)) {
-      blockedGames = blockedGames.filter(g => g !== game);
+      blockedGames = blockedGames.filter((g) => g !== game);
     } else {
       blockedGames.push(game);
       isBlocked = true;
     }
 
     await prisma.gameSettings.update({
-      where: { id: "main" },
-      data: { data: { ...settings.data, blockedGames } }
+      where: { id: 'main' },
+      data: { data: { ...settings.data, blockedGames } },
     });
 
     // Send SSE Event to all clients if the game was just blocked
     if (isBlocked) {
-      const message = `data: ${JSON.stringify({ type: "GAME_BLOCKED", game })}\n\n`;
-      gameClients.forEach(client => client.write(message));
+      const message = `data: ${JSON.stringify({ type: 'GAME_BLOCKED', game })}\n\n`;
+      gameClients.forEach((client) => client.write(message));
     } else {
-      const message = `data: ${JSON.stringify({ type: "GAME_UNBLOCKED", game })}\n\n`;
-      gameClients.forEach(client => client.write(message));
+      const message = `data: ${JSON.stringify({ type: 'GAME_UNBLOCKED', game })}\n\n`;
+      gameClients.forEach((client) => client.write(message));
     }
 
     res.json({ success: true, blockedGames });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Помилка зміни статусу гри." });
+    res.status(500).json({ error: 'Помилка зміни статусу гри.' });
   }
 });
-
 
 // ----------------------------------------
 // ФАРМ (БИТВИ З БОСАМИ ТА АНТИЧІТ)
@@ -1328,7 +1444,7 @@ app.get('/api/game/market/notifications', authenticate, async (req, res) => {
   try {
     let currentUser = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      select: { uid: true, isBanned: true, banUntil: true, bannedBy: true, banReason: true }
+      select: { uid: true, isBanned: true, banUntil: true, bannedBy: true, banReason: true },
     });
 
     currentUser = await checkAndUnbanUser(currentUser);
@@ -1347,22 +1463,22 @@ app.get('/api/game/market/notifications', authenticate, async (req, res) => {
       where: {
         sellerId: req.user.uid,
         status: 'sold',
-        soldAt: { gt: checkDate }
+        soldAt: { gt: checkDate },
       },
-      include: { card: true }
+      include: { card: true },
     });
 
     let updatedProfile = null;
     if (recentSales.length > 0) {
       updatedProfile = await prisma.user.findUnique({
         where: { uid: req.user.uid },
-        include: { inventory: { include: { card: true } }, farmState: true, showcases: true }
+        include: { inventory: { include: { card: true } }, farmState: true, showcases: true },
       });
     }
 
     res.json({ sales: recentSales, profile: updatedProfile, serverTime });
   } catch (error) {
-    res.status(500).json({ error: "Помилка перевірки сповіщень." });
+    res.status(500).json({ error: 'Помилка перевірки сповіщень.' });
   }
 });
 
@@ -1371,7 +1487,9 @@ app.get('/api/game/farm/state', authenticate, async (req, res) => {
   try {
     const farm = await prisma.farmState.findUnique({ where: { userId: req.user.uid } });
     res.json(farm || {});
-  } catch (error) { res.status(500).json({ error: "Помилка завантаження фарму." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження фарму.' });
+  }
 });
 
 // Синхронізація кліків (Античіт)
@@ -1379,38 +1497,61 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
   const { bossId, damageDone, maxHp } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { farmState: true } });
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { farmState: true },
+    });
     let farm = user.farmState;
 
-    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
 
     // Безпечний доступ до JSON поля
     let bosses = [];
-    if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
+    if (
+      settings &&
+      settings.data &&
+      typeof settings.data === 'object' &&
+      Array.isArray(settings.data.bosses)
+    ) {
       bosses = settings.data.bosses;
     }
 
-    const currentBoss = bosses.find(b => b.id === bossId);
-    const dbMaxHp = currentBoss && currentBoss.maxHp ? Number(currentBoss.maxHp) : (maxHp || 1000);
+    const currentBoss = bosses.find((b) => b.id === bossId);
+    const dbMaxHp = currentBoss && currentBoss.maxHp ? Number(currentBoss.maxHp) : maxHp || 1000;
 
     if (!farm) {
-      farm = await prisma.farmState.create({ data: { userId: user.uid, bossId, currentHp: Math.max(0, dbMaxHp - damageDone), lastUpdated: new Date() } });
+      farm = await prisma.farmState.create({
+        data: {
+          userId: user.uid,
+          bossId,
+          currentHp: Math.max(0, dbMaxHp - damageDone),
+          lastUpdated: new Date(),
+        },
+      });
     } else if (farm.bossId !== bossId) {
-      farm = await prisma.farmState.update({ where: { userId: user.uid }, data: { bossId, currentHp: Math.max(0, dbMaxHp - damageDone), cooldownUntil: null, lastUpdated: new Date() } });
+      farm = await prisma.farmState.update({
+        where: { userId: user.uid },
+        data: {
+          bossId,
+          currentHp: Math.max(0, dbMaxHp - damageDone),
+          cooldownUntil: null,
+          lastUpdated: new Date(),
+        },
+      });
     } else {
       if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date()) {
-        return res.status(400).json({ error: "Бос ще на кулдауні!" });
+        return res.status(400).json({ error: 'Бос ще на кулдауні!' });
       }
       const currentHp = farm.currentHp ?? dbMaxHp;
       farm = await prisma.farmState.update({
         where: { userId: user.uid },
-        data: { currentHp: Math.max(0, currentHp - damageDone), lastUpdated: new Date() }
+        data: { currentHp: Math.max(0, currentHp - damageDone), lastUpdated: new Date() },
       });
     }
     res.json({ success: true, farmState: farm });
   } catch (error) {
-    console.error("Помилка синхронізації кліків:", error);
-    res.status(500).json({ error: "Помилка синхронізації кліків." });
+    console.error('Помилка синхронізації кліків:', error);
+    res.status(500).json({ error: 'Помилка синхронізації кліків.' });
   }
 });
 
@@ -1418,20 +1559,30 @@ app.post('/api/game/farm/sync', authenticate, async (req, res) => {
 app.post('/api/game/farm/claim', authenticate, async (req, res) => {
   const { bossId } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { farmState: true } });
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { farmState: true },
+    });
     const farm = user.farmState;
 
-    if (!farm || farm.bossId !== bossId || farm.currentHp > 0) return res.status(400).json({ error: "Боса ще не переможено!" });
-    if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date()) return res.status(400).json({ error: "Нагороду вже забрано!" });
+    if (!farm || farm.bossId !== bossId || farm.currentHp > 0)
+      return res.status(400).json({ error: 'Боса ще не переможено!' });
+    if (farm.cooldownUntil && new Date(farm.cooldownUntil) > new Date())
+      return res.status(400).json({ error: 'Нагороду вже забрано!' });
 
     // БЕЗПЕКА: Дістаємо дані про боса з БД замість того, щоб вірити клієнту (F12 bypass prevention)
-    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     let bosses = [];
-    if (settings && settings.data && typeof settings.data === 'object' && Array.isArray(settings.data.bosses)) {
+    if (
+      settings &&
+      settings.data &&
+      typeof settings.data === 'object' &&
+      Array.isArray(settings.data.bosses)
+    ) {
       bosses = settings.data.bosses;
     }
-    const currentBoss = bosses.find(b => b.id === bossId);
-    if (!currentBoss) return res.status(404).json({ error: "Боса не знайдено!" });
+    const currentBoss = bosses.find((b) => b.id === bossId);
+    if (!currentBoss) return res.status(404).json({ error: 'Боса не знайдено!' });
 
     const maxHp = Number(currentBoss.maxHp) || 1000;
     const damagePerClick = Number(currentBoss.damagePerClick) || 10;
@@ -1440,7 +1591,7 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
     const cdHours = Number(currentBoss.cooldownHours) || 4;
 
     const maxHitsAllowed = Math.ceil(maxHp / damagePerClick);
-    const calculatedReward = (maxHitsAllowed * rewardPerClick) + killBonus;
+    const calculatedReward = maxHitsAllowed * rewardPerClick + killBonus;
 
     // Визначаємо чи треба підвищити рівень (якщо вбитий бос - поточний за рівнем)
     const sortedBosses = [...bosses].sort((a, b) => a.level - b.level);
@@ -1455,9 +1606,11 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
     // Скидання денного фарму
     if (user.lastFarmDate) {
       const lastFarm = new Date(user.lastFarmDate);
-      if (lastFarm.getUTCDate() !== now.getUTCDate() ||
+      if (
+        lastFarm.getUTCDate() !== now.getUTCDate() ||
         lastFarm.getUTCMonth() !== now.getUTCMonth() ||
-        lastFarm.getUTCFullYear() !== now.getUTCFullYear()) {
+        lastFarm.getUTCFullYear() !== now.getUTCFullYear()
+      ) {
         currentDailyFarm = 0;
       }
     }
@@ -1478,20 +1631,20 @@ app.post('/api/game/farm/claim', authenticate, async (req, res) => {
           coins: { increment: actualReward },
           farmLevel: isLevelUp ? { increment: 1 } : undefined,
           dailyFarmAmount: currentDailyFarm + actualReward,
-          lastFarmDate: now
-        }
+          lastFarmDate: now,
+        },
       });
       await tx.farmState.update({
         where: { userId: user.uid },
-        data: { cooldownUntil: cdUntil, currentHp: maxHp }
+        data: { cooldownUntil: cdUntil, currentHp: maxHp },
       });
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     res.json({ success: true, profile: updatedUser, cdUntil, reward: actualReward, isLevelUp });
   } catch (error) {
-    console.error("Помилка отримання нагороди:", error);
-    res.status(500).json({ error: "Помилка отримання нагороди." });
+    console.error('Помилка отримання нагороди:', error);
+    res.status(500).json({ error: 'Помилка отримання нагороди.' });
   }
 });
 
@@ -1502,10 +1655,12 @@ app.post('/api/admin/farm/reset-cd', authenticate, checkAdmin, async (req, res) 
     await prisma.farmState.upsert({
       where: { userId: targetUid },
       update: { cooldownUntil: null, currentHp: maxHp },
-      create: { userId: targetUid, currentHp: maxHp, cooldownUntil: null }
+      create: { userId: targetUid, currentHp: maxHp, cooldownUntil: null },
     });
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: "Помилка скидання кулдауну." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка скидання кулдауну.' });
+  }
 });
 
 // ----------------------------------------
@@ -1515,31 +1670,39 @@ app.post('/api/admin/farm/reset-cd', authenticate, checkAdmin, async (req, res) 
 // --- Налаштування ---
 app.get('/api/game/settings', async (req, res) => {
   try {
-    let settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    let settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     if (!settings) {
       settings = await prisma.gameSettings.create({
         data: {
-          id: "main", data: {
-            bosses: [], dailyRewards: [1000, 2000, 3000, 4000, 5000, 6000, 7000],
+          id: 'main',
+          data: {
+            bosses: [],
+            dailyRewards: [1000, 2000, 3000, 4000, 5000, 6000, 7000],
             premiumDailyRewards: [2000, 4000, 6000, 8000, 10000, 12000, 15000],
-            premiumPrice: 10000, premiumDurationDays: 30, premiumShopItems: []
-          }
-        }
+            premiumPrice: 10000,
+            premiumDurationDays: 30,
+            premiumShopItems: [],
+          },
+        },
       });
     }
     res.json(settings.data);
-  } catch (error) { res.status(500).json({ error: "Помилка завантаження налаштувань." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження налаштувань.' });
+  }
 });
 
 app.post('/api/admin/settings', authenticate, checkAdmin, async (req, res) => {
   try {
     const settings = await prisma.gameSettings.upsert({
-      where: { id: "main" },
+      where: { id: 'main' },
       update: { data: req.body },
-      create: { id: "main", data: req.body }
+      create: { id: 'main', data: req.body },
     });
     res.json({ success: true, data: settings.data });
-  } catch (error) { res.status(500).json({ error: "Помилка збереження налаштувань." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка збереження налаштувань.' });
+  }
 });
 
 // --- Промокоди ---
@@ -1547,7 +1710,9 @@ app.get('/api/admin/promos', authenticate, checkAdmin, async (req, res) => {
   try {
     const promos = await prisma.promoCode.findMany();
     res.json(promos);
-  } catch (e) { res.status(500).json({ error: "Помилка завантаження промокодів." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка завантаження промокодів.' });
+  }
 });
 
 app.post('/api/admin/promos', authenticate, checkAdmin, async (req, res) => {
@@ -1555,71 +1720,93 @@ app.post('/api/admin/promos', authenticate, checkAdmin, async (req, res) => {
     const { code, reward, maxGlobalUses, maxUserUses } = req.body;
     const promo = await prisma.promoCode.upsert({
       where: { code },
-      update: { reward: Number(reward), maxGlobalUses: Number(maxGlobalUses), maxUserUses: Number(maxUserUses) },
-      create: { code, reward: Number(reward), maxGlobalUses: Number(maxGlobalUses), maxUserUses: Number(maxUserUses), currentGlobalUses: 0, usedBy: [] }
+      update: {
+        reward: Number(reward),
+        maxGlobalUses: Number(maxGlobalUses),
+        maxUserUses: Number(maxUserUses),
+      },
+      create: {
+        code,
+        reward: Number(reward),
+        maxGlobalUses: Number(maxGlobalUses),
+        maxUserUses: Number(maxUserUses),
+        currentGlobalUses: 0,
+        usedBy: [],
+      },
     });
     res.json(promo);
-  } catch (e) { res.status(500).json({ error: "Помилка збереження промокоду." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка збереження промокоду.' });
+  }
 });
 
 app.delete('/api/admin/promos/:code', authenticate, checkAdmin, async (req, res) => {
   try {
     await prisma.promoCode.delete({ where: { code: req.params.code } });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка видалення промокоду." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка видалення промокоду.' });
+  }
 });
 
 app.post('/api/game/promos/use', authenticate, async (req, res) => {
   const { code } = req.body;
   try {
     const promo = await prisma.promoCode.findUnique({ where: { code } });
-    if (!promo) return res.status(404).json({ error: "Промокод не знайдено!" });
+    if (!promo) return res.status(404).json({ error: 'Промокод не знайдено!' });
 
     const usedByList = promo.usedBy || [];
-    const userUses = usedByList.filter(uid => uid === req.user.uid).length;
+    const userUses = usedByList.filter((uid) => uid === req.user.uid).length;
 
     if (promo.maxGlobalUses > 0 && promo.currentGlobalUses >= promo.maxGlobalUses) {
-      return res.status(400).json({ error: "Ліміт використання цього промокоду вичерпано!" });
+      return res.status(400).json({ error: 'Ліміт використання цього промокоду вичерпано!' });
     }
     if (promo.maxUserUses > 0 && userUses >= promo.maxUserUses) {
-      return res.status(400).json({ error: "Ви вже використали цей код максимальну кількість разів!" });
+      return res
+        .status(400)
+        .json({ error: 'Ви вже використали цей код максимальну кількість разів!' });
     }
 
     await prisma.$transaction(async (tx) => {
       const newUsedBy = [...usedByList, req.user.uid];
       await tx.promoCode.update({
         where: { code },
-        data: { currentGlobalUses: { increment: 1 }, usedBy: newUsedBy }
+        data: { currentGlobalUses: { increment: 1 }, usedBy: newUsedBy },
       });
       await tx.user.update({
         where: { uid: req.user.uid },
-        data: { coins: { increment: promo.reward } }
+        data: { coins: { increment: promo.reward } },
       });
     });
 
     const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     res.json({ success: true, reward: promo.reward, profile: updatedUser });
-
-  } catch (e) { res.status(500).json({ error: "Помилка активації промокоду." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка активації промокоду.' });
+  }
 });
 
 // --- ЩОДЕННА НАГОРОДА ---
 app.post('/api/game/daily-claim', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     const sData = settings?.data || {};
 
     const now = new Date();
     if (user.lastDailyClaim) {
       const last = new Date(user.lastDailyClaim);
-      if (last.getUTCDate() === now.getUTCDate() && last.getUTCMonth() === now.getUTCMonth() && last.getUTCFullYear() === now.getUTCFullYear()) {
-        return res.status(400).json({ error: "Ви вже забирали нагороду сьогодні!" });
+      if (
+        last.getUTCDate() === now.getUTCDate() &&
+        last.getUTCMonth() === now.getUTCMonth() &&
+        last.getUTCFullYear() === now.getUTCFullYear()
+      ) {
+        return res.status(400).json({ error: 'Ви вже забирали нагороду сьогодні!' });
       }
     }
 
     const isPremium = user.isPremium && new Date(user.premiumUntil) > now;
-    const rewardsArr = isPremium ? (sData.premiumDailyRewards || []) : (sData.dailyRewards || []);
+    const rewardsArr = isPremium ? sData.premiumDailyRewards || [] : sData.dailyRewards || [];
     const streak = user.dailyStreak || 0;
     const reward = rewardsArr[streak % rewardsArr.length] || 1000;
 
@@ -1628,13 +1815,13 @@ app.post('/api/game/daily-claim', authenticate, async (req, res) => {
       data: {
         coins: { increment: reward },
         lastDailyClaim: now,
-        dailyStreak: streak + 1
-      }
+        dailyStreak: streak + 1,
+      },
     });
 
     res.json({ success: true, reward, profile: updatedUser });
   } catch (error) {
-    res.status(500).json({ error: "Помилка отримання нагороди." });
+    res.status(500).json({ error: 'Помилка отримання нагороди.' });
   }
 });
 
@@ -1651,38 +1838,38 @@ app.get('/api/game/leaderboard', async (req, res) => {
         farmLevel: true,
         isBanned: true,
         avatarUrl: true,
-        isAdmin: true,       // <-- ДОДАНО
-        isSuperAdmin: true,  // <-- ДОДАНО
-        isPremium: true,     // <-- ДОДАНО
-        premiumUntil: true,  // <-- ДОДАНО
-        lastIp: true,        // <-- ДОДАНО для адмінів
+        isAdmin: true, // <-- ДОДАНО
+        isSuperAdmin: true, // <-- ДОДАНО
+        isPremium: true, // <-- ДОДАНО
+        premiumUntil: true, // <-- ДОДАНО
+        lastIp: true, // <-- ДОДАНО для адмінів
         // Рахуємо кількість унікальних записів в інвентарі гравця
         _count: {
-          select: { inventory: true }
-        }
-      }
+          select: { inventory: true },
+        },
+      },
     });
 
     // Форматуємо дані під те, що очікує RatingView.jsx
-    const formattedUsers = users.map(user => ({
+    const formattedUsers = users.map((user) => ({
       uid: user.uid,
       nickname: user.nickname,
       coins: user.coins,
       farmLevel: user.farmLevel,
       isBanned: user.isBanned,
       avatarUrl: user.avatarUrl,
-      isAdmin: user.isAdmin,             // <-- ДОДАНО
-      isSuperAdmin: user.isSuperAdmin,   // <-- ДОДАНО
-      isPremium: user.isPremium,         // <-- ДОДАНО
-      premiumUntil: user.premiumUntil,   // <-- ДОДАНО
-      lastIp: user.lastIp,               // <-- ДОДАНО
-      uniqueCardsCount: user._count.inventory
+      isAdmin: user.isAdmin, // <-- ДОДАНО
+      isSuperAdmin: user.isSuperAdmin, // <-- ДОДАНО
+      isPremium: user.isPremium, // <-- ДОДАНО
+      premiumUntil: user.premiumUntil, // <-- ДОДАНО
+      lastIp: user.lastIp, // <-- ДОДАНО
+      uniqueCardsCount: user._count.inventory,
     }));
 
     res.json(formattedUsers);
   } catch (error) {
-    console.error("Помилка лідерборду:", error);
-    res.status(500).json({ error: "Помилка завантаження рейтингу." });
+    console.error('Помилка лідерборду:', error);
+    res.status(500).json({ error: 'Помилка завантаження рейтингу.' });
   }
 });
 
@@ -1693,25 +1880,31 @@ app.get('/api/game/leaderboard', async (req, res) => {
 // Створення вітрини
 app.post('/api/profile/showcases', authenticate, async (req, res) => {
   const { name } = req.body;
-  if (!name) return res.status(400).json({ error: "Введіть назву вітрини." });
+  if (!name) return res.status(400).json({ error: 'Введіть назву вітрини.' });
 
   try {
-    const user = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { showcases: true } });
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { showcases: true },
+    });
     if (user.showcases.length >= 5 && !user.isSuperAdmin) {
-      return res.status(400).json({ error: "Досягнуто ліміт вітрин (5 шт)." });
+      return res.status(400).json({ error: 'Досягнуто ліміт вітрин (5 шт).' });
     }
     const showcase = await prisma.showcase.create({
-      data: { name, cardIds: [], userId: req.user.uid }
+      data: { name, cardIds: [], userId: req.user.uid },
     });
     res.json({ success: true, showcase });
-  } catch (error) { res.status(500).json({ error: "Помилка створення вітрини." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка створення вітрини.' });
+  }
 });
 
 // Видалення вітрини
 app.delete('/api/profile/showcases/:id', authenticate, async (req, res) => {
   try {
     const showcase = await prisma.showcase.findUnique({ where: { id: req.params.id } });
-    if (!showcase || showcase.userId !== req.user.uid) return res.status(403).json({ error: "Доступ заборонено." });
+    if (!showcase || showcase.userId !== req.user.uid)
+      return res.status(403).json({ error: 'Доступ заборонено.' });
 
     await prisma.showcase.delete({ where: { id: req.params.id } });
 
@@ -1721,7 +1914,9 @@ app.delete('/api/profile/showcases/:id', authenticate, async (req, res) => {
       await prisma.user.update({ where: { uid: req.user.uid }, data: { mainShowcaseId: null } });
     }
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: "Помилка видалення вітрини." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка видалення вітрини.' });
+  }
 });
 
 // Збереження карток у вітрині
@@ -1729,25 +1924,28 @@ app.put('/api/profile/showcases/:id/cards', authenticate, async (req, res) => {
   const { cardIds } = req.body;
   try {
     const showcase = await prisma.showcase.findUnique({ where: { id: req.params.id } });
-    if (!showcase || showcase.userId !== req.user.uid) return res.status(403).json({ error: "Доступ заборонено." });
+    if (!showcase || showcase.userId !== req.user.uid)
+      return res.status(403).json({ error: 'Доступ заборонено.' });
 
     const updated = await prisma.showcase.update({
       where: { id: req.params.id },
-      data: { cardIds }
+      data: { cardIds },
     });
     res.json({ success: true, showcase: updated });
-  } catch (error) { res.status(500).json({ error: "Помилка збереження карток." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка збереження карток.' });
+  }
 });
 
 // Купівля преміуму
 app.post('/api/game/buy-premium', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    const settings = await prisma.gameSettings.findUnique({ where: { id: "main" } });
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     const price = settings?.data?.premiumPrice || 10000;
     const days = settings?.data?.premiumDurationDays || 30;
 
-    if (user.coins < price) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (user.coins < price) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     let currentExp = new Date();
     if (user.isPremium && user.premiumUntil) {
@@ -1758,11 +1956,17 @@ app.post('/api/game/buy-premium', authenticate, async (req, res) => {
 
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
-      data: { coins: { decrement: price }, isPremium: true, premiumUntil: currentExp.toISOString() }
+      data: {
+        coins: { decrement: price },
+        isPremium: true,
+        premiumUntil: currentExp.toISOString(),
+      },
     });
 
     res.json({ success: true, profile: updatedUser });
-  } catch (error) { res.status(500).json({ error: "Помилка покупки преміуму." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка покупки преміуму.' });
+  }
 });
 
 // Зміна головної вітрини
@@ -1771,10 +1975,12 @@ app.post('/api/profile/main-showcase', authenticate, async (req, res) => {
   try {
     const updatedUser = await prisma.user.update({
       where: { uid: req.user.uid },
-      data: { mainShowcaseId: showcaseId } // showcaseId може бути null, якщо знімаємо
+      data: { mainShowcaseId: showcaseId }, // showcaseId може бути null, якщо знімаємо
     });
     res.json({ success: true, profile: updatedUser });
-  } catch (error) { res.status(500).json({ error: "Помилка оновлення вітрини." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка оновлення вітрини.' });
+  }
 });
 
 // ----------------------------------------
@@ -1784,17 +1990,43 @@ app.post('/api/profile/main-showcase', authenticate, async (req, res) => {
 // Завантаження всіх гравців
 app.get('/api/admin/users', authenticate, checkAdmin, async (req, res) => {
   try {
-    const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, select: { uid: true, nickname: true, email: true, coins: true, totalCards: true, createdAt: true, isAdmin: true, isSuperAdmin: true, isBanned: true, banReason: true, banUntil: true, isPremium: true, premiumUntil: true, avatarUrl: true, mainShowcaseId: true, lastIp: true, autoSoundEnabled: true, farmLevel: true } });
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        uid: true,
+        nickname: true,
+        email: true,
+        coins: true,
+        totalCards: true,
+        createdAt: true,
+        isAdmin: true,
+        isSuperAdmin: true,
+        isBanned: true,
+        banReason: true,
+        banUntil: true,
+        isPremium: true,
+        premiumUntil: true,
+        avatarUrl: true,
+        mainShowcaseId: true,
+        lastIp: true,
+        autoSoundEnabled: true,
+        farmLevel: true,
+      },
+    });
     res.json(users);
-  } catch (error) { res.status(500).json({ error: "Помилка завантаження гравців." }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження гравців.' });
+  }
 });
 
 // Завантаження інвентарю конкретного гравця
 app.get('/api/admin/users/:uid/inventory', authenticate, checkAdmin, async (req, res) => {
   try {
     const inv = await prisma.inventoryItem.findMany({ where: { userId: req.params.uid } });
-    res.json(inv.map(i => ({ id: i.cardId, amount: i.amount })));
-  } catch (error) { res.status(500).json({ error: "Помилка завантаження інвентарю." }); }
+    res.json(inv.map((i) => ({ id: i.cardId, amount: i.amount })));
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження інвентарю.' });
+  }
 });
 
 // Універсальний обробник дій адміна
@@ -1804,42 +2036,90 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
     let updatedUser;
 
     // Отримуємо адміна для запису в bannedBy
-    const adminUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, select: { nickname: true } });
+    const adminUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      select: { nickname: true },
+    });
 
     switch (action) {
       case 'ban':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: true, banReason: payload.reason, banUntil: payload.until, bannedBy: adminUser?.nickname || "Адміністратор" } });
-        await prisma.notification.create({ data: { userId: targetUid, type: 'punishment', title: 'Бан акаунту', message: `Вас забанено адміністратором ${adminUser?.nickname || "Адміністратор"}. Причина: ${payload.reason}. Термін дії: ${payload.until ? new Date(payload.until).toLocaleString() : 'Назавжди'}` } });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: {
+            isBanned: true,
+            banReason: payload.reason,
+            banUntil: payload.until,
+            bannedBy: adminUser?.nickname || 'Адміністратор',
+          },
+        });
+        await prisma.notification.create({
+          data: {
+            userId: targetUid,
+            type: 'punishment',
+            title: 'Бан акаунту',
+            message: `Вас забанено адміністратором ${adminUser?.nickname || 'Адміністратор'}. Причина: ${payload.reason}. Термін дії: ${payload.until ? new Date(payload.until).toLocaleString() : 'Назавжди'}`,
+          },
+        });
         break;
       case 'unban':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null } });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { isBanned: false, banReason: null, banUntil: null, bannedBy: null },
+        });
         break;
       case 'toggleAdmin':
         const userToToggle = await prisma.user.findUnique({ where: { uid: targetUid } });
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isAdmin: !userToToggle.isAdmin } });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { isAdmin: !userToToggle.isAdmin },
+        });
         break;
       case 'nickname':
         const exists = await prisma.user.findFirst({ where: { nickname: payload.nickname } });
-        if (exists && exists.uid !== targetUid) return res.status(400).json({ error: "Нікнейм вже зайнятий!" });
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { nickname: payload.nickname } });
+        if (exists && exists.uid !== targetUid)
+          return res.status(400).json({ error: 'Нікнейм вже зайнятий!' });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { nickname: payload.nickname },
+        });
         break;
       case 'coins':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { coins: payload.exact ? payload.amount : { increment: payload.amount } } });
-        await prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Зміна балансу', message: `Адміністратор змінив ваш баланс монет. ${payload.exact ? 'Новий баланс: ' + payload.amount : 'Різниця: ' + payload.amount}` } });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { coins: payload.exact ? payload.amount : { increment: payload.amount } },
+        });
+        await prisma.notification.create({
+          data: {
+            userId: targetUid,
+            type: 'admin_action',
+            title: 'Зміна балансу',
+            message: `Адміністратор змінив ваш баланс монет. ${payload.exact ? 'Новий баланс: ' + payload.amount : 'Різниця: ' + payload.amount}`,
+          },
+        });
         break;
       case 'farmLevel':
-        updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { farmLevel: payload.level } });
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { farmLevel: payload.level },
+        });
         await prisma.farmState.deleteMany({ where: { userId: targetUid } }); // Скидаємо поточного боса
         break;
       case 'premium':
         if (payload.revoke) {
-          updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isPremium: false, premiumUntil: null } });
+          updatedUser = await prisma.user.update({
+            where: { uid: targetUid },
+            data: { isPremium: false, premiumUntil: null },
+          });
         } else {
           const u = await prisma.user.findUnique({ where: { uid: targetUid } });
           let currentExp = new Date();
-          if (u.isPremium && u.premiumUntil && new Date(u.premiumUntil) > currentExp) currentExp = new Date(u.premiumUntil);
+          if (u.isPremium && u.premiumUntil && new Date(u.premiumUntil) > currentExp)
+            currentExp = new Date(u.premiumUntil);
           currentExp.setDate(currentExp.getDate() + payload.days);
-          updatedUser = await prisma.user.update({ where: { uid: targetUid }, data: { isPremium: true, premiumUntil: currentExp.toISOString() } });
+          updatedUser = await prisma.user.update({
+            where: { uid: targetUid },
+            data: { isPremium: true, premiumUntil: currentExp.toISOString() },
+          });
         }
         break;
       case 'delete':
@@ -1850,34 +2130,72 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
           prisma.inventoryItem.upsert({
             where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } },
             update: { amount: { increment: payload.amount } },
-            create: { userId: targetUid, cardId: payload.cardId, amount: payload.amount }
+            create: { userId: targetUid, cardId: payload.cardId, amount: payload.amount },
           }),
-          prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { increment: payload.amount } } }),
-          prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Отримано картки', message: `Адміністратор видав вам картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.` } })
+          prisma.user.update({
+            where: { uid: targetUid },
+            data: { totalCards: { increment: payload.amount } },
+          }),
+          prisma.notification.create({
+            data: {
+              userId: targetUid,
+              type: 'admin_action',
+              title: 'Отримано картки',
+              message: `Адміністратор видав вам картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.`,
+            },
+          }),
         ]);
         break;
       case 'removeCard':
-        const invItem = await prisma.inventoryItem.findUnique({ where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } } });
+        const invItem = await prisma.inventoryItem.findUnique({
+          where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } },
+        });
         if (invItem && invItem.amount <= payload.amount) {
           await prisma.$transaction([
-            prisma.inventoryItem.delete({ where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } } }),
-            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: invItem.amount } } }),
-            prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Вилучено картки', message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${invItem.amount} шт.` } })
+            prisma.inventoryItem.delete({
+              where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } },
+            }),
+            prisma.user.update({
+              where: { uid: targetUid },
+              data: { totalCards: { decrement: invItem.amount } },
+            }),
+            prisma.notification.create({
+              data: {
+                userId: targetUid,
+                type: 'admin_action',
+                title: 'Вилучено картки',
+                message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${invItem.amount} шт.`,
+              },
+            }),
           ]);
         } else if (invItem) {
           await prisma.$transaction([
-            prisma.inventoryItem.update({ where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } }, data: { amount: { decrement: payload.amount } } }),
-            prisma.user.update({ where: { uid: targetUid }, data: { totalCards: { decrement: payload.amount } } }),
-            prisma.notification.create({ data: { userId: targetUid, type: 'admin_action', title: 'Вилучено картки', message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.` } })
+            prisma.inventoryItem.update({
+              where: { userId_cardId: { userId: targetUid, cardId: payload.cardId } },
+              data: { amount: { decrement: payload.amount } },
+            }),
+            prisma.user.update({
+              where: { uid: targetUid },
+              data: { totalCards: { decrement: payload.amount } },
+            }),
+            prisma.notification.create({
+              data: {
+                userId: targetUid,
+                type: 'admin_action',
+                title: 'Вилучено картки',
+                message: `Адміністратор вилучив у вас картки (ID: ${payload.cardId}) у кількості ${payload.amount} шт.`,
+              },
+            }),
           ]);
         }
         break;
-      default: return res.status(400).json({ error: "Невідома дія." });
+      default:
+        return res.status(400).json({ error: 'Невідома дія.' });
     }
     res.json({ success: true, profile: updatedUser });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: "Помилка виконання дії на сервері." });
+    res.status(500).json({ error: 'Помилка виконання дії на сервері.' });
   }
 });
 
@@ -1888,55 +2206,60 @@ app.post('/api/profile/update-avatar', authenticate, async (req, res) => {
   const { avatarUrl } = req.body;
 
   if (!avatarUrl) {
-    return res.status(400).json({ error: "URL аватара не надано." });
+    return res.status(400).json({ error: 'URL аватара не надано.' });
   }
 
   try {
     const updatedUser = await prisma.user.update({
       where: { uid: req.user.uid },
-      data: { avatarUrl }
+      data: { avatarUrl },
     });
 
     console.log(`Аватар оновлено для користувача: ${updatedUser.nickname}`);
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
-    console.error("Помилка при оновленні аватара:", error);
-    res.status(500).json({ error: "Помилка оновлення аватара на сервері." });
+    console.error('Помилка при оновленні аватара:', error);
+    res.status(500).json({ error: 'Помилка оновлення аватара на сервері.' });
   }
 });
 
-app.post('/api/profile/upload-avatar', authenticate, uploadAvatar.single('avatar'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Файл не завантажено." });
-    }
+app.post(
+  '/api/profile/upload-avatar',
+  authenticate,
+  uploadAvatar.single('avatar'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Файл не завантажено.' });
+      }
 
-    const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
-    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+      const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
-    // Видаляємо стару аватарку, якщо вона локальна
-    if (user && user.avatarUrl && user.avatarUrl.startsWith('/uploads/avatars/')) {
-      const oldPath = path.join(__dirname, user.avatarUrl);
-      if (fs.existsSync(oldPath)) {
-        try {
-          fs.unlinkSync(oldPath);
-        } catch (err) {
-          console.error("Помилка видалення старого аватара:", err);
+      // Видаляємо стару аватарку, якщо вона локальна
+      if (user && user.avatarUrl && user.avatarUrl.startsWith('/uploads/avatars/')) {
+        const oldPath = path.join(__dirname, user.avatarUrl);
+        if (fs.existsSync(oldPath)) {
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (err) {
+            console.error('Помилка видалення старого аватара:', err);
+          }
         }
       }
+
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { avatarUrl: newAvatarUrl },
+      });
+
+      res.json({ success: true, profile: updatedUser, avatarUrl: newAvatarUrl });
+    } catch (error) {
+      console.error('Помилка при завантаженні аватара:', error);
+      res.status(500).json({ error: error.message || 'Помилка завантаження аватара.' });
     }
-
-    const updatedUser = await prisma.user.update({
-      where: { uid: req.user.uid },
-      data: { avatarUrl: newAvatarUrl }
-    });
-
-    res.json({ success: true, profile: updatedUser, avatarUrl: newAvatarUrl });
-  } catch (error) {
-    console.error("Помилка при завантаженні аватара:", error);
-    res.status(500).json({ error: error.message || "Помилка завантаження аватара." });
   }
-});
+);
 
 // Запуск сервера
 const PORT = process.env.PORT || 5000;
@@ -1944,20 +2267,22 @@ const PORT = process.env.PORT || 5000;
 // Зміна нікнейму (Преміум магазин)
 app.post('/api/profile/change-nickname', authenticate, async (req, res) => {
   const { newNickname } = req.body;
-  if (!newNickname) return res.status(400).json({ error: "Введіть нікнейм!" });
+  if (!newNickname) return res.status(400).json({ error: 'Введіть нікнейм!' });
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    if (user.coins < 100000) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (user.coins < 100000) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     const exists = await prisma.user.findFirst({ where: { nickname: newNickname } });
-    if (exists) return res.status(400).json({ error: "Цей нікнейм вже зайнятий!" });
+    if (exists) return res.status(400).json({ error: 'Цей нікнейм вже зайнятий!' });
 
     const updated = await prisma.user.update({
       where: { uid: req.user.uid },
-      data: { nickname: newNickname, coins: { decrement: 100000 } }
+      data: { nickname: newNickname, coins: { decrement: 100000 } },
     });
     res.json({ success: true, profile: updated });
-  } catch (e) { res.status(500).json({ error: "Помилка сервера." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка сервера.' });
+  }
 });
 
 // Покупка преміум-товару
@@ -1966,27 +2291,32 @@ app.post('/api/game/premium-shop/buy', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     if (!user.isPremium || new Date(user.premiumUntil) < new Date()) {
-      return res.status(403).json({ error: "Тільки для Преміум гравців!" });
+      return res.status(403).json({ error: 'Тільки для Преміум гравців!' });
     }
-    if (user.coins < item.price) return res.status(400).json({ error: "Недостатньо монет!" });
+    if (user.coins < item.price) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { decrement: item.price }, totalCards: { increment: 1 } }
+        data: { coins: { decrement: item.price }, totalCards: { increment: 1 } },
       });
       if (item.type === 'card') {
         await tx.inventoryItem.upsert({
           where: { userId_cardId: { userId: user.uid, cardId: item.itemId } },
           update: { amount: { increment: 1 } },
-          create: { userId: user.uid, cardId: item.itemId, amount: 1 }
+          create: { userId: user.uid, cardId: item.itemId, amount: 1 },
         });
       }
     });
 
-    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true } });
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
     res.json({ success: true, profile: updatedUser });
-  } catch (e) { res.status(500).json({ error: "Помилка покупки." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка покупки.' });
+  }
 });
 
 // Системні Логи Адмінки
@@ -1995,24 +2325,30 @@ app.post('/api/admin/logs', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     await prisma.adminLog.create({
-      data: { type, details, userUid: user.uid, userNickname: user.nickname }
+      data: { type, details, userUid: user.uid, userNickname: user.nickname },
     });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка логування." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка логування.' });
+  }
 });
 
 app.get('/api/admin/logs', authenticate, checkAdmin, async (req, res) => {
   try {
     const logs = await prisma.adminLog.findMany({ orderBy: { timestamp: 'desc' }, take: 100 });
     res.json(logs);
-  } catch (e) { res.status(500).json({ error: "Помилка отримання логів." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка отримання логів.' });
+  }
 });
 
 app.delete('/api/admin/logs', authenticate, checkAdmin, async (req, res) => {
   try {
     await prisma.adminLog.deleteMany({});
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Помилка очищення логів." }); }
+  } catch (e) {
+    res.status(500).json({ error: 'Помилка очищення логів.' });
+  }
 });
 
 // ----------------------------------------
@@ -2024,11 +2360,11 @@ app.get('/api/notifications', authenticate, async (req, res) => {
     const notifications = await prisma.notification.findMany({
       where: { userId: req.user.uid },
       orderBy: { createdAt: 'desc' },
-      take: 50
+      take: 50,
     });
     res.json(notifications);
   } catch (err) {
-    res.status(500).json({ error: "Помилка завантаження сповіщень." });
+    res.status(500).json({ error: 'Помилка завантаження сповіщень.' });
   }
 });
 
@@ -2036,27 +2372,35 @@ app.put('/api/notifications/:id/read', authenticate, async (req, res) => {
   try {
     await prisma.notification.updateMany({
       where: { id: req.params.id, userId: req.user.uid },
-      data: { isRead: true }
+      data: { isRead: true },
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: "Помилка оновлення сповіщення." });
+    res.status(500).json({ error: 'Помилка оновлення сповіщення.' });
   }
 });
 
 app.post('/api/notifications/:id/claim', authenticate, async (req, res) => {
   try {
     const notif = await prisma.notification.findUnique({ where: { id: req.params.id } });
-    if (!notif || notif.userId !== req.user.uid) return res.status(404).json({ error: "Сповіщення не знайдено." });
-    if (notif.type !== 'gift' || notif.isClaimed) return res.status(400).json({ error: "Подарунок вже забрано або він відсутній." });
+    if (!notif || notif.userId !== req.user.uid)
+      return res.status(404).json({ error: 'Сповіщення не знайдено.' });
+    if (notif.type !== 'gift' || notif.isClaimed)
+      return res.status(400).json({ error: 'Подарунок вже забрано або він відсутній.' });
 
     await prisma.$transaction(async (tx) => {
       // Відмічаємо як забране
-      await tx.notification.update({ where: { id: notif.id }, data: { isClaimed: true, isRead: true } });
+      await tx.notification.update({
+        where: { id: notif.id },
+        data: { isClaimed: true, isRead: true },
+      });
 
       // Надаємо монети
       if (notif.attachedCoins > 0) {
-        await tx.user.update({ where: { uid: req.user.uid }, data: { coins: { increment: notif.attachedCoins } } });
+        await tx.user.update({
+          where: { uid: req.user.uid },
+          data: { coins: { increment: notif.attachedCoins } },
+        });
       }
 
       // Надаємо картки
@@ -2064,31 +2408,49 @@ app.post('/api/notifications/:id/claim', authenticate, async (req, res) => {
         await tx.inventoryItem.upsert({
           where: { userId_cardId: { userId: req.user.uid, cardId: notif.attachedCardId } },
           update: { amount: { increment: notif.attachedCardAmount } },
-          create: { userId: req.user.uid, cardId: notif.attachedCardId, amount: notif.attachedCardAmount }
+          create: {
+            userId: req.user.uid,
+            cardId: notif.attachedCardId,
+            amount: notif.attachedCardAmount,
+          },
         });
-        await tx.user.update({ where: { uid: req.user.uid }, data: { totalCards: { increment: notif.attachedCardAmount } } });
+        await tx.user.update({
+          where: { uid: req.user.uid },
+          data: { totalCards: { increment: notif.attachedCardAmount } },
+        });
       }
     });
 
-    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid }, include: { inventory: true, showcases: true, farmState: true } });
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true, showcases: true, farmState: true },
+    });
     res.json({ success: true, profile: updatedUser });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Помилка отримання подарунку." });
+    res.status(500).json({ error: 'Помилка отримання подарунку.' });
   }
 });
 
 app.post('/api/admin/notifications', authenticate, checkAdmin, async (req, res) => {
-  const { targetUid, type, title, message, attachedCoins, attachedCardId, attachedCardAmount } = req.body;
+  const { targetUid, type, title, message, attachedCoins, attachedCardId, attachedCardAmount } =
+    req.body;
   // type: 'update' (site update) or 'gift'
   // targetUid: 'ALL' or specific UID
 
   try {
-    const dataObj = { type, title, message, attachedCoins: Number(attachedCoins) || 0, attachedCardId: attachedCardId || null, attachedCardAmount: Number(attachedCardAmount) || 0 };
+    const dataObj = {
+      type,
+      title,
+      message,
+      attachedCoins: Number(attachedCoins) || 0,
+      attachedCardId: attachedCardId || null,
+      attachedCardAmount: Number(attachedCardAmount) || 0,
+    };
 
     if (targetUid === 'ALL') {
       const users = await prisma.user.findMany({ select: { uid: true } });
-      const notificationsData = users.map(u => ({ ...dataObj, userId: u.uid }));
+      const notificationsData = users.map((u) => ({ ...dataObj, userId: u.uid }));
       await prisma.notification.createMany({ data: notificationsData });
     } else {
       await prisma.notification.create({ data: { ...dataObj, userId: targetUid } });
@@ -2096,7 +2458,7 @@ app.post('/api/admin/notifications', authenticate, checkAdmin, async (req, res) 
     res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Помилка надсилання сповіщень." });
+    res.status(500).json({ error: 'Помилка надсилання сповіщень.' });
   }
 });
 
@@ -2112,7 +2474,7 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
-    if (!user) return res.status(404).json({ error: "Гравця не знайдено." });
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
 
     let totalEarned = 0;
     let totalCardsRemoved = 0;
@@ -2124,7 +2486,9 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
         if (!card) continue;
 
         if (card.maxSupply > 0) {
-          throw new Error(`Лімітовану картку "${card.name}" можна продати тільки на ринку гравцям.`);
+          throw new Error(
+            `Лімітовану картку "${card.name}" можна продати тільки на ринку гравцям.`
+          );
         }
 
         const price = card.sellPrice || 15;
@@ -2132,24 +2496,29 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
         // Перевіряємо, чи є в інвентарі достатньо карток
         const invItem = await tx.inventoryItem.findUnique({
-          where: { userId_cardId: { userId: user.uid, cardId: item.cardId } }
+          where: { userId_cardId: { userId: user.uid, cardId: item.cardId } },
         });
 
         if (invItem && invItem.amount >= item.amount) {
           let statsArray = [];
           if (invItem.gameStats) {
-            statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+            statsArray =
+              typeof invItem.gameStats === 'string'
+                ? JSON.parse(invItem.gameStats)
+                : invItem.gameStats;
           }
 
           // If a specific power is requested to sell
           if (item.power !== undefined && item.power !== null) {
             const parsedPower = Number(item.power);
-            const powerIndex = statsArray.findIndex(p => Number(p) === parsedPower);
+            const powerIndex = statsArray.findIndex((p) => Number(p) === parsedPower);
             if (powerIndex > -1) {
               statsArray.splice(powerIndex, 1);
             } else if (statsArray.length > 0) {
               // Fallback: power not found (data mismatch), remove closest match
-              statsArray.sort((a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower));
+              statsArray.sort(
+                (a, b) => Math.abs(Number(a) - parsedPower) - Math.abs(Number(b) - parsedPower)
+              );
               statsArray.splice(0, 1);
             }
             // else: no gameStats tracked, skip
@@ -2170,13 +2539,13 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
           if (invItem.amount === item.amount) {
             await tx.inventoryItem.delete({
-              where: { userId_cardId: { userId: user.uid, cardId: item.cardId } }
+              where: { userId_cardId: { userId: user.uid, cardId: item.cardId } },
             });
             await sanitizeShowcases(tx, user.uid, item.cardId, 0);
           } else {
             await tx.inventoryItem.update({
               where: { userId_cardId: { userId: user.uid, cardId: item.cardId } },
-              data: { amount: { decrement: item.amount }, gameStats: statsArray }
+              data: { amount: { decrement: item.amount }, gameStats: statsArray },
             });
             await sanitizeShowcases(tx, user.uid, item.cardId, invItem.amount - item.amount);
           }
@@ -2190,21 +2559,20 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
           where: { uid: user.uid },
           data: {
             coins: { increment: totalEarned },
-            totalCards: { decrement: totalCardsRemoved }
-          }
+            totalCards: { decrement: totalCardsRemoved },
+          },
         });
       }
     });
 
     const updatedUser = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      include: { inventory: true }
+      include: { inventory: true },
     });
 
     res.json({ success: true, earned: totalEarned, profile: updatedUser });
-
   } catch (error) {
     console.error(error);
-    res.status(400).json({ error: error.message || "Помилка продажу карток." });
+    res.status(400).json({ error: error.message || 'Помилка продажу карток.' });
   }
 });

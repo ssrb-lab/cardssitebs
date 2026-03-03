@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { getCardStyle } from '../utils/helpers';
-import CardFrame from "./CardFrame";
+import CardFrame from './CardFrame';
 
 export default function CardModal({ viewingCard, setViewingCard, rarities }) {
   const [tiltStyle, setTiltStyle] = useState({});
@@ -26,7 +26,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
 
     setTiltStyle({
       transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`,
-      transition: 'transform 0.1s ease-out'
+      transition: 'transform 0.1s ease-out',
     });
   };
 
@@ -34,7 +34,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
     setIsHovering(false);
     setTiltStyle({
       transform: `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`,
-      transition: 'transform 0.5s ease-out'
+      transition: 'transform 0.5s ease-out',
     });
   };
 
@@ -43,9 +43,20 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300 perspective-1000" onClick={() => setViewingCard(null)}>
-      <div className="relative flex flex-col items-center w-full max-w-sm animate-in zoom-in-95 slide-in-from-bottom-10 duration-500" onClick={(e) => e.stopPropagation()}>
-        <button onClick={() => setViewingCard(null)} className="absolute -top-12 right-0 text-neutral-400 hover:text-white font-bold tracking-widest uppercase transition-colors">Закрити ✕</button>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300 perspective-1000"
+      onClick={() => setViewingCard(null)}
+    >
+      <div
+        className="relative flex flex-col items-center w-full max-w-sm animate-in zoom-in-95 slide-in-from-bottom-10 duration-500"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={() => setViewingCard(null)}
+          className="absolute -top-12 right-0 text-neutral-400 hover:text-white font-bold tracking-widest uppercase transition-colors"
+        >
+          Закрити ✕
+        </button>
 
         <div
           className="preserve-3d w-full"
@@ -60,7 +71,12 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
             className={`w-full aspect-[2/3] rounded-3xl border-4 overflow-hidden ${style.border} ${effectClass} relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)]`}
           >
             <CardFrame frame={card.frame}>
-              <img src={card.image} alt={card.name} className="w-full h-full object-cover" loading="lazy" />
+              <img
+                src={card.image}
+                alt={card.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
             </CardFrame>
             {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
             {/* Відблиск світла при нахилі */}
@@ -71,7 +87,9 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
         </div>
 
         <div className="mt-8 flex flex-col items-center text-center w-full">
-          <div className={`text-sm font-black uppercase tracking-widest mb-2 ${style.text} flex items-center gap-1.5`}>
+          <div
+            className={`text-sm font-black uppercase tracking-widest mb-2 ${style.text} flex items-center gap-1.5`}
+          >
             <Sparkles size={16} /> {card.rarity}
           </div>
           <h3 className="font-black text-4xl text-white mb-2 drop-shadow-xl">{card.name}</h3>

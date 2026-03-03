@@ -1,14 +1,51 @@
-import React, { useState, useEffect } from "react";
-import { Search, Filter, Sparkles, Zap, Coins, ArrowLeft, Gem, Loader2, Volume2, PackageOpen, HelpCircle, AlertCircle, X, ChevronLeft, ChevronRight, ShoppingCart, Bookmark } from "lucide-react";
-import { getCardStyle, getCardWeight, playCardSound } from "../utils/helpers";
-import { SELL_PRICE } from "../config/constants";
-import CardFrame from "../components/CardFrame";
+import React, { useState, useEffect } from 'react';
+import {
+  Search,
+  Filter,
+  Sparkles,
+  Zap,
+  Coins,
+  ArrowLeft,
+  Gem,
+  Loader2,
+  Volume2,
+  PackageOpen,
+  HelpCircle,
+  AlertCircle,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ShoppingCart,
+  Bookmark,
+} from 'lucide-react';
+import { getCardStyle, getCardWeight, playCardSound } from '../utils/helpers';
+import { SELL_PRICE } from '../config/constants';
+import CardFrame from '../components/CardFrame';
 
-export default function ShopView({ profile, packs, cardsCatalog, cardStats, rarities, openPack, openingPackId, isRouletteSpinning, rouletteItems, pulledCards, setPulledCards, sellPulledCards, sellSinglePulledCard, selectedPackId, setSelectedPackId, setViewingCard, isAdmin, isProcessing, isPremiumActive }) {
-
+export default function ShopView({
+  profile,
+  packs,
+  cardsCatalog,
+  cardStats,
+  rarities,
+  openPack,
+  openingPackId,
+  isRouletteSpinning,
+  rouletteItems,
+  pulledCards,
+  setPulledCards,
+  sellPulledCards,
+  sellSinglePulledCard,
+  selectedPackId,
+  setSelectedPackId,
+  setViewingCard,
+  isAdmin,
+  isProcessing,
+  isPremiumActive,
+}) {
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeCategory, setActiveCategory] = useState('all');
 
   useEffect(() => {
     if (isRouletteSpinning) {
@@ -33,9 +70,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
   useEffect(() => {
     // Відтворюємо звук ТІЛЬКИ якщо гравець НЕ вимкнув цю опцію
     if (pulledCards && pulledCards.length > 0 && profile?.autoSoundEnabled !== false) {
-      const cardsWithSound = pulledCards.filter(c => c.soundUrl);
+      const cardsWithSound = pulledCards.filter((c) => c.soundUrl);
       if (cardsWithSound.length > 0) {
-        cardsWithSound.sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
+        cardsWithSound.sort(
+          (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
+        );
         playCardSound(cardsWithSound[0].soundUrl, cardsWithSound[0].soundVolume);
       }
     }
@@ -60,23 +99,37 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
             className="absolute inset-y-0 flex items-center gap-4"
             style={{
               left: '50%',
-              transition: roulettePos === 1 ? 'transform 4.5s cubic-bezier(0.1, 0.85, 0.1, 1)' : 'none',
-              transform: roulettePos === 1
-                ? `translateX(-${35 * 176 + 80 + rouletteOffset}px)`
-                : `translateX(-80px)`
+              transition:
+                roulettePos === 1 ? 'transform 4.5s cubic-bezier(0.1, 0.85, 0.1, 1)' : 'none',
+              transform:
+                roulettePos === 1
+                  ? `translateX(-${35 * 176 + 80 + rouletteOffset}px)`
+                  : `translateX(-80px)`,
             }}
           >
             {rouletteItems.map((item, i) => {
               const style = getCardStyle(item.rarity, rarities);
               const effectClass = item.effect ? `effect-${item.effect}` : '';
               return (
-                <div key={i} className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass}`}>
+                <div
+                  key={i}
+                  className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass}`}
+                >
                   <CardFrame frame={item.frame}>
-                    <img src={item.image} alt="card" className="w-full h-full object-cover" loading="lazy" />
+                    <img
+                      src={item.image}
+                      alt="card"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </CardFrame>
                   {item.effect && <div className={`${item.effect} pointer-events-none z-10`} />}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}>{item.rarity}</span>
+                    <span
+                      className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}
+                    >
+                      {item.rarity}
+                    </span>
                   </div>
                 </div>
               );
@@ -89,20 +142,22 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
   if (pulledCards && pulledCards.length > 0) {
     const countsMap = {};
-    pulledCards.forEach(c => { countsMap[c.id] = (countsMap[c.id] || 0) + 1; });
+    pulledCards.forEach((c) => {
+      countsMap[c.id] = (countsMap[c.id] || 0) + 1;
+    });
 
     let duplicateSellPrice = 0;
     let hasDuplicates = false;
 
     Object.entries(countsMap).forEach(([id, pulledAmount]) => {
-      const invItem = profile?.inventory?.find(i => i.cardId === id || i.id === id);
+      const invItem = profile?.inventory?.find((i) => i.cardId === id || i.id === id);
       const invAmount = invItem ? invItem.amount : 0;
       const duplicateCount = Math.max(0, invAmount - 1);
       const sellAmount = Math.min(pulledAmount, duplicateCount);
 
       if (sellAmount > 0) {
         hasDuplicates = true;
-        const cardDef = pulledCards.find(c => c.id === id);
+        const cardDef = pulledCards.find((c) => c.id === id);
         const price = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
         duplicateSellPrice += price * sellAmount;
       }
@@ -111,7 +166,7 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
     return (
       <div className="flex flex-col items-center min-h-[65vh] animate-in zoom-in-95 duration-700 w-full pb-10">
         <h2 className="text-3xl sm:text-4xl font-black mb-8 text-white uppercase tracking-widest text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-          Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : "!"}
+          Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : '!'}
         </h2>
 
         <div className="flex flex-wrap justify-center gap-6 mb-10 w-full max-h-[60vh] overflow-y-auto hide-scrollbar p-4">
@@ -120,15 +175,15 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
             const effectClass = card.effect ? `effect-${card.effect}` : '';
 
             // ЛОГІКА АНІМАЦІЙ: Спочатку кастомна, потім за рідкістю, потім стандартна
-            let animClass = "animate-in zoom-in slide-in-from-bottom-6";
+            let animClass = 'animate-in zoom-in slide-in-from-bottom-6';
             if (card.dropAnim) {
               animClass = `anim - ${card.dropAnim} `;
-            } else if (card.rarity === "Унікальна") {
-              animClass = "anim-epic";
-            } else if (card.rarity === "Легендарна") {
-              animClass = "anim-flash";
-            } else if (card.rarity === "Епічна") {
-              animClass = "anim-flip";
+            } else if (card.rarity === 'Унікальна') {
+              animClass = 'anim-epic';
+            } else if (card.rarity === 'Легендарна') {
+              animClass = 'anim-flash';
+            } else if (card.rarity === 'Епічна') {
+              animClass = 'anim-flip';
             }
 
             return (
@@ -136,11 +191,21 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                 key={index}
                 onClick={() => setViewingCard({ card, amount: 1 })}
                 className={`flex flex-col items-center cursor-pointer group ${animClass}`}
-                style={{ animationDelay: `${Math.min(index * 50, 2000)}ms`, animationFillMode: 'both' }}
+                style={{
+                  animationDelay: `${Math.min(index * 50, 2000)}ms`,
+                  animationFillMode: 'both',
+                }}
               >
-                <div className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}>
+                <div
+                  className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass}`}
+                >
                   <CardFrame frame={card.frame}>
-                    <img src={card.image} alt={card.name} className="w-full h-full object-cover" loading="lazy" />
+                    <img
+                      src={card.image}
+                      alt={card.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </CardFrame>
                   {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   {Number(card.maxSupply) > 0 && (
@@ -149,7 +214,10 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                     </div>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); sellSinglePulledCard(card); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      sellSinglePulledCard(card);
+                    }}
                     className="absolute top-2 left-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
                     title="Продати картку"
                   >
@@ -157,7 +225,10 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                   </button>
                   {card.soundUrl && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playCardSound(card.soundUrl, card.soundVolume);
+                      }}
                       className="absolute bottom-2 right-2 bg-black/80 text-white p-2 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
                       title="Відтворити звук"
                     >
@@ -166,7 +237,9 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                   )}
                 </div>
                 <div className="text-center w-full px-2">
-                  <div className={`text-[10px] sm:text-xs font-black uppercase tracking-widest flex justify-center items-center gap-1 ${style.text}`}>
+                  <div
+                    className={`text-[10px] sm:text-xs font-black uppercase tracking-widest flex justify-center items-center gap-1 ${style.text}`}
+                  >
                     <Sparkles size={12} /> {card.rarity}
                   </div>
                   {card.generatedPower && (
@@ -174,7 +247,9 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                       <Zap size={14} /> Сила: {card.generatedPower}
                     </div>
                   )}
-                  <h3 className="font-bold text-white text-xs sm:text-sm truncate w-full group-hover:text-yellow-100 transition-colors">{card.name}</h3>
+                  <h3 className="font-bold text-white text-xs sm:text-sm truncate w-full group-hover:text-yellow-100 transition-colors">
+                    {card.name}
+                  </h3>
                 </div>
               </div>
             );
@@ -207,11 +282,15 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
       .filter((c) => c.packId === selectedPackId)
       .sort((a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities));
 
-    const maxPacksAffordable = profile?.coins && selectedPack?.cost ? Math.floor(profile.coins / selectedPack.cost) : 0;
+    const maxPacksAffordable =
+      profile?.coins && selectedPack?.cost ? Math.floor(profile.coins / selectedPack.cost) : 0;
 
     return (
       <div className="pb-10 animate-in fade-in slide-in-from-right-8 duration-500">
-        <button onClick={() => setSelectedPackId(null)} className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold px-4 py-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 w-fit border border-neutral-800">
+        <button
+          onClick={() => setSelectedPackId(null)}
+          className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold px-4 py-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 w-fit border border-neutral-800"
+        >
           <ArrowLeft size={20} /> Назад
         </button>
 
@@ -234,19 +313,64 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
                 <Loader2 className="animate-spin text-indigo-300 w-12 h-12" />
               </div>
             ) : (
-              <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 overflow-hidden ${selectedPack.isPremiumOnly ? 'border-fuchsia-600 shadow-[0_10px_40px_rgba(217,70,239,0.3)]' : 'border-neutral-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)]'}`}>
-                <img src={selectedPack.image} alt={selectedPack.name} className="w-full h-full object-cover" loading="lazy" />
+              <div
+                className={`w-full h-full bg-neutral-800 rounded-2xl border-4 overflow-hidden ${selectedPack.isPremiumOnly ? 'border-fuchsia-600 shadow-[0_10px_40px_rgba(217,70,239,0.3)]' : 'border-neutral-700 shadow-[0_10px_40px_rgba(0,0,0,0.5)]'}`}
+              >
+                <img
+                  src={selectedPack.image}
+                  alt={selectedPack.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 w-full">
-            <OpenButton amount={1} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)} opening={openingPackId === selectedPack.id || isProcessing} />
-            <OpenButton amount={5} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-orange-500 hover:bg-orange-400 text-white" />
-            <OpenButton amount={10} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-red-500 hover:bg-red-400 text-white" />
-            <OpenButton amount={100} cost={selectedPack.cost} onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)} opening={openingPackId === selectedPack.id || isProcessing} color="bg-purple-600 hover:bg-purple-500 text-white" />
+            <OpenButton
+              amount={1}
+              cost={selectedPack.cost}
+              onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)}
+              opening={openingPackId === selectedPack.id || isProcessing}
+            />
+            <OpenButton
+              amount={5}
+              cost={selectedPack.cost}
+              onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)}
+              opening={openingPackId === selectedPack.id || isProcessing}
+              color="bg-orange-500 hover:bg-orange-400 text-white"
+            />
+            <OpenButton
+              amount={10}
+              cost={selectedPack.cost}
+              onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)}
+              opening={openingPackId === selectedPack.id || isProcessing}
+              color="bg-red-500 hover:bg-red-400 text-white"
+            />
+            <OpenButton
+              amount={100}
+              cost={selectedPack.cost}
+              onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)}
+              opening={openingPackId === selectedPack.id || isProcessing}
+              color="bg-purple-600 hover:bg-purple-500 text-white"
+            />
             {maxPacksAffordable > 0 && (
-              <OpenButton amount={maxPacksAffordable} cost={selectedPack.cost} label={`На всі (${maxPacksAffordable}x)`} onClick={() => { if (window.confirm(`Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`)) { openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable) } }} opening={openingPackId === selectedPack.id || isProcessing} color="bg-green-600 hover:bg-green-500 text-white" />
+              <OpenButton
+                amount={maxPacksAffordable}
+                cost={selectedPack.cost}
+                label={`На всі (${maxPacksAffordable}x)`}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`
+                    )
+                  ) {
+                    openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable);
+                  }
+                }}
+                opening={openingPackId === selectedPack.id || isProcessing}
+                color="bg-green-600 hover:bg-green-500 text-white"
+              />
             )}
           </div>
 
@@ -267,74 +391,119 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               const effectClass = card.effect ? `effect-${card.effect}` : '';
               const maxSup = Number(card.maxSupply) || 0;
               const isSoldOut = maxSup > 0 && (cardStats[card.id] || 0) >= maxSup;
-              const hasCard = profile?.inventory?.some(item => item.cardId === card.id || item.id === card.id);
+              const hasCard = profile?.inventory?.some(
+                (item) => item.cardId === card.id || item.id === card.id
+              );
 
               return (
-                <div key={card.id} className={`flex flex-col items-center group ${isSoldOut ? "opacity-50 grayscale" : "cursor-pointer"}`} onClick={() => !isSoldOut && setViewingCard({ card })}>
-                  <div className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? "group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]" : ""} ${style.border} ${effectClass}`}>
+                <div
+                  key={card.id}
+                  className={`flex flex-col items-center group ${isSoldOut ? 'opacity-50 grayscale' : 'cursor-pointer'}`}
+                  onClick={() => !isSoldOut && setViewingCard({ card })}
+                >
+                  <div
+                    className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? 'group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]' : ''} ${style.border} ${effectClass}`}
+                  >
                     <CardFrame frame={card.frame}>
-                      <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" />
+                      <img
+                        src={card.image}
+                        alt={card.name}
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        loading="lazy"
+                      />
                     </CardFrame>
                     {card.effect && <div className={`${card.effect} z-10 pointer-events-none`} />}
                     {maxSup > 0 && (
                       <div className="absolute top-1 right-1 bg-black/90 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 font-bold z-10">
-                        {isSoldOut ? "РОЗПРОДАНО" : `${maxSup - (cardStats[card.id] || 0)}/${maxSup}`}
-                      </div >
+                        {isSoldOut
+                          ? 'РОЗПРОДАНО'
+                          : `${maxSup - (cardStats[card.id] || 0)}/${maxSup}`}
+                      </div>
                     )}
-                    {
-                      card.soundUrl && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); playCardSound(card.soundUrl, card.soundVolume); }}
-                          className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
-                          title="Відтворити звук"
-                        >
-                          <Volume2 size={12} />
-                        </button>
-                      )
-                    }
+                    {card.soundUrl && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playCardSound(card.soundUrl, card.soundVolume);
+                        }}
+                        className="absolute bottom-1 right-1 bg-black/80 text-white p-1.5 rounded-full hover:text-blue-400 z-30 transition-colors shadow-lg"
+                        title="Відтворити звук"
+                      >
+                        <Volume2 size={12} />
+                      </button>
+                    )}
                     {hasCard && (
-                      <div className={`absolute bottom-1 ${card.soundUrl ? 'right-9' : 'right-1'} text-yellow-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] z-20`} title="Вже є в інвентарі">
+                      <div
+                        className={`absolute bottom-1 ${card.soundUrl ? 'right-9' : 'right-1'} text-yellow-500 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] z-20`}
+                        title="Вже є в інвентарі"
+                      >
                         <Bookmark size={22} fill="currentColor" />
                         <div className="absolute inset-0 flex items-center justify-center top-[-1px] text-yellow-950">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
                         </div>
                       </div>
                     )}
-                  </div >
-                  <div className="text-center px-1 w-full">
-                    <div className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${style.text}`}>{card.rarity}</div>
-                    <div className="font-bold text-xs leading-tight text-white truncate w-full group-hover:text-yellow-100 transition-colors" title={card.name}>{card.name}</div>
                   </div>
-                </div >
+                  <div className="text-center px-1 w-full">
+                    <div
+                      className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${style.text}`}
+                    >
+                      {card.rarity}
+                    </div>
+                    <div
+                      className="font-bold text-xs leading-tight text-white truncate w-full group-hover:text-yellow-100 transition-colors"
+                      title={card.name}
+                    >
+                      {card.name}
+                    </div>
+                  </div>
+                </div>
               );
             })}
-            {packCards.length === 0 && <p className="col-span-full text-center text-neutral-500 py-4">Картки відсутні.</p>}
-          </div >
-        </div >
-      </div >
+            {packCards.length === 0 && (
+              <p className="col-span-full text-center text-neutral-500 py-4">Картки відсутні.</p>
+            )}
+          </div>
+        </div>
+      </div>
     );
   }
 
-  const visiblePacks = (isAdmin || profile?.isSuperAdmin) ? packs : packs.filter(p => !p.isHidden);
-  const categoriesList = ["all", ...new Set(visiblePacks.map(p => p.category || "Базові"))];
-  const displayedPacks = visiblePacks.filter(p => activeCategory === "all" || (p.category || "Базові") === activeCategory);
+  const visiblePacks = isAdmin || profile?.isSuperAdmin ? packs : packs.filter((p) => !p.isHidden);
+  const categoriesList = ['all', ...new Set(visiblePacks.map((p) => p.category || 'Базові'))];
+  const displayedPacks = visiblePacks.filter(
+    (p) => activeCategory === 'all' || (p.category || 'Базові') === activeCategory
+  );
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
       <div className="text-center mb-6">
-        <h2 className="text-3xl font-black mb-2 text-white uppercase tracking-widest">Магазин Паків</h2>
+        <h2 className="text-3xl font-black mb-2 text-white uppercase tracking-widest">
+          Магазин Паків
+        </h2>
         <p className="text-neutral-400 text-sm">Оберіть пак, Мій лорд, і випробуйте удачу!</p>
       </div>
 
       {categoriesList.length > 2 && (
         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 hide-scrollbar justify-center max-w-4xl mx-auto">
-          {categoriesList.map(c => (
+          {categoriesList.map((c) => (
             <button
               key={c}
               onClick={() => setActiveCategory(c)}
-              className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap transition-colors border ${activeCategory === c ? "bg-purple-600 border-purple-500 text-white" : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white"}`}
+              className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap transition-colors border ${activeCategory === c ? 'bg-purple-600 border-purple-500 text-white' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
             >
-              {c === "all" ? "Всі Паки" : c}
+              {c === 'all' ? 'Всі Паки' : c}
             </button>
           ))}
         </div>
@@ -342,7 +511,11 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
         {displayedPacks.map((pack) => (
-          <button key={pack.id} onClick={() => setSelectedPackId(pack.id)} className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-3xl p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}>
+          <button
+            key={pack.id}
+            onClick={() => setSelectedPackId(pack.id)}
+            className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-3xl p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}
+          >
             {pack.isHidden && (
               <div className="absolute top-3 left-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
                 Приховано
@@ -354,43 +527,74 @@ export default function ShopView({ profile, packs, cardsCatalog, cardStats, rari
               </div>
             )}
             {pack.isGame && (
-              <div className={`absolute ${pack.isHidden ? 'top-10' : 'top-3'} left-3 bg-green-900 text-green-100 text-[10px] px-2 py-1 rounded border border-green-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1`}>
+              <div
+                className={`absolute ${pack.isHidden ? 'top-10' : 'top-3'} left-3 bg-green-900 text-green-100 text-[10px] px-2 py-1 rounded border border-green-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1`}
+              >
                 ⚔ Ігровий
               </div>
             )}
 
-            <div className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}>{pack.category || "Базові"}</div>
-            <h3 className="text-xl font-bold text-white mb-2 text-center w-full relative z-10">{pack.name}</h3>
+            <div
+              className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}
+            >
+              {pack.category || 'Базові'}
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2 text-center w-full relative z-10">
+              {pack.name}
+            </h3>
 
             <div className="flex items-center justify-center gap-1.5 text-yellow-500 font-bold mb-4 bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10">
               {pack.cost} <Coins size={16} />
             </div>
 
             <div className="relative w-40 h-40 mb-6 flex justify-center items-center perspective-1000">
-              <div className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}>
-                <img src={pack.image} alt={pack.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500 ${pack.isHidden ? 'grayscale' : ''}`} loading="lazy" />
+              <div
+                className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}
+              >
+                <img
+                  src={pack.image}
+                  alt={pack.name}
+                  className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500 ${pack.isHidden ? 'grayscale' : ''}`}
+                  loading="lazy"
+                />
               </div>
             </div>
-            <div className={`w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10`}>
+            <div
+              className={`w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10`}
+            >
               Детальніше
             </div>
           </button>
         ))}
-        {displayedPacks.length === 0 && <div className="col-span-full text-center text-neutral-500 py-10">У цій категорії паків ще немає.</div>}
+        {displayedPacks.length === 0 && (
+          <div className="col-span-full text-center text-neutral-500 py-10">
+            У цій категорії паків ще немає.
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // Допоміжний компонент для кнопки відкриття
-function OpenButton({ amount, cost, onClick, opening, color = "bg-yellow-500 hover:bg-yellow-400 text-white", label }) {
+function OpenButton({
+  amount,
+  cost,
+  onClick,
+  opening,
+  color = 'bg-yellow-500 hover:bg-yellow-400 text-white',
+  label,
+}) {
   const disabled = opening;
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${disabled ? "bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70" : `${color} transform hover:-translate-y-1`
-        }`}
+      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${
+        disabled
+          ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70'
+          : `${color} transform hover:-translate-y-1`
+      }`}
     >
       {label ? label : `Відкрити ${amount}x`}
       <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">

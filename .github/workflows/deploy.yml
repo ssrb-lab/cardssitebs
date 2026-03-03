@@ -19,25 +19,25 @@ jobs:
           script: |
             # Переходимо в папку проекту на сервері
             cd /var/www/cardssitebs || exit
-            
+
             # Отримуємо свій код
             git reset --hard origin/main || git reset --hard origin/master
             git pull origin main || git pull origin master
-            
+
             # Копіюємо .env файли (тільки для фронтенду, у бекенда свій)
             cp .env.production .env || true
-            
+
             # Встановлюємо залежності та білдимо фронтенд
             npm install
             npm run build
-            
+
             # Налаштовуємо бекенд
             cd backend
             npm install
-            
+
             # Міграції бази даних (якщо використовується Prisma)
             npx prisma generate
             npx prisma db push --accept-data-loss || true
-            
+
             # Перезапускаємо бекенд через PM2
             pm2 restart backend || pm2 start server.js --name backend

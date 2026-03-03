@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    return res.status(401).json({ error: "Доступ заборонено, Мій лорд. Токен відсутній." });
+    return res.status(401).json({ error: 'Доступ заборонено, Мій лорд. Токен відсутній.' });
   }
 
   try {
@@ -11,7 +11,7 @@ const authenticate = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ error: "Недійсний токен." });
+    res.status(401).json({ error: 'Недійсний токен.' });
   }
 };
 
