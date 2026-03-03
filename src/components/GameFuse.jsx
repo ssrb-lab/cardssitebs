@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw, Heart, Zap } from 'lucide-react';
+import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw, Heart, Zap, Pause, Play } from 'lucide-react';
 import { claimFuseRewardRequest, startFuseGameRequest, getToken } from '../config/api';
 
 const GRID_SIZE = 25; // 5x5
@@ -12,6 +12,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
   const [gameOver, setGameOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [nextHeartScore, setNextHeartScore] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Memory Mechanics States
   const [phase, setPhase] = useState('memorize'); // 'memorize' or 'play'
@@ -76,22 +78,36 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
 
   const startMemorizePhase = () => {
     setPhase('memorize');
-    setTimeLeft(5); // 5 seconds to memorize
+    setTimeLeft(3); // 3 seconds to memorize
+  };
+
+  const togglePause = () => {
+    // Cannot pause if game over or not initialized or processing
+    if (gameOver || !isInitialized || isProcessing) return;
+
+    setIsPaused((prev) => {
+      const newPausedState = !prev;
+      if (!newPausedState) {
+        // Resuming game: regenerate level and restart memorize phase
+        generateLevel();
+      }
+      return newPausedState;
+    });
   };
 
   // Countdown logic for memorize phase
   useEffect(() => {
-    if (phase === 'memorize' && timeLeft > 0 && !gameOver) {
+    if (phase === 'memorize' && timeLeft > 0 && !gameOver && !isPaused) {
       const timerId = setTimeout(() => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
       return () => clearTimeout(timerId);
-    } else if (phase === 'memorize' && timeLeft === 0 && !gameOver) {
+    } else if (phase === 'memorize' && timeLeft === 0 && !gameOver && !isPaused) {
       // Timer ended, enter play phase and flip specific tiles visually
       setPhase('play');
       // We just need phase to trigger the visual hide in renderFuse
     }
-  }, [phase, timeLeft, gameOver]);
+  }, [phase, timeLeft, gameOver, isPaused]);
 
   const startGame = async () => {
     setIsProcessing(true);
@@ -101,6 +117,9 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       setLives(INITIAL_LIVES);
       setGameOver(false);
       setPhase('memorize');
+      const randomTarget = Math.floor(Math.random() * (15 - 7 + 1)) + 7;
+      setNextHeartScore(randomTarget);
+      setIsPaused(false);
       generateLevel();
       setIsInitialized(true);
     } catch (e) {
@@ -117,7 +136,7 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
   }, []);
 
   const handleTileClick = (index) => {
-    if (gameOver || isProcessing || phase === 'memorize') return;
+    if (gameOver || isProcessing || phase === 'memorize' || isPaused) return;
 
     const tile = board[index];
     if (tile.isFound || tile.memoryFlipped) return; // Already clicked correctly
@@ -132,7 +151,19 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       const remainingDamaged = newBoard.filter((t) => t.isDamaged && !t.isFound).length;
       if (remainingDamaged === 0) {
         // Level complete!
-        setScore((prev) => prev + 1);
+        const newScore = score + 1;
+        setScore(newScore);
+
+        // Heart restoration logic
+        if (newScore === nextHeartScore) {
+          if (lives < INITIAL_LIVES) {
+            setLives((prev) => prev + 1);
+            showToast('+1 Життя!', 'success');
+          }
+          const nextTarget = newScore + Math.floor(Math.random() * (15 - 7 + 1)) + 7;
+          setNextHeartScore(nextTarget);
+        }
+
         setTimeout(() => {
           generateLevel();
         }, 1000); // Delay to let them see the last green highlight
@@ -203,8 +234,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       phase === 'memorize'
         ? !isDamaged
         : !isDamaged ||
-          (!isDamaged && (isFound || memoryFlipped)) ||
-          (isDamaged && !isFound && !memoryFlipped);
+        (!isDamaged && (isFound || memoryFlipped)) ||
+        (isDamaged && !isFound && !memoryFlipped);
 
     // To handle the visual of clicking a wrong healthy fuse
     if (phase === 'play' && !isDamaged && memoryFlipped) {
@@ -256,11 +287,23 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           <ArrowLeft size={20} /> Покинути
         </button>
         <div className="flex items-center gap-4">
-          {phase === 'memorize' && (
+          {phase === 'memorize' && !isPaused && (
             <div className="bg-red-500/20 text-red-500 px-3 py-1.5 rounded-lg border border-red-500/50 font-bold flex items-center gap-2 animate-pulse">
               Запам'ятайте! {timeLeft}с
             </div>
           )}
+          <button
+            onClick={togglePause}
+            disabled={isProcessing || gameOver}
+            className={`flex items-center gap-2 font-bold transition-colors px-3 py-1.5 rounded-lg border \${
+              isPaused 
+                ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20 border-yellow-900/50' 
+                : 'text-neutral-400 hover:text-white bg-neutral-900/20 border-neutral-800'
+            }`}
+          >
+            {isPaused ? <Play size={16} /> : <Pause size={16} />}
+            {isPaused ? 'Продовжити' : 'Пауза'}
+          </button>
           <button
             onClick={restartGame}
             disabled={isProcessing}
@@ -372,6 +415,24 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         </div>
       </div>
 
+      {isPaused && !gameOver && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-40 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
+          <Pause size={60} className="text-yellow-500 mb-4" />
+          <h2 className="text-3xl font-black mb-2 uppercase text-white">Пауза</h2>
+          <p className="text-neutral-300 mb-6">
+            Гру призупинено. Коли ви повернетеся, положення запобіжників буде <strong>змінено</strong>.
+          </p>
+
+          <button
+            onClick={togglePause}
+            className="bg-blue-500 hover:bg-blue-400 text-white font-black py-4 px-8 rounded-2xl flex items-center gap-2 shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all transform hover:scale-105 active:scale-95"
+          >
+            <Play size={20} />
+            Продовжити гру
+          </button>
+        </div>
+      )}
+
       {gameOver && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
           <Trophy size={60} className="text-yellow-500 mb-4" />
@@ -387,16 +448,19 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           >
             {isProcessing ? <Loader2 size={20} className="animate-spin" /> : <Coins size={20} />}
             Забрати{' '}
-            {score *
+            {Math.floor(
+              score *
               (progressInfo.level === 1
-                ? 75
+                ? 86
                 : progressInfo.level === 2
-                  ? 150
+                  ? 172
                   : progressInfo.level === 3
-                    ? 200
+                    ? 230
                     : progressInfo.level === 4
-                      ? 375
-                      : 350)}{' '}
+                      ? 431
+                      : 402) *
+              (1 + Math.floor(score / 5) * 0.1)
+            )}{' '}
             монет
           </button>
 

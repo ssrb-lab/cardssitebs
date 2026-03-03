@@ -1274,19 +1274,24 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
-    // Курс: 1 поїнт рахунку (рівень) = 10 монети
-    let coinsToGive = score * 10;
-
-    if (currentDailyFarm + coinsToGive > 500000) {
-      coinsToGive = 500000 - currentDailyFarm;
-    }
-
     const newPoints = (user.fuseRepairedPoints || 0) + score;
     let newLevel = 1;
     if (newPoints >= 30000) newLevel = 5;
     else if (newPoints >= 15000) newLevel = 4;
     else if (newPoints >= 5000) newLevel = 3;
     else if (newPoints >= 2000) newLevel = 2;
+
+    const payoutPerScore =
+      newLevel === 1 ? 86 :
+        newLevel === 2 ? 172 :
+          newLevel === 3 ? 230 :
+            newLevel === 4 ? 431 : 402;
+
+    let coinsToGive = Math.floor(score * payoutPerScore * (1 + Math.floor(score / 5) * 0.1));
+
+    if (currentDailyFarm + coinsToGive > 500000) {
+      coinsToGive = 500000 - currentDailyFarm;
+    }
 
     const updatedUser = await prisma.user.update({
       where: { uid: req.user.uid },
