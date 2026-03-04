@@ -309,7 +309,7 @@ export default function App() {
         try {
           const notifs = await fetchNotifications(getToken());
           setNotifications(notifs);
-        } catch (err) {}
+        } catch (err) { }
       } catch (e) {
         console.error('Помилка фонового опитування:', e);
       }
@@ -426,7 +426,8 @@ export default function App() {
     setIsProcessing(true);
     try {
       const power = listingCard?.targetPowerToSell || null;
-      const data = await listCardRequest(getToken(), cardId, price, power);
+      const hp = listingCard?.targetHpToSell || null;
+      const data = await listCardRequest(getToken(), cardId, price, power, hp);
       setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
         data.profile.inventory.map((i) => ({
@@ -602,7 +603,9 @@ export default function App() {
       const invItem = dbInventory.find((i) => i.id === id || i.cardId === id);
       const invAmount = invItem ? invItem.amount : 0;
 
-      const duplicateCount = Math.max(0, invAmount - 1);
+      const isGameCard = pulledCards.find(c => c.id === id)?.isGame;
+      const keepAmount = isGameCard ? 3 : 1;
+      const duplicateCount = Math.max(0, invAmount - keepAmount);
       const sellAmount = Math.min(pulledAmount, duplicateCount);
 
       if (sellAmount > 0) {
@@ -696,7 +699,7 @@ export default function App() {
     }
   };
 
-  const sellDuplicate = async (cardId, power = undefined) => {
+  const sellDuplicate = async (cardId, power = undefined, hp = undefined) => {
     if (actionLock.current) return false;
     actionLock.current = true;
     setIsProcessing(true);
@@ -705,6 +708,9 @@ export default function App() {
       const payload = { cardId, amount: 1 };
       if (power !== undefined) {
         payload.power = power;
+      }
+      if (hp !== undefined) {
+        payload.hp = hp;
       }
       const data = await sellCardsRequest(getToken(), [payload]);
       setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
@@ -733,13 +739,18 @@ export default function App() {
 
     try {
       const existing = dbInventory.find((i) => i.id === cardId);
-      if (!existing || existing.amount <= 1) {
+      const cardData = cardsCatalog.find((c) => c.id === cardId);
+      const isGameCard = cardData?.isGame;
+      const keepAmount = isGameCard ? 3 : 1;
+
+      if (!existing || existing.amount <= keepAmount) {
+        showToast(`Для масового продажу потрібно більше ніж ${keepAmount} шт. цієї картки.`, 'error');
         actionLock.current = false;
         setIsProcessing(false);
         return;
       }
 
-      const sellCount = existing.amount - 1;
+      const sellCount = existing.amount - keepAmount;
       const data = await sellCardsRequest(getToken(), [{ cardId, amount: sellCount }]);
       setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
@@ -773,7 +784,10 @@ export default function App() {
           })
           .filter(Boolean);
 
-      const duplicates = baseList.filter((item) => item.amount > 1);
+      const duplicates = baseList.filter((item) => {
+        const keepAmount = item.card?.isGame ? 3 : 1;
+        return item.amount > keepAmount;
+      });
       if (duplicates.length === 0) {
         showToast('Немає дублікатів для продажу!', 'error');
         actionLock.current = false;
@@ -781,10 +795,13 @@ export default function App() {
         return;
       }
 
-      const itemsToSell = duplicates.map((item) => ({
-        cardId: item.card?.id || item.id,
-        amount: item.amount - 1,
-      }));
+      const itemsToSell = duplicates.map((item) => {
+        const keepAmount = item.card?.isGame ? 3 : 1;
+        return {
+          cardId: item.card?.id || item.id,
+          amount: item.amount - keepAmount,
+        };
+      });
 
       const data = await sellCardsRequest(getToken(), itemsToSell);
       setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
@@ -1113,6 +1130,10 @@ export default function App() {
               <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
                 <Coins size={18} className="text-yellow-500" />
                 <span className="text-yellow-500 font-black">{profile?.coins}</span>
+              </div>
+              <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
+                <Gem size={18} className="text-fuchsia-500" />
+                <span className="text-fuchsia-500 font-black">{profile?.crystals || 0}</span>
               </div>
               <button
                 onClick={() => setCurrentView('premium')}

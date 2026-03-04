@@ -13,6 +13,7 @@ model User {
   email                String   @unique
   passwordHash         String
   coins                Int      @default(200)
+  crystals             Int      @default(0)
   totalCards           Int      @default(0)
   uniqueCardsCount     Int      @default(0)
   packsOpened          Int      @default(0)
@@ -45,9 +46,11 @@ model User {
   lastFusePlayDate     DateTime?
   fuseLevel            Int      @default(1)
   fuseRepairedPoints   Int      @default(0)
+  activeMinigame       Json?
   wordleState          Json?
   dailyWordleAttempts  Int      @default(0)
   lastWordlePlayDate   DateTime?
+  blackjackState       Json?
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
@@ -134,6 +137,7 @@ model MarketListing {
   createdAt DateTime @default(now())
   soldAt    DateTime?
   power     Int?
+  hp        Int?
 
   sellerId  String
   seller    User     @relation(fields: [sellerId], references: [uid], onDelete: Cascade)
@@ -207,11 +211,19 @@ model Notification {
 }
 
 model ArenaPoint {
-  id        String   @id @default(uuid())
-  x         Float
-  y         Float
-  name      String   @default("Точка Арени")
-  icon      String   @default("castle")
-  color     String   @default("#4f46e5")
-  createdAt DateTime @default(now())
+  id                 String    @id @default(uuid())
+  x                  Float
+  y                  Float
+  name               String    @default("Точка Арени")
+  icon               String    @default("castle")
+  color              String    @default("#4f46e5")
+  entryFee           Int       @default(0)
+  cooldownMinutes    Int       @default(15)
+  crystalRatePerHour Int       @default(0)
+  ownerId            String?
+  ownerNickname      String?
+  capturedAt         DateTime?
+  crystalsLastClaimedAt DateTime?
+  defendingCards     Json      @default("[]")
+  createdAt          DateTime  @default(now())
 }

@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Volume2,
 } from 'lucide-react';
-import { getCardStyle, getCardWeight, playCardSound } from '../utils/helpers';
+import { getCardStyle, getCardWeight, playCardSound, parseGameStat } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
 
 // Мінімальна сила за рідкістю для старих карток без записаної сили
@@ -22,17 +22,18 @@ const RARITY_MIN_POWER = {
   Звичайна: 5,
 };
 
-// Повертає масив об'єктів { value, isRecorded } для картки.
+// Повертає масив об'єктів { power, hp, isRecorded } для картки.
 // isRecorded=false: сила не записана в БД (мінімальний заповнювач).
 function getEffectivePowers(item, packsCatalog = []) {
-  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map(Number) : [];
+  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map(s => parseGameStat(s, item.card.rarity)) : [];
   const pack = packsCatalog.find((p) => p.id === item.card.packId);
   const isGameCard = item.card.isGame || (pack && pack.isGame) || recorded.length > 0;
   if (!isGameCard) return [];
   const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
-  const powers = recorded.map((v) => ({ value: v, isRecorded: true }));
+  const parsedDefault = parseGameStat(minPower, item.card.rarity);
+  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true }));
   while (powers.length < item.amount) {
-    powers.push({ value: minPower, isRecorded: false });
+    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false });
   }
   return powers;
 }
@@ -90,7 +91,7 @@ export default function InventoryView({
     if (sortBy === 'power') {
       const getPower = (item) => {
         const powers = getEffectivePowers(item, packsCatalog) || [];
-        return powers.length > 0 ? Math.max(...powers) : 0;
+        return powers.length > 0 ? Math.max(...powers.map(p => p.power)) : 0;
       };
       return getPower(b) - getPower(a);
     }
@@ -169,9 +170,9 @@ export default function InventoryView({
 
   const visibleCatalogTotal = cardsCatalog
     ? cardsCatalog.filter((card) => {
-        const pack = packsCatalog.find((p) => p.id === card.packId);
-        return pack && !pack.isHidden;
-      }).length
+      const pack = packsCatalog.find((p) => p.id === card.packId);
+      return pack && !pack.isHidden;
+    }).length
     : catalogTotal;
 
   const visibleInventoryCount = inventory.filter((item) => {
@@ -294,7 +295,7 @@ export default function InventoryView({
                       <div
                         onClick={() =>
                           isGameItem
-                            ? setViewingGameCard({ ...item, _effectivePowers: powerValues })
+                            ? setViewingGameCard({ ...item })
                             : setViewingCard({ card: item.card, amount: item.amount })
                         }
                         className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform`}
@@ -348,11 +349,19 @@ export default function InventoryView({
                         </div>
 
                         {isGameItem && (
-                          <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-green-400 mb-2 mt-0.5">
-                            <Zap size={10} />
-                            {powers.length === 1
-                              ? `Сила: ${powers[0].value}`
-                              : `Сила: ${Math.min(...powers.map((p) => p.value))}–${Math.max(...powers.map((p) => p.value))}`}
+                          <div className="flex flex-col items-center justify-center gap-0.5 mb-2 mt-0.5">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-yellow-500">
+                              <Zap size={10} />
+                              {powers.length === 1
+                                ? `${powers[0].power}`
+                                : `${Math.min(...powers.map(p => p.power))}–${Math.max(...powers.map(p => p.power))}`}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-red-500">
+                              ❤️
+                              {powers.length === 1
+                                ? `${powers[0].hp}`
+                                : `${Math.min(...powers.map(p => p.hp))}–${Math.max(...powers.map(p => p.hp))}`}
+                            </div>
                           </div>
                         )}
 
@@ -399,7 +408,7 @@ export default function InventoryView({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setViewingGameCard({ ...item, _effectivePowers: powers });
+                                    setViewingGameCard({ ...item });
                                   }}
                                   className="w-full bg-blue-900/40 hover:bg-blue-600 text-[10px] py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
                                 >
@@ -429,7 +438,7 @@ export default function InventoryView({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 isGameItem
-                                  ? setViewingGameCard({ ...item, _effectivePowers: powers })
+                                  ? setViewingGameCard({ ...item })
                                   : setListingCard(item.card);
                               }}
                               className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
@@ -705,25 +714,38 @@ export default function InventoryView({
                 <div className="p-6">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {powers.map((powerObj, idx) => {
-                      const powerVal = powerObj.value;
+                      const powerVal = powerObj.power;
+                      const hpVal = powerObj.hp;
                       const isRec = powerObj.isRecorded;
                       return (
                         <div
                           key={idx}
                           className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center text-center"
                         >
-                          <div className="text-4xl font-black text-green-400 mb-1 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]">
-                            {powerVal}
+                          <div className="flex justify-center gap-4 mb-2">
+                            <div className="flex flex-col items-center">
+                              <div className="text-3xl font-black text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">
+                                {powerVal}
+                              </div>
+                              <Zap size={14} className="text-yellow-600 mt-1" />
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <div className="text-3xl font-black text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+                                {hpVal}
+                              </div>
+                              <span className="text-red-700 mt-1 text-sm font-black">❤️</span>
+                            </div>
                           </div>
-                          <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest mb-4">
-                            {isRec ? 'Сила Картки' : 'Сила (базова)'}
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-4">
+                            {isRec ? 'Характеристики' : 'Базові'}
                           </div>
                           <div className="flex flex-col gap-2 w-full mt-auto">
                             <button
                               onClick={async () => {
                                 const success = await sellDuplicate(
                                   viewingGameCard.card.id,
-                                  isRec ? powerVal : undefined
+                                  isRec ? powerVal : undefined,
+                                  isRec ? hpVal : undefined
                                 );
                                 if (success) {
                                   const newPowers = [...powers];
@@ -736,7 +758,7 @@ export default function InventoryView({
                                       amount: viewingGameCard.amount - 1,
                                       gameStats: newPowers
                                         .filter((p) => p.isRecorded)
-                                        .map((p) => p.value),
+                                        .map((p) => ({ power: p.power, hp: p.hp })),
                                     });
                                   }
                                 }
@@ -751,6 +773,7 @@ export default function InventoryView({
                                 setListingCard({
                                   ...viewingGameCard.card,
                                   targetPowerToSell: isRec ? powerVal : null,
+                                  targetHpToSell: isRec ? hpVal : null,
                                 });
                                 setViewingGameCard(null);
                               }}

@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Loader2, Coins, Play, RefreshCw, Hand, Plus, Minus, Info } from 'lucide-react';
-import { startBlackjackGameRequest, claimBlackjackRewardRequest, getToken } from '../config/api';
-
-const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'];
-const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
+import { startBlackjackGameRequest, hitBlackjackRequest, standBlackjackRequest, getBlackjackStateRequest, getToken } from '../config/api';
 
 export default function GameBlackjack({ profile, setProfile, goBack, showToast }) {
   const [deck, setDeck] = useState([]);
@@ -11,70 +8,41 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
   const [dealerHand, setDealerHand] = useState([]);
   const [betAmount, setBetAmount] = useState(10);
 
-  const [gameState, setGameState] = useState('betting'); // betting, playing, dealer_turn, game_over
+  const [gameState, setGameState] = useState('betting'); // betting, playing, game_over
   const [gameResult, setGameResult] = useState(null); // win, lose, push, blackjack
   const [earnedCoins, setEarnedCoins] = useState(0);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Save/Load state to localStorage based on profile.uid
-  const storageKey = `blackjack_state_${profile?.uid || 'guest'}`;
-
+  // Load state from backend on mount
   useEffect(() => {
-    const savedState = localStorage.getItem(storageKey);
-    if (savedState) {
+    const loadState = async () => {
       try {
-        const parsed = JSON.parse(savedState);
-        if (parsed.gameState && parsed.gameState !== 'betting') {
-          setDeck(parsed.deck || []);
-          setPlayerHand(parsed.playerHand || []);
-          setDealerHand(parsed.dealerHand || []);
-          setBetAmount(parsed.betAmount || 10);
-          setGameState(parsed.gameState);
-          setGameResult(parsed.gameResult || null);
-          setEarnedCoins(parsed.earnedCoins || 0);
+        const data = await getBlackjackStateRequest(getToken());
+        if (data.state && data.state.gameState && data.state.gameState !== 'betting') {
+          const { state } = data;
+          setDeck(state.deck || []);
+          setPlayerHand(state.playerHand || []);
+          setDealerHand(state.dealerHand || []);
+          setBetAmount(state.betAmount || 10);
+          setGameState(state.gameState);
+          setGameResult(state.gameResult || null);
+          setEarnedCoins(state.earnedCoins || 0);
         }
       } catch (e) {
-        console.error('Failed to parse saved blackjack state:', e);
-        localStorage.removeItem(storageKey);
+        console.error('Failed to load saved blackjack state:', e);
+      } finally {
+        setIsLoaded(true);
       }
-    }
-    setIsLoaded(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (gameState === 'betting') {
-      localStorage.removeItem(storageKey);
-    } else {
-      const stateToSave = {
-        deck,
-        playerHand,
-        dealerHand,
-        betAmount,
-        gameState,
-        gameResult,
-        earnedCoins,
-      };
-      localStorage.setItem(storageKey, JSON.stringify(stateToSave));
-    }
-  }, [
-    deck,
-    playerHand,
-    dealerHand,
-    betAmount,
-    gameState,
-    gameResult,
-    earnedCoins,
-    isLoaded,
-    storageKey,
-  ]);
+    };
+    loadState();
+  }, []);
 
   const getCardValue = (rank) => {
     if (['jack', 'queen', 'king'].includes(rank)) return 10;
     if (rank === 'ace') return 11;
-    return parseInt(rank);
+    return parseInt(rank, 10);
   };
 
   const getHandScore = (hand) => {
@@ -94,28 +62,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
     return score;
   };
 
-  const createDeck = () => {
-    const newDeck = [];
-    const suitMap = { clubs: 'Clubs', diamonds: 'Diamonds', hearts: 'Hearts', spades: 'Spades' };
-    const rankMap = { jack: 'J', queen: 'Q', king: 'K', ace: 'A' };
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        newDeck.push({
-          suit,
-          rank,
-          value: getCardValue(rank),
-          image: `/png/card${suitMap[suit]}${rankMap[rank] || rank}.png`,
-        });
-      }
-    }
-    // Shuffle
-    for (let i = newDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
-    }
-    return newDeck;
-  };
-
   const startGame = async () => {
     if (betAmount < 10) return showToast('Мінімальна ставка 10 монет!', 'error');
     if (profile.coins < betAmount) return showToast('Недостатньо монет!', 'error');
@@ -125,28 +71,23 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       const data = await startBlackjackGameRequest(getToken(), betAmount);
       setProfile(data.profile);
 
-      const newDeck = createDeck();
+      const { state } = data;
+      setDeck(state.deck);
+      setPlayerHand(state.playerHand);
+      setDealerHand(state.dealerHand);
+      setBetAmount(state.betAmount);
+      setGameState(state.gameState);
+      setGameResult(state.gameResult);
+      setEarnedCoins(state.earnedCoins);
 
-      const pHand = [newDeck.pop(), newDeck.pop()];
-      const dHand = [newDeck.pop(), newDeck.pop()];
-
-      setDeck(newDeck);
-      setPlayerHand(pHand);
-      setDealerHand(dHand);
-
-      const pScore = getHandScore(pHand);
-      const dScore = getHandScore(dHand);
-
-      if (pScore === 21) {
-        setGameState('game_over');
-        if (dScore === 21) {
-          endGameValidation('push', betAmount);
-        } else {
-          endGameValidation('blackjack', betAmount);
+      if (state.gameResult === 'win' || state.gameResult === 'blackjack' || state.gameResult === 'push') {
+        if (state.earnedCoins > 0 && state.gameResult !== 'push') {
+          showToast(`Ви виграли ${state.earnedCoins} монет!`, 'success');
         }
-      } else {
-        setGameState('playing');
+      } else if (state.gameResult === 'lose') {
+        showToast('Ви програли ставку.', 'error');
       }
+
     } catch (e) {
       showToast(e.message || 'Помилка початку гри.', 'error');
     } finally {
@@ -154,74 +95,55 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
     }
   };
 
-  const hit = () => {
+  const hit = async () => {
     if (gameState !== 'playing' || isProcessing) return;
 
-    const newDeck = [...deck];
-    const card = newDeck.pop();
-    const newHand = [...playerHand, card];
-
-    setDeck(newDeck);
-    setPlayerHand(newHand);
-
-    if (getHandScore(newHand) > 21) {
-      setGameState('game_over');
-      endGameValidation('lose', betAmount);
-    }
-  };
-
-  const stand = () => {
-    if (gameState !== 'playing' || isProcessing) return;
-    setGameState('dealer_turn');
-  };
-
-  // Dealer play logic
-  useEffect(() => {
-    if (gameState === 'dealer_turn') {
-      const playDealerTimer = setTimeout(() => {
-        if (getHandScore(dealerHand) < 17) {
-          const currentDeck = [...deck];
-          const nextCard = currentDeck.pop();
-          setDeck(currentDeck);
-          setDealerHand([...dealerHand, nextCard]);
-        } else {
-          const pScore = getHandScore(playerHand);
-          const dScore = getHandScore(dealerHand);
-
-          setGameState('game_over');
-
-          if (dScore > 21) {
-            endGameValidation('win', betAmount);
-          } else if (dScore > pScore) {
-            endGameValidation('lose', betAmount);
-          } else if (dScore < pScore) {
-            endGameValidation('win', betAmount);
-          } else {
-            endGameValidation('push', betAmount);
-          }
-        }
-      }, 800);
-
-      return () => clearTimeout(playDealerTimer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState, dealerHand]);
-
-  const endGameValidation = async (result, bAmount) => {
     setIsProcessing(true);
-    setGameResult(result);
     try {
-      if (result !== 'lose') {
-        const data = await claimBlackjackRewardRequest(getToken(), result, bAmount);
-        setProfile(data.profile);
-        setEarnedCoins(data.earned);
-        if (data.earned > 0) showToast(`Ви виграли ${data.earned} монет!`, 'success');
-      } else {
-        showToast('Ви програли ставку.', 'error');
-        setEarnedCoins(0);
+      const data = await hitBlackjackRequest(getToken());
+      setProfile(data.profile);
+
+      const { state } = data;
+      setDeck(state.deck);
+      setPlayerHand(state.playerHand);
+      setGameState(state.gameState);
+      setGameResult(state.gameResult);
+      setEarnedCoins(state.earnedCoins);
+
+      if (state.gameState === 'game_over') {
+        showToast('Ви програли ставку (Перебір).', 'error');
       }
     } catch (e) {
-      showToast(e.message, 'error');
+      showToast(e.message || 'Помилка.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const stand = async () => {
+    if (gameState !== 'playing' || isProcessing) return;
+
+    setIsProcessing(true);
+    // Show dealer turn state locally for a bit of suspense while waiting for the request optionally
+    // But since it's backend, we just wait for response
+    try {
+      const data = await standBlackjackRequest(getToken());
+      setProfile(data.profile);
+
+      const { state } = data;
+      setDeck(state.deck);
+      setDealerHand(state.dealerHand);
+      setGameState(state.gameState);
+      setGameResult(state.gameResult);
+      setEarnedCoins(state.earnedCoins);
+
+      if (state.gameResult === 'win' || state.gameResult === 'blackjack') {
+        showToast(`Ви виграли ${state.earnedCoins} монет!`, 'success');
+      } else if (state.gameResult === 'lose') {
+        showToast('Ви програли ставку.', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'Помилка.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -327,15 +249,14 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         <div className="flex-1 flex items-center justify-center my-2 min-h-[40px]">
           {gameState === 'game_over' && (
             <div
-              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${
-                gameResult === 'win'
+              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${gameResult === 'win'
                   ? 'bg-green-500 text-green-950'
                   : gameResult === 'blackjack'
                     ? 'bg-fuchsia-500 text-white'
                     : gameResult === 'push'
                       ? 'bg-blue-500 text-white'
                       : 'bg-red-600 text-white'
-              }`}
+                }`}
             >
               {gameResult === 'win'
                 ? 'Перемога!'

@@ -653,6 +653,7 @@ export default function FarmView({
     return (
       <GameArena
         profile={profile}
+        setProfile={setProfile}
         cardsCatalog={cardsCatalog}
         goBack={() => setActiveGame(null)}
         showToast={showToast}
@@ -818,11 +819,10 @@ export default function FarmView({
         <button
           onClick={claimRewards}
           disabled={hp > 0 || isProcessing}
-          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${
-            hp <= 0
+          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
               ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
               : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-          }`}
+            }`}
         >
           {isProcessing ? (
             <Loader2 size={18} className="animate-spin" />

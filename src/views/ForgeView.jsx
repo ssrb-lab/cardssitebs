@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Hammer, Zap, Coins, ArrowUpCircle, Sparkles, Loader2, RefreshCw } from 'lucide-react';
-import { getCardStyle, playCardSound, getCardWeight } from '../utils/helpers';
+import { getCardStyle, playCardSound, getCardWeight, parseGameStat } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
 import { rerollPowerRequest } from '../config/api';
 
@@ -41,10 +41,12 @@ export default function ForgeView({
         return;
       }
       item.gameStats.forEach((statVal, index) => {
+        const parsed = parseGameStat(statVal, item.card.rarity);
         cards.push({
           card: item.card,
-          power: Number(statVal),
-          uniqueKey: `${item.card.id}-${index}-${statVal}`,
+          power: parsed.power,
+          hp: parsed.hp,
+          uniqueKey: `${item.card.id}-${index}-${parsed.power}-${parsed.hp}`,
         });
       });
     });
@@ -84,7 +86,7 @@ export default function ForgeView({
     playCardSound('/sounds/anvil_strike.mp3', 0.5); // Optional: add an anvil sound if available
 
     try {
-      const data = await rerollPowerRequest(getToken(), selectedCard.card.id, selectedCard.power);
+      const data = await rerollPowerRequest(getToken(), selectedCard.card.id, selectedCard.power, selectedCard.hp);
 
       // Оновлюємо дані одразу після успішної транзакції (знімаються монети)
       reloadProfile();
@@ -92,16 +94,16 @@ export default function ForgeView({
       // Анімація прокрутки цифр
       let rolls = 0;
       const rollInterval = setInterval(() => {
-        setRollingPower(Math.floor(Math.random() * 100) + 10);
+        setRollingPower({ power: Math.floor(Math.random() * 100) + 10, hp: Math.floor(Math.random() * 100) + 10 });
         rolls++;
         if (rolls > 30) {
           clearInterval(rollInterval);
-          setRollingPower(data.newPower);
-          setSelectedCard({ ...selectedCard, power: data.newPower });
+          setRollingPower({ power: data.newPower, hp: data.newHp });
+          setSelectedCard({ ...selectedCard, power: data.newPower, hp: data.newHp });
 
           // Видалено довгу затримку - одразу фіксуємо результат
           setIsForging(false);
-          showToast(`Успішно сковано! Нова сила: ${data.newPower}`, 'success');
+          showToast(`Успішно сковано! Нова Характеристика: ⚡${data.newPower} ❤️${data.newHp}`, 'success');
         }
       }, 40);
     } catch (e) {
@@ -139,14 +141,16 @@ export default function ForgeView({
                     <div className={`${selectedCard.card.effect} pointer-events-none z-10`} />
                   )}
                 </div>
-                <div className="mt-4 bg-black/60 px-4 py-2 rounded-xl border border-neutral-800 flex items-center justify-center gap-2 shadow-lg min-w-[100px] h-[48px]">
-                  <Zap size={20} className="text-green-400 shrink-0" />
-                  <div className="w-[60px] flex justify-center items-center h-full">
-                    <span
-                      className={`text-2xl font-black text-center transition-all duration-75 block ${isForging ? 'text-amber-100 scale-125 blur-[1px]' : 'text-white scale-100 blur-none'}`}
-                      style={{ willChange: 'transform, filter' }}
-                    >
-                      {isForging ? rollingPower : selectedCard.power}
+                <div className="mt-4 flex gap-1">
+                  <div className="bg-black/60 px-2 py-1.5 rounded-xl border border-neutral-800 flex items-center justify-center gap-1 shadow-lg min-w-[60px]">
+                    <Zap size={14} className="text-yellow-400 shrink-0" />
+                    <span className={`text-lg font-black transition-all ${isForging ? 'text-amber-100 blur-[1px]' : 'text-white blur-none'}`}>
+                      {isForging && rollingPower ? rollingPower.power : selectedCard.power}
+                    </span>
+                  </div>
+                  <div className="bg-black/60 px-2 py-1.5 rounded-xl border border-neutral-800 flex items-center justify-center gap-1 shadow-lg min-w-[60px]">
+                    <span className={`text-lg font-black transition-all ${isForging ? 'text-amber-100 blur-[1px]' : 'text-red-400 blur-none'}`}>
+                      ❤️ {isForging && rollingPower ? rollingPower.hp : selectedCard.hp}
                     </span>
                   </div>
                 </div>
@@ -244,7 +248,7 @@ export default function ForgeView({
           {forgeableCards.map((item, index) => {
             const style = getCardStyle(item.card.rarity, rarities);
             const isSelected =
-              selectedCard?.card.id === item.card.id && selectedCard?.power === item.power;
+              selectedCard?.card.id === item.card.id && selectedCard?.power === item.power && selectedCard?.hp === item.hp;
 
             return (
               <div
@@ -281,8 +285,13 @@ export default function ForgeView({
                   <div className="font-bold text-xs text-white mb-1 line-clamp-1 group-hover:text-orange-400 transition-colors">
                     {item.card.name}
                   </div>
-                  <div className="bg-black/50 rounded-lg py-1 px-2 inline-flex items-center gap-1 border border-neutral-800 font-bold text-green-400 text-xs">
-                    <Zap size={10} /> {item.power}
+                  <div>
+                    <div className="bg-black/50 rounded-lg py-0.5 px-1.5 inline-flex items-center gap-1 border border-neutral-800 font-bold text-yellow-500 text-[10px] mr-1">
+                      <Zap size={8} /> {item.power}
+                    </div>
+                    <div className="bg-black/50 rounded-lg py-0.5 px-1.5 inline-flex items-center gap-1 border border-neutral-800 font-bold text-red-400 text-[10px]">
+                      ❤️ {item.hp}
+                    </div>
                   </div>
                 </div>
               </div>

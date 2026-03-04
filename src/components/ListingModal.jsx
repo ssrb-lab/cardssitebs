@@ -30,6 +30,16 @@ export default function ListingModal({ listingCard, setListingCard, listOnMarket
           <div>
             <h3 className="text-lg font-black text-white leading-tight">{listingCard.name}</h3>
             <div className="text-xs text-neutral-400 mt-1">Виставлення на Ринок</div>
+            {listingCard.targetPowerToSell !== undefined && listingCard.targetPowerToSell !== null && (
+              <div className="flex gap-2 mt-2">
+                <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-yellow-500">
+                  ⚡ {listingCard.targetPowerToSell}
+                </div>
+                <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-red-500">
+                  ❤️ {listingCard.targetHpToSell !== undefined && listingCard.targetHpToSell !== null ? listingCard.targetHpToSell : 50}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
