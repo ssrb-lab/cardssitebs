@@ -111,6 +111,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
 
       const { state } = data;
       setPlayerHand(state.playerHand);
+      setDealerHand(state.dealerHand);
       setGameState(state.gameState);
       setGameResult(state.gameResult);
       setEarnedCoins(state.earnedCoins);
@@ -206,7 +207,9 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
             <div className="flex justify-center -space-x-10 sm:-space-x-14">
               {dealerHand.map((card, idx) => {
                 const isHiddenCard = gameState === 'playing' && idx === 1;
-                const showBack = idx === 1;
+                // Завжди показуємо flip-контейнер для другої карти, щоб анімувати переворот
+                const useFlipAnimation = idx === 1;
+
                 return (
                   <div
                     key={idx}
@@ -217,21 +220,26 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
                       perspective: '1000px',
                     }}
                   >
-                    {showBack ? (
+                    {useFlipAnimation ? (
                       <div
-                        className={`w-20 sm:w-24 h-full relative transition-transform duration-700 preserve-3d`}
-                        style={{ transform: isHiddenCard ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                        className={`w-20 sm:w-24 h-[116px] sm:h-[139px] relative transition-transform duration-700 preserve-3d`}
+                        style={{
+                          transform: isHiddenCard ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                          transformStyle: 'preserve-3d'
+                        }}
                       >
+                        {/* Front of the card (visible when rotateY is 0deg) */}
                         <img
                           src={card.image}
                           alt="card front"
-                          className="absolute inset-0 w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10 backface-hidden"
+                          className="absolute inset-0 w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10"
                           style={{ backfaceVisibility: 'hidden' }}
                         />
+                        {/* Back of the card (visible when rotateY is 180deg) */}
                         <img
                           src="/png/cardBack_blue1.png"
                           alt="card back"
-                          className="absolute inset-0 w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10 backface-hidden"
+                          className="absolute inset-0 w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10"
                           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                         />
                       </div>
@@ -253,15 +261,14 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         <div className="flex-1 flex items-center justify-center my-2 min-h-[40px]">
           {gameState === 'game_over' && (
             <div
-              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${
-                gameResult === 'win'
-                  ? 'bg-green-500 text-green-950'
-                  : gameResult === 'blackjack'
-                    ? 'bg-fuchsia-500 text-white'
-                    : gameResult === 'push'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-red-600 text-white'
-              }`}
+              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${gameResult === 'win'
+                ? 'bg-green-500 text-green-950'
+                : gameResult === 'blackjack'
+                  ? 'bg-fuchsia-500 text-white'
+                  : gameResult === 'push'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-red-600 text-white'
+                }`}
             >
               {gameResult === 'win'
                 ? 'Перемога!'
