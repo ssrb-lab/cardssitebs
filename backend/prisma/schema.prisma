@@ -135,6 +135,7 @@ model MarketListing {
   createdAt DateTime @default(now())
   soldAt    DateTime?
   power     Int?
+  hp        Int?
 
   sellerId  String
   seller    User     @relation(fields: [sellerId], references: [uid], onDelete: Cascade)

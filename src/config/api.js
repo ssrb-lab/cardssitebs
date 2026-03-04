@@ -170,15 +170,20 @@ export const sellCardsRequest = async (token, items) => {
   return data;
 };
 
-export const rerollPowerRequest = async (token, cardId, currentPower) => {
-  const res = await fetch(`${API_URL}/game/forge/reroll`, {
+export const rerollPowerRequest = async (token, cardId, currentPower, currentHp) => {
+  const response = await fetch(`${API_URL}/game/forge/reroll`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ cardId, currentPower }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ cardId, currentPower, currentHp }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Помилка кування');
-  return data;
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || 'Помилка кування.');
+  }
+  return response.json();
 };
 
 // --- РИНОК ---
@@ -189,11 +194,11 @@ export const fetchMarket = async () => {
   return data;
 };
 
-export const listCardRequest = async (token, cardId, price, power = null) => {
+export const listCardRequest = async (token, cardId, price, power = null, hp = null) => {
   const res = await fetch(`${API_URL}/game/market/list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ cardId, price, power }),
+    body: JSON.stringify({ cardId, price, power, hp }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -699,3 +704,26 @@ export const deleteArenaPointRequest = async (token, pointId) => {
   if (!res.ok) throw new Error(data.error);
   return data;
 };
+
+export const captureArenaPointRequest = async (token, pointId, cards = []) => {
+  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/capture`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cards }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const battleArenaPointRequest = async (token, pointId, cards = []) => {
+  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/battle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cards }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+

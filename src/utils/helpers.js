@@ -45,6 +45,22 @@ export const getCardStyle = (rName, raritiesList) => {
   return r && COLOR_PRESETS[r.color] ? COLOR_PRESETS[r.color] : COLOR_PRESETS['gray'];
 };
 
+export const parseGameStat = (stat, rarity) => {
+  if (typeof stat === 'object' && stat !== null && stat.power !== undefined) {
+    return { power: Number(stat.power) || 0, hp: Number(stat.hp) || 0 };
+  }
+  const power = Number(stat) || 0;
+  let hp = 50; // default average
+  switch (rarity) {
+    case 'Унікальна': hp = 400; break;
+    case 'Легендарна': hp = 300; break;
+    case 'Епічна': hp = 225; break;
+    case 'Рідкісна': hp = 150; break;
+    case 'Звичайна': hp = 75; break;
+  }
+  return { power, hp };
+};
+
 // --- ГЛОБАЛЬНИЙ ГОДИННИК ---
 // Запитує незалежний світовий час. Має захист (таймаут 3 сек),
 // щоб гра не зависла, якщо сервер часу раптом ляже.

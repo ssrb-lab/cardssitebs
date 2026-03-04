@@ -327,15 +327,14 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         <div className="flex-1 flex items-center justify-center my-2 min-h-[40px]">
           {gameState === 'game_over' && (
             <div
-              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${
-                gameResult === 'win'
+              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${gameResult === 'win'
                   ? 'bg-green-500 text-green-950'
                   : gameResult === 'blackjack'
                     ? 'bg-fuchsia-500 text-white'
                     : gameResult === 'push'
                       ? 'bg-blue-500 text-white'
                       : 'bg-red-600 text-white'
-              }`}
+                }`}
             >
               {gameResult === 'win'
                 ? 'Перемога!'

@@ -133,9 +133,14 @@ export default function MarketView({
                     <User size={10} /> {listing.sellerNickname}
                   </div>
 
-                  {listing.power && (
-                    <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 mb-2 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-green-400">
-                      Сила: {listing.power}
+                  {listing.power !== null && (
+                    <div className="flex gap-1 justify-center mb-2">
+                      <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-yellow-500">
+                        ⚡ {listing.power}
+                      </div>
+                      <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-red-500">
+                        ❤️ {listing.hp !== null ? listing.hp : 50}
+                      </div>
                     </div>
                   )}
 
