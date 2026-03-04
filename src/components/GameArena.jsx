@@ -248,6 +248,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       if (selectedPoint?.id === pointId) {
         setSelectedPoint(updatedPoint); // trigger refresh
       }
+      setDeck([]);
       showToast(data.message || 'Точку успішно захоплено!', 'success');
     } catch (error) {
       showToast(error.message || 'Помилка захоплення точки.', 'error');
@@ -406,6 +407,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       setIsBattleAnimating(false);
       setBattleResult({ won });
       setPoints((points) => points.map((p) => (p.id === pointUpdate.id ? pointUpdate : p)));
+      setDeck([]);
     }, 1500);
   };
 

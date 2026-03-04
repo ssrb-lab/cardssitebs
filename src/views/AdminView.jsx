@@ -111,8 +111,12 @@ export default function AdminView({
 
   const [adminAddCardId, setAdminAddCardId] = useState('');
   const [adminAddCardAmount, setAdminAddCardAmount] = useState(1);
+  const [adminAddCardPower, setAdminAddCardPower] = useState('');
+  const [adminAddCardHp, setAdminAddCardHp] = useState('');
   const [adminAddCoinsAmount, setAdminAddCoinsAmount] = useState(100);
   const [adminSetCoinsAmount, setAdminSetCoinsAmount] = useState(0);
+
+  const [adminRemoveModalData, setAdminRemoveModalData] = useState(null);
 
   const [editingCard, setEditingCard] = useState(null);
   const [cardForm, setCardForm] = useState({
@@ -139,6 +143,7 @@ export default function AdminView({
     cost: 50,
     image: '',
     customWeights: {},
+    statsRanges: {},
     isHidden: false,
     isPremiumOnly: false,
     isGame: false,
@@ -200,6 +205,19 @@ export default function AdminView({
     price: 500,
     description: '',
   });
+
+  const updatePackStatsRange = (rarity, field, value) => {
+    setPackForm((prev) => ({
+      ...prev,
+      statsRanges: {
+        ...(prev.statsRanges || {}),
+        [rarity]: {
+          ...(prev.statsRanges?.[rarity] || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
 
   const getFullSettings = () => ({
     bosses: bosses || [],
@@ -450,16 +468,30 @@ export default function AdminView({
       await adminUserActionRequest(getToken(), 'giveCard', viewingUser.uid, {
         cardId: adminAddCardId,
         amount: adminAddCardAmount,
+        power: adminAddCardPower ? Number(adminAddCardPower) : undefined,
+        hp: adminAddCardHp ? Number(adminAddCardHp) : undefined,
       });
       showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, 'success');
       handleInspectUser(viewingUser.uid);
+      setAdminAddCardPower('');
+      setAdminAddCardHp('');
       loadUsers();
     } catch {
       showToast('Помилка картки.', 'error');
     }
   };
 
-  const removeCardFromUser = async (cardId, currentAmount) => {
+  const removeCardFromUser = async (cardId, currentAmount, isGameCard, gameStatsArray) => {
+    if (gameStatsArray && (typeof gameStatsArray === 'string' ? JSON.parse(gameStatsArray).length > 0 : gameStatsArray.length > 0)) {
+      const cDef = cardsCatalog.find(c => c.id === cardId);
+      setAdminRemoveModalData({
+        cardId,
+        cardName: cDef?.name || 'Card',
+        stats: typeof gameStatsArray === 'string' ? JSON.parse(gameStatsArray) : gameStatsArray
+      });
+      return;
+    }
+
     const input = prompt(`Скільки карток відібрати? (У гравця зараз: ${currentAmount} шт.)`, '1');
     if (input === null) return; // Якщо ви натиснули "Скасувати"
 
@@ -478,6 +510,22 @@ export default function AdminView({
       loadUsers();
     } catch {
       showToast('Помилка вилучення.', 'error');
+    }
+  };
+
+  const removeSpecificCardInstance = async (cardId, statsIndex) => {
+    try {
+      await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, {
+        cardId,
+        amount: 1, // Doesn't matter because we pass statsIndex
+        statsIndex,
+      });
+      showToast(`Специфічний дублікат вилучено.`, 'success');
+      setAdminRemoveModalData(null);
+      handleInspectUser(viewingUser.uid);
+      loadUsers();
+    } catch {
+      showToast('Помилка вилучення дублікату.', 'error');
     }
   };
 
@@ -593,6 +641,7 @@ export default function AdminView({
         cost: 50,
         image: '',
         customWeights: {},
+        statsRanges: {},
         isHidden: false,
         isPremiumOnly: false,
         isGame: false,
@@ -976,6 +1025,44 @@ export default function AdminView({
         </div>
       )}
 
+      {/* МОДАЛКА ВИЛУЧЕННЯ ІГРОВОЇ КАРТКИ */}
+      {adminRemoveModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-neutral-900 border border-red-900/50 p-6 rounded-3xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-red-500 mb-2">
+              Вилучення: {adminRemoveModalData.cardName}
+            </h3>
+            <p className="text-sm text-neutral-400 mb-4">Оберіть конкретний екземпляр для видалення (Сила / HP).</p>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 mb-4">
+              {adminRemoveModalData.stats && adminRemoveModalData.stats.length > 0 ? (
+                adminRemoveModalData.stats.map((stat, idx) => (
+                  <div key={idx} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex justify-between items-center">
+                    <div className="flex gap-4">
+                      <div className="text-green-400 font-bold text-sm">Сила: {stat.power}</div>
+                      <div className="text-red-400 font-bold text-sm">HP: {stat.hp}</div>
+                    </div>
+                    <button
+                      onClick={() => removeSpecificCardInstance(adminRemoveModalData.cardId, idx)}
+                      className="bg-red-600/20 hover:bg-red-600/40 text-red-500 p-2 rounded-lg transition-colors border border-red-900/50"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-neutral-500 text-sm py-4 text-center">Ця картка не має ігрових статів або вони ще не були призначені. (Видаляйте через бек)</div>
+              )}
+            </div>
+            <button
+              onClick={() => setAdminRemoveModalData(null)}
+              className="w-full bg-neutral-800 text-white font-bold py-3 rounded-xl hover:bg-neutral-700 transition-colors"
+            >
+              Закрити
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* МОДАЛКА ПРЕМІУМУ */}
       {premiumModalUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -1201,6 +1288,26 @@ export default function AdminView({
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
                   />
                 </div>
+                <div className="w-full sm:w-20">
+                  <label className="text-xs text-neutral-400 font-bold mb-1 block">Сила:</label>
+                  <input
+                    type="number"
+                    placeholder="Auto"
+                    value={adminAddCardPower}
+                    onChange={(e) => setAdminAddCardPower(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-green-500"
+                  />
+                </div>
+                <div className="w-full sm:w-20">
+                  <label className="text-xs text-neutral-400 font-bold mb-1 block">HP:</label>
+                  <input
+                    type="number"
+                    placeholder="Auto"
+                    value={adminAddCardHp}
+                    onChange={(e) => setAdminAddCardHp(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-red-500"
+                  />
+                </div>
                 <button
                   onClick={giveCardToUser}
                   disabled={!adminAddCardId}
@@ -1336,9 +1443,9 @@ export default function AdminView({
 
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
                           <button
-                            onClick={() => removeCardFromUser(invItem.id, invItem.amount)}
+                            onClick={() => removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats)}
                             className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-full font-bold shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform"
-                            title="Вилучити 1 шт."
+                            title="Вилучити"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -2415,6 +2522,49 @@ export default function AdminView({
                 </div>
               </div>
 
+              {packForm.isGame && (
+                <div className="sm:col-span-2 mt-2 p-4 border border-neutral-800 rounded-xl bg-neutral-950/50">
+                  <h4 className="text-neutral-400 text-sm font-bold mb-3">
+                    Кастомні діапазони ХП і Сили для паку (залиште пустими для стандартних):
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {rarities.map((r) => (
+                      <div key={`stats-${r.name}`} className="flex flex-col gap-1 p-2 bg-neutral-900 border border-neutral-700 rounded-lg">
+                        <label className="text-xs font-bold text-center text-purple-400">{r.name}</label>
+                        <input
+                          type="number"
+                          placeholder="Min Power"
+                          value={packForm.statsRanges?.[r.name]?.minPower || ''}
+                          onChange={(e) => updatePackStatsRange(r.name, 'minPower', e.target.value)}
+                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max Power"
+                          value={packForm.statsRanges?.[r.name]?.maxPower || ''}
+                          onChange={(e) => updatePackStatsRange(r.name, 'maxPower', e.target.value)}
+                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Min HP"
+                          value={packForm.statsRanges?.[r.name]?.minHp || ''}
+                          onChange={(e) => updatePackStatsRange(r.name, 'minHp', e.target.value)}
+                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max HP"
+                          value={packForm.statsRanges?.[r.name]?.maxHp || ''}
+                          onChange={(e) => updatePackStatsRange(r.name, 'maxHp', e.target.value)}
+                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
                 <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800">
                   <input
@@ -2923,7 +3073,7 @@ export default function AdminView({
                     notifForm.targetUid === 'ALL'
                       ? 'Всі гравці (Глобальне)'
                       : allUsers.find((u) => u.uid === notifForm.targetUid)?.nickname ||
-                        notifForm.targetUid
+                      notifForm.targetUid
                   }
                   onChange={(e) => {
                     const val = e.target.value;
