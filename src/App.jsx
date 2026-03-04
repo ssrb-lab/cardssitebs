@@ -1055,7 +1055,7 @@ export default function App() {
           href="https://send.monobank.ua/jar/3t5ULx6Qx2"
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-[100] hidden lg:block origin-left hover:scale-[4] transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)] rounded-xl"
+          className="absolute left-4 top-2 z-[100] hidden lg:block origin-top-left hover:scale-[4] transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)] rounded-xl"
         >
           <img
             src="/QR.avif"
