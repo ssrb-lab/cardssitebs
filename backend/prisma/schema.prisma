@@ -45,6 +45,9 @@ model User {
   lastFusePlayDate     DateTime?
   fuseLevel            Int      @default(1)
   fuseRepairedPoints   Int      @default(0)
+  wordleState          Json?
+  dailyWordleAttempts  Int      @default(0)
+  lastWordlePlayDate   DateTime?
 
   inventory      InventoryItem[]
   marketListings MarketListing[]

@@ -2567,6 +2567,170 @@ app.post('/api/admin/notifications', authenticate, checkAdmin, async (req, res) 
   }
 });
 
+// ----------------------------------------
+// СЛІВЦЕ (WORDLE)
+// ----------------------------------------
+const wordleDictPath = path.join(__dirname, 'data', 'wordle_uk.json');
+let wordleDict = [];
+try {
+  wordleDict = require(wordleDictPath);
+} catch (e) {
+  console.log('Помилка завантаження словника Wordle', e);
+}
+
+app.get('/api/wordle/state', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено' });
+
+    let dailyAttempts = user.dailyWordleAttempts;
+    let lastPlay = user.lastWordlePlayDate ? new Date(user.lastWordlePlayDate) : null;
+    const now = new Date();
+
+    if (
+      (lastPlay && lastPlay.getDate() !== now.getDate()) ||
+      (lastPlay && lastPlay.getMonth() !== now.getMonth())
+    ) {
+      dailyAttempts = 0;
+    }
+
+    res.json({ state: user.wordleState, dailyAttempts });
+  } catch (err) {
+    res.status(500).json({ error: 'Помилка отримання стану Wordle.' });
+  }
+});
+
+app.post('/api/wordle/start', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
+    const wordleEntryCost =
+      settings?.data?.wordleEntryCost !== undefined ? Number(settings.data.wordleEntryCost) : 0;
+
+    if (wordleEntryCost > 0 && user.coins < wordleEntryCost) {
+      return res.status(400).json({ error: `Недостатньо монет (Потрібно ${wordleEntryCost}).` });
+    }
+
+    let dailyAttempts = user.dailyWordleAttempts;
+    let lastPlay = user.lastWordlePlayDate ? new Date(user.lastWordlePlayDate) : null;
+    const now = new Date();
+    if (
+      (lastPlay && lastPlay.getDate() !== now.getDate()) ||
+      (lastPlay && lastPlay.getMonth() !== now.getMonth())
+    ) {
+      dailyAttempts = 0;
+    }
+
+    if (dailyAttempts >= 5)
+      return res.status(400).json({ error: 'Ви вичерпали ліміт на 5 ігор сьогодні.' });
+
+    const randomWord = wordleDict[Math.floor(Math.random() * wordleDict.length)].toLowerCase();
+
+    const newState = {
+      word: randomWord,
+      guesses: [], // [{ word: '...', colors: ['green', 'yellow', 'gray'] }]
+      status: 'playing', // 'playing', 'won', 'lost'
+    };
+
+    const updateData = {
+      wordleState: newState,
+      dailyWordleAttempts: dailyAttempts + 1,
+      lastWordlePlayDate: now,
+    };
+
+    if (wordleEntryCost > 0) {
+      updateData.coins = { decrement: wordleEntryCost };
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      state: newState,
+      profile: updatedUser,
+      dailyAttempts: dailyAttempts + 1,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Помилка початку гри Wordle.' });
+  }
+});
+
+app.post('/api/wordle/guess', authenticate, async (req, res) => {
+  const { guess } = req.body;
+
+  if (!guess || guess.length !== 5)
+    return res.status(400).json({ error: 'Слово має містити 5 літер.' });
+
+  const lowerGuess = guess.toLowerCase();
+
+  if (!wordleDict.includes(lowerGuess)) {
+    return res.status(400).json({ error: 'Слово відсутнє в словнику.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    let state =
+      typeof user.wordleState === 'string' ? JSON.parse(user.wordleState) : user.wordleState;
+
+    if (!state || state.status !== 'playing') {
+      return res.status(400).json({ error: 'Немає активної гри.' });
+    }
+
+    const targetWord = state.word;
+    const colors = Array(5).fill('gray');
+    const targetArr = targetWord.split('');
+    const guessArr = lowerGuess.split('');
+
+    // First pass: exact matches (green)
+    guessArr.forEach((char, i) => {
+      if (char === targetArr[i]) {
+        colors[i] = 'green';
+        targetArr[i] = null; // Mark as used
+      }
+    });
+
+    // Second pass: correct letter, wrong place (yellow)
+    guessArr.forEach((char, i) => {
+      if (colors[i] !== 'green') {
+        const index = targetArr.indexOf(char);
+        if (index !== -1) {
+          colors[i] = 'yellow';
+          targetArr[index] = null; // Mark as used
+        }
+      }
+    });
+
+    state.guesses.push({ word: lowerGuess, colors });
+
+    let reward = 0;
+
+    if (lowerGuess === targetWord) {
+      state.status = 'won';
+      reward = 1000; // Виграш
+    } else if (state.guesses.length >= 6) {
+      state.status = 'lost';
+    }
+
+    const updateData = { wordleState: state };
+    if (reward > 0) {
+      updateData.coins = { increment: reward };
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: updateData,
+    });
+
+    res.json({ success: true, state, profile: updatedUser, reward });
+  } catch (err) {
+    res.status(500).json({ error: 'Помилка перевірки слова.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Бекенд успішно запущено на порту ${PORT}, Мій лорд.`);
 });

@@ -29,8 +29,16 @@ import GameTetris from '../components/GameTetris';
 import GameFuse from '../components/GameFuse';
 import GameBlackjack from '../components/GameBlackjack';
 import GameArena from '../components/GameArena';
+import GameWordle from '../components/GameWordle';
 
-export default function FarmView({ profile, setProfile, cardsCatalog, showToast, bosses }) {
+export default function FarmView({
+  profile,
+  setProfile,
+  cardsCatalog,
+  showToast,
+  bosses,
+  wordleEntryCost,
+}) {
   const playerLevel = profile?.farmLevel || 1;
 
   const sortedBosses = [...(bosses || [])].sort((a, b) => a.level - b.level);
@@ -53,8 +61,6 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
 
   const actionLock = useRef(false);
   const accumulatedDamage = useRef(0);
-  const clickTimes = useRef([]);
-  const isAntiCheatTriggered = useRef(false);
 
   // Завантаження статусів ігор та підключення SSE
   useEffect(() => {
@@ -62,7 +68,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
       try {
         const res = await fetchGameStatuses();
         setBlockedGames(res.blockedGames || []);
-      } catch (e) {
+      } catch {
         console.error('Помилка завантаження статусів ігор');
       }
     };
@@ -82,7 +88,9 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         } else if (data.type === 'GAME_UNBLOCKED') {
           setBlockedGames((prev) => prev.filter((g) => g !== data.game));
         }
-      } catch (e) { }
+      } catch {
+        // ігноруємо помилки парсингу
+      }
     };
 
     return () => {
@@ -115,7 +123,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
               : currentBoss.maxHp
           );
         }
-      } catch (e) {
+      } catch {
         console.error('Помилка завантаження стану боса');
       }
       setIsLoading(false);
@@ -151,7 +159,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         accumulatedDamage.current = 0; // Очищаємо локальний лічильник
         try {
           await syncFarmHitRequest(getToken(), currentBoss.id, dmgToSync, currentBoss.maxHp);
-        } catch (e) {
+        } catch {
           accumulatedDamage.current += dmgToSync; // Якщо помилка - повертаємо урон в чергу
         }
       }
@@ -177,7 +185,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
       setHp(currentBoss.maxHp);
       accumulatedDamage.current = 0;
       showToast('АДМІН: Кулдаун скинуто!', 'success');
-    } catch (e) {
+    } catch {
       showToast('Помилка скидання КД.', 'error');
     } finally {
       setIsProcessing(false);
@@ -191,7 +199,7 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
       const res = await adminToggleGameStatus(getToken(), gameName);
       setBlockedGames(res.blockedGames);
       showToast(`Статус гри ${gameName} змінено.`, 'success');
-    } catch (e) {
+    } catch {
       showToast('Помилка зміни статусу', 'error');
     } finally {
       setIsProcessing(false);
@@ -323,28 +331,51 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
               >
                 Арена
               </button>
+              <button
+                onClick={() => adminToggleBlock('wordle')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('wordle') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}
+              >
+                Слівце
+              </button>
             </div>
           </div>
         )}
 
         {/* Арена (Виділена окремо) */}
         <div className="mb-8 px-2 w-full">
-          <div className={`bg-gradient-to-r ${blockedGames.includes('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}>
+          <div
+            className={`bg-gradient-to-r ${blockedGames.includes('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
+          >
             <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
-              <Trophy size={200} className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'} />
+              <Trophy
+                size={200}
+                className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'}
+              />
             </div>
 
             <div className="relative z-10 flex-1">
               <div className="flex items-center gap-3 mb-3">
-                <div className={`p-3 rounded-2xl border flex-shrink-0 ${blockedGames.includes('arena') ? 'bg-neutral-800 border-neutral-700' : 'bg-indigo-500/20 border-indigo-500/30'}`}>
-                  <Swords size={32} className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'} />
+                <div
+                  className={`p-3 rounded-2xl border flex-shrink-0 ${blockedGames.includes('arena') ? 'bg-neutral-800 border-neutral-700' : 'bg-indigo-500/20 border-indigo-500/30'}`}
+                >
+                  <Swords
+                    size={32}
+                    className={
+                      blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'
+                    }
+                  />
                 </div>
-                <h3 className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${blockedGames.includes('arena') ? 'text-neutral-500' : 'text-white'}`}>
+                <h3
+                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${blockedGames.includes('arena') ? 'text-neutral-500' : 'text-white'}`}
+                >
                   Арена
                 </h3>
               </div>
-              <p className={`${blockedGames.includes('arena') ? 'text-neutral-600' : 'text-indigo-200'} text-sm sm:text-base max-w-xl leading-relaxed`}>
-                Доведіть свою перевагу в епічних PvP битвах проти інших гравців! Здобувайте славу, унікальні нагороди та піднімайтеся на вершину рейтингу.
+              <p
+                className={`${blockedGames.includes('arena') ? 'text-neutral-600' : 'text-indigo-200'} text-sm sm:text-base max-w-xl leading-relaxed`}
+              >
+                Доведіть свою перевагу в епічних PvP битвах проти інших гравців! Здобувайте славу,
+                унікальні нагороди та піднімайтеся на вершину рейтингу.
               </p>
             </div>
 
@@ -531,6 +562,38 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
               </button>
             )}
           </div>
+
+          <div
+            onClick={() => (blockedGames.includes('wordle') ? null : setActiveGame('wordle'))}
+            className={`bg-neutral-900 border ${blockedGames.includes('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+          >
+            <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Gamepad2
+                size={120}
+                className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
+              />
+            </div>
+            <h3
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-white'}`}
+            >
+              <Gamepad2
+                className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
+              />{' '}
+              Слівце 🇺🇦
+            </h3>
+            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+              Вгадайте українське слово з 5 літер! Тренуйте розум і заробляйте великі призи.
+            </p>
+            {blockedGames.includes('wordle') ? (
+              <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
+                <Lock size={16} /> Тимчасово недоступна
+              </div>
+            ) : (
+              <button className="bg-blue-600/20 text-blue-400 group-hover:bg-blue-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">
+                Грати
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -603,6 +666,17 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         setProfile={setProfile}
         goBack={() => setActiveGame(null)}
         showToast={showToast}
+      />
+    );
+  }
+  if (activeGame === 'wordle') {
+    return (
+      <GameWordle
+        profile={profile}
+        setProfile={setProfile}
+        goBack={() => setActiveGame(null)}
+        showToast={showToast}
+        wordleEntryCost={wordleEntryCost}
       />
     );
   }
@@ -692,10 +766,11 @@ export default function FarmView({ profile, setProfile, cardsCatalog, showToast,
         <button
           onClick={claimRewards}
           disabled={hp > 0 || isProcessing}
-          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
-            ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
-            : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-            }`}
+          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${
+            hp <= 0
+              ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
+              : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+          }`}
         >
           {isProcessing ? (
             <Loader2 size={18} className="animate-spin" />

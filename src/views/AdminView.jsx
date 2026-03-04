@@ -77,6 +77,7 @@ export default function AdminView({
   setViewingPlayerProfile,
   setCurrentView,
   bosses,
+  wordleEntryCost,
 }) {
   const [activeTab, setActiveTab] = useState('users');
   const [newBoss, setNewBoss] = useState({
@@ -190,6 +191,9 @@ export default function AdminView({
   const [durationDaysForm, setDurationDaysForm] = useState(
     premiumDurationDays !== undefined ? premiumDurationDays : 30
   );
+  const [wordleCostForm, setWordleCostForm] = useState(
+    wordleEntryCost !== undefined ? wordleEntryCost : 0
+  );
   const [shopItemForm, setShopItemForm] = useState({
     type: 'card',
     itemId: '',
@@ -204,6 +208,7 @@ export default function AdminView({
     premiumPrice: Number(priceForm),
     premiumDurationDays: Number(durationDaysForm),
     premiumShopItems: premiumShopItems || [],
+    wordleEntryCost: Number(wordleCostForm) >= 0 ? Number(wordleCostForm) : 0,
   });
 
   useEffect(() => {
@@ -211,7 +216,8 @@ export default function AdminView({
     setPremiumRewardsForm(premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]);
     setPriceForm(premiumPrice !== undefined ? premiumPrice : 10000);
     setDurationDaysForm(premiumDurationDays !== undefined ? premiumDurationDays : 30);
-  }, [dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays]);
+    setWordleCostForm(wordleEntryCost !== undefined ? wordleEntryCost : 0);
+  }, [dailyRewards, premiumDailyRewards, premiumPrice, premiumDurationDays, wordleEntryCost]);
 
   const loadUsers = async () => {
     try {
@@ -1550,6 +1556,22 @@ export default function AdminView({
                     value={durationDaysForm}
                     onChange={(e) => setDurationDaysForm(e.target.value)}
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-blue-500 outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 sm:col-span-2">
+                <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">
+                  Вартість Входу "Слівце" (Монети, 0 = Безкоштовно):
+                </label>
+                <div className="relative">
+                  <Coins className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 w-5 h-5" />
+                  <input
+                    type="number"
+                    min="0"
+                    value={wordleCostForm}
+                    onChange={(e) => setWordleCostForm(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg pl-10 pr-4 py-3 text-white focus:border-green-500 outline-none font-bold"
                   />
                 </div>
               </div>
@@ -2901,7 +2923,7 @@ export default function AdminView({
                     notifForm.targetUid === 'ALL'
                       ? 'Всі гравці (Глобальне)'
                       : allUsers.find((u) => u.uid === notifForm.targetUid)?.nickname ||
-                      notifForm.targetUid
+                        notifForm.targetUid
                   }
                   onChange={(e) => {
                     const val = e.target.value;

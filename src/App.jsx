@@ -45,7 +45,7 @@ import {
 } from './config/api';
 import NotificationsModal from './components/NotificationsModal';
 import { GoogleLogin } from '@react-oauth/google';
-import { getGlobalTime, isToday, getCardWeight } from './utils/helpers';
+import { isToday, getCardWeight } from './utils/helpers';
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from './config/constants';
 
 import logo1 from './assets/logo1.png';
@@ -88,7 +88,7 @@ export default function App() {
   const [packsCatalog, setPacksCatalog] = useState([]);
   const [achievementsCatalog, setAchievementsCatalog] = useState([]);
   const [cardStats, setCardStats] = useState({});
-  const [rarities, setRarities] = useState(DEFAULT_RARITIES);
+  const [rarities] = useState(DEFAULT_RARITIES);
   const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]);
   const [premiumDailyRewards, setPremiumDailyRewards] = useState([
     2000, 4000, 6000, 8000, 10000, 12000, 15000,
@@ -96,6 +96,7 @@ export default function App() {
   const [premiumPrice, setPremiumPrice] = useState(10000);
   const [premiumDurationDays, setPremiumDurationDays] = useState(30);
   const [premiumShopItems, setPremiumShopItems] = useState([]);
+  const [wordleEntryCost, setWordleEntryCost] = useState(0);
 
   const [currentView, setCurrentView] = useState(() => {
     // Намагаємось отримати збережену вкладку, якщо її немає — за замовчуванням "shop"
@@ -220,6 +221,9 @@ export default function App() {
         settings.premiumDurationDays !== undefined ? settings.premiumDurationDays : 30
       );
       setPremiumShopItems(settings.premiumShopItems || []);
+      setWordleEntryCost(
+        settings.wordleEntryCost !== undefined ? Number(settings.wordleEntryCost) : 0
+      );
     } catch (e) {
       console.error('Помилка завантаження налаштувань:', e);
     }
@@ -1139,6 +1143,7 @@ export default function App() {
             showToast={showToast}
             bosses={bosses}
             rarities={rarities}
+            wordleEntryCost={wordleEntryCost}
           />
         )}
         {currentView === 'shop' && (
@@ -1294,6 +1299,7 @@ export default function App() {
             setCurrentView={setCurrentView}
             bosses={bosses}
             setBosses={setBosses}
+            wordleEntryCost={wordleEntryCost}
           />
         )}
       </main>
