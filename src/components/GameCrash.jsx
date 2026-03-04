@@ -270,31 +270,36 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
   return (
     <div className="w-full flex justify-center pb-10 animate-in fade-in zoom-in-95 duration-500 p-2">
       <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-xl mt-4">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-2">
-            <Rocket className="text-red-500" size={32} /> Crash
-          </h2>
-          <button
-            onClick={goBack}
-            className="text-sm font-bold text-neutral-400 hover:text-white transition-colors"
-          >
-            Повернутися
-          </button>
-        </div>
+        <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 p-4">
+          {/* Заголовок та Історія */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Rocket size={32} className="text-red-500" />
+              <h1 className="text-3xl font-black text-white tracking-widest uppercase">Crash</h1>
+            </div>
 
-        {/* Історія */}
-        {history.length > 0 && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-            {history.map((h, i) => (
-              <span
-                key={i}
-                className={`px-3 py-1 bg-neutral-950 rounded-lg text-xs font-mono font-bold border border-neutral-800 ${getMultiplierColor(h)}`}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+              {history.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto scrollbar-hide py-2 px-1">
+                  {history.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className={`px-3 py-1 rounded-lg text-sm font-bold shadow-md ${getMultiplierColor(m)}`}
+                    >
+                      {m.toFixed(2)}x
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={goBack}
+                className="text-neutral-400 hover:text-white transition-colors text-sm font-bold ml-auto"
               >
-                {h.toFixed(2)}x
-              </span>
-            ))}
+                Повернутися
+              </button>
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Екран гри */}
         <div className="relative bg-neutral-950 rounded-2xl h-64 sm:h-80 w-full mb-6 border-2 flex-shrink-0 border-neutral-800 overflow-hidden shadow-inner">
@@ -378,39 +383,41 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             <label className="text-neutral-500 font-bold text-xs uppercase tracking-wider mb-2 block">
               Ставка (Монети)
             </label>
-            <div className="relative group">
-              <input
-                type="number"
-                value={bet}
-                onChange={(e) => setBet(Number(e.target.value))}
-                disabled={status === 'playing' || isLoading}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 sm:py-4 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 pr-28 placeholder-neutral-700 disabled:opacity-50"
-                min="10"
-              />
-              <Coins
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500"
-                size={20}
-              />
+            <div className="flex flex-col gap-2">
+              <div className="relative group">
+                <input
+                  type="number"
+                  value={bet}
+                  onChange={(e) => setBet(Number(e.target.value))}
+                  disabled={status === 'playing' || isLoading}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 sm:py-4 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 placeholder-neutral-700 disabled:opacity-50"
+                  min="10"
+                />
+                <Coins
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500"
+                  size={20}
+                />
+              </div>
 
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+              <div className="flex gap-2 w-full">
                 <button
                   disabled={status === 'playing' || isLoading}
                   onClick={() => setBet((b) => Math.max(10, Math.floor(b / 2)))}
-                  className="bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 text-xs px-2 py-1 rounded-md font-bold transition-colors"
+                  className="flex-1 bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
                 >
                   /2
                 </button>
                 <button
                   disabled={status === 'playing' || isLoading}
                   onClick={() => setBet((b) => b * 2)}
-                  className="bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 text-xs px-2 py-1 rounded-md font-bold transition-colors"
+                  className="flex-1 bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
                 >
                   x2
                 </button>
                 <button
                   disabled={status === 'playing' || isLoading}
                   onClick={() => setBet(Math.max(10, profile?.coins || 0))}
-                  className="bg-red-900/30 text-red-400 hover:text-white hover:bg-red-600 text-xs px-2 py-1 rounded-md font-bold border border-red-500/20 transition-colors"
+                  className="flex-1 bg-red-900/30 text-red-400 hover:text-white hover:bg-red-600 py-2 rounded-xl font-bold border border-red-500/20 transition-colors disabled:opacity-50"
                 >
                   MAX
                 </button>
@@ -453,4 +460,4 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
       </div>
     </div>
   );
-}
+
