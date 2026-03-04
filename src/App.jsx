@@ -1050,7 +1050,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
-      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
+      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm relative">
+        <a
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-[60] hidden lg:block hover:scale-105 transition-transform cursor-pointer"
+        >
+          <img
+            src="/QR.avif"
+            alt="QR Code"
+            className="w-14 h-14 object-cover rounded-xl border border-neutral-700 shadow-lg hover:border-neutral-500"
+          />
+        </a>
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div
             className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer"
