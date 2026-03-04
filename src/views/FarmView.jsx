@@ -409,38 +409,6 @@ export default function FarmView({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 px-2">
           <div
-            onClick={() => (blockedGames.includes('boss') ? null : setActiveGame('boss'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
-          >
-            <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Swords
-                size={120}
-                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
-              />
-            </div>
-            <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('boss') ? 'text-neutral-500' : 'text-white'}`}
-            >
-              <Swords
-                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
-              />{' '}
-              Битва з Босом
-            </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
-              Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.
-            </p>
-            {blockedGames.includes('boss') ? (
-              <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
-                <Lock size={16} /> Тимчасово недоступна
-              </div>
-            ) : (
-              <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">
-                Грати
-              </button>
-            )}
-          </div>
-
-          <div
             onClick={() => (blockedGames.includes('2048') ? null : setActiveGame('2048'))}
             className={`bg-neutral-900 border ${blockedGames.includes('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
@@ -635,6 +603,38 @@ export default function FarmView({
               </button>
             )}
           </div>
+
+          <div
+            onClick={() => (blockedGames.includes('boss') ? null : setActiveGame('boss'))}
+            className={`bg-neutral-900 border ${blockedGames.includes('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+          >
+            <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Swords
+                size={120}
+                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
+              />
+            </div>
+            <h3
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('boss') ? 'text-neutral-500' : 'text-white'}`}
+            >
+              <Swords
+                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
+              />{' '}
+              Битва з Босом
+            </h3>
+            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+              Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.
+            </p>
+            {blockedGames.includes('boss') ? (
+              <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
+                <Lock size={16} /> Тимчасово недоступна
+              </div>
+            ) : (
+              <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">
+                Грати
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -819,10 +819,11 @@ export default function FarmView({
         <button
           onClick={claimRewards}
           disabled={hp > 0 || isProcessing}
-          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${hp <= 0
+          className={`font-bold py-3 px-6 rounded-xl transition-all shadow-lg flex items-center gap-2 ${
+            hp <= 0
               ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)] animate-pulse'
               : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-            }`}
+          }`}
         >
           {isProcessing ? (
             <Loader2 size={18} className="animate-spin" />
