@@ -126,13 +126,13 @@ export default function ForgeView({
                 className={`flex flex-col items-center relative transition-transform duration-500 w-full max-w-[200px] ${isForging ? 'animate-pulse scale-105 drop-shadow-[0_0_20px_rgba(234,88,12,0.6)]' : ''}`}
               >
                 <div
-                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${getCardStyle(selectedCard.card.rarity, rarities).border}`}
+                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${getCardStyle(selectedCard.card.rarity, rarities).border}`}
                 >
                   <CardFrame frame={selectedCard.card.frame}>
                     <img
                       src={selectedCard.card.image}
                       alt={selectedCard.card.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transform-gpu will-change-transform"
                     />
                   </CardFrame>
                   {selectedCard.card.effect && (
@@ -254,13 +254,13 @@ export default function ForgeView({
                 style={{ animationDelay: `${index * 15}ms`, fillMode: 'backwards' }}
               >
                 <div
-                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} hover:border-neutral-400`}`}
+                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} hover:border-neutral-400`}`}
                 >
                   <CardFrame frame={item.card.frame}>
                     <img
                       src={item.card.image}
                       alt={item.card.name}
-                      className={`w-full h-full object-cover transition-transform duration-500 ${isSelected ? 'scale-105' : 'group-hover:scale-105'}`}
+                      className={`w-full h-full object-cover transition-transform duration-500 transform-gpu will-change-transform ${isSelected ? 'scale-105' : 'group-hover:scale-105'}`}
                       loading="lazy"
                     />
                   </CardFrame>

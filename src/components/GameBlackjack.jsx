@@ -41,7 +41,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       }
     }
     setIsLoaded(true);
-     
   }, [storageKey]);
 
   useEffect(() => {
@@ -285,7 +284,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
                 return (
                   <div
                     key={idx}
-                    className={`relative transform transition-all duration-300 ${isHiddenCard ? '' : 'hover:-translate-y-2'}`}
+                    className={`relative transform transition-all duration-300 transform-gpu will-change-transform ${isHiddenCard ? '' : 'hover:-translate-y-2'}`}
                     style={{
                       zIndex: idx,
                       animation: `flyInTop 0.5s ease-out ${idx < 2 ? 0.15 + idx * 0.3 : 0}s backwards`,
@@ -314,7 +313,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
                       <img
                         src={card.image}
                         alt="card"
-                        className="w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10"
+                        className="w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10 transform-gpu will-change-transform"
                       />
                     )}
                   </div>
@@ -370,7 +369,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
               {playerHand.map((card, idx) => (
                 <div
                   key={idx}
-                  className="relative transform transition-all duration-300 hover:-translate-y-4"
+                  className="relative transform transition-all duration-300 hover:-translate-y-4 transform-gpu will-change-transform"
                   style={{
                     zIndex: idx,
                     animation: `flyInBottom 0.5s ease-out ${idx < 2 ? idx * 0.3 : 0}s backwards`,
@@ -379,7 +378,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
                   <img
                     src={card.image}
                     alt="card"
-                    className="w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10"
+                    className="w-20 sm:w-24 h-auto rounded-xl shadow-xl border border-white/10 transform-gpu will-change-transform"
                   />
                 </div>
               ))}
