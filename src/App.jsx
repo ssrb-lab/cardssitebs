@@ -18,6 +18,7 @@ import {
   Gift,
   Volume2,
   VolumeX,
+  Hammer,
 } from 'lucide-react';
 
 import {
@@ -58,6 +59,7 @@ import ShopView from './views/ShopView';
 import PremiumShopView from './views/PremiumShopView';
 import InventoryView from './views/InventoryView';
 import MarketView from './views/MarketView';
+import ForgeView from './views/ForgeView';
 import ProfileView from './views/ProfileView';
 import RatingView from './views/RatingView';
 import PublicProfileView from './views/PublicProfileView';
@@ -368,9 +370,13 @@ export default function App() {
     setLoading(false);
   };
 
+  // Use a ref to store the timeout ID so it persists across renders
+  const toastTimeoutRef = useRef(null);
+
   const showToast = (msg, type = 'error') => {
     setToastMsg({ text: msg, type });
-    setTimeout(() => setToastMsg({ text: '', type: '' }), 3000);
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToastMsg({ text: '', type: '' }), 3000);
   };
 
   const reloadMarket = async () => {
@@ -1009,7 +1015,11 @@ export default function App() {
       const cardData = cardsCatalog.find((c) => c.id === item.id);
       let parsedStats = item.gameStats || [];
       if (typeof parsedStats === 'string') {
-        try { parsedStats = JSON.parse(parsedStats); } catch(e) { parsedStats = []; }
+        try {
+          parsedStats = JSON.parse(parsedStats);
+        } catch (e) {
+          parsedStats = [];
+        }
       }
       return cardData && item.amount > 0
         ? { card: cardData, amount: item.amount, gameStats: parsedStats }
@@ -1193,6 +1203,18 @@ export default function App() {
             deleteShowcase={deleteShowcase}
             setMainShowcase={setMainShowcase}
             saveShowcaseCards={saveShowcaseCards}
+          />
+        )}
+        {currentView === 'forge' && (
+          <ForgeView
+            inventory={fullInventory}
+            cardsCatalog={cardsCatalog}
+            packsCatalog={packsCatalog}
+            rarities={rarities}
+            profile={profile}
+            showToast={showToast}
+            getToken={getToken}
+            reloadProfile={reloadProfile}
           />
         )}
         {currentView === 'market' && (
@@ -1413,6 +1435,15 @@ export default function App() {
             onClick={() => {
               setCurrentView('inventory');
               reloadProfile(); // Примусово оновлюємо дані з сервера
+            }}
+          />
+          <NavButton
+            icon={<Hammer size={22} />}
+            label="Кузня"
+            isActive={currentView === 'forge'}
+            onClick={() => {
+              setCurrentView('forge');
+              reloadProfile();
             }}
           />
           <NavButton

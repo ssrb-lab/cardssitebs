@@ -170,6 +170,17 @@ export const sellCardsRequest = async (token, items) => {
   return data;
 };
 
+export const rerollPowerRequest = async (token, cardId, currentPower) => {
+  const res = await fetch(`${API_URL}/game/forge/reroll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, currentPower }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка кування');
+  return data;
+};
+
 // --- РИНОК ---
 export const fetchMarket = async () => {
   const res = await fetch(`${API_URL}/game/market`);

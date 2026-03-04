@@ -606,35 +606,41 @@ app.get('/api/catalog', async (req, res) => {
 });
 
 // Додавання/Редагування картки
-app.post('/api/admin/cards', authenticate, checkAdmin, uploadCard.single('imageFile'), async (req, res) => {
-  try {
-    let data;
-    if (req.body.data) {
-      data = JSON.parse(req.body.data);
-    } else {
-      data = req.body;
-    }
+app.post(
+  '/api/admin/cards',
+  authenticate,
+  checkAdmin,
+  uploadCard.single('imageFile'),
+  async (req, res) => {
+    try {
+      let data;
+      if (req.body.data) {
+        data = JSON.parse(req.body.data);
+      } else {
+        data = req.body;
+      }
 
-    if (req.file) {
-      data.image = `/api/uploads/cards/${req.file.filename}`;
-    }
+      if (req.file) {
+        data.image = `/api/uploads/cards/${req.file.filename}`;
+      }
 
-    // Переконуємося, що frame передається правильно (fallback на "normal")
-    const cardData = { ...data, frame: data.frame || 'normal', isGame: Boolean(data.isGame) };
+      // Переконуємося, що frame передається правильно (fallback на "normal")
+      const cardData = { ...data, frame: data.frame || 'normal', isGame: Boolean(data.isGame) };
 
-    const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
-    let card;
-    if (existing) {
-      card = await prisma.cardCatalog.update({ where: { id: cardData.id }, data: cardData });
-    } else {
-      card = await prisma.cardCatalog.create({ data: cardData });
+      const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
+      let card;
+      if (existing) {
+        card = await prisma.cardCatalog.update({ where: { id: cardData.id }, data: cardData });
+      } else {
+        card = await prisma.cardCatalog.create({ data: cardData });
+      }
+      res.json(card);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Помилка збереження картки.' });
     }
-    res.json(card);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Помилка збереження картки.' });
   }
-});
+);
 
 // Видалення картки
 app.delete('/api/admin/cards/:id', authenticate, checkAdmin, async (req, res) => {
@@ -647,32 +653,38 @@ app.delete('/api/admin/cards/:id', authenticate, checkAdmin, async (req, res) =>
 });
 
 // Додавання/Редагування паку
-app.post('/api/admin/packs', authenticate, checkAdmin, uploadCard.single('imageFile'), async (req, res) => {
-  try {
-    let data;
-    if (req.body.data) {
-      data = JSON.parse(req.body.data);
-    } else {
-      data = req.body;
-    }
+app.post(
+  '/api/admin/packs',
+  authenticate,
+  checkAdmin,
+  uploadCard.single('imageFile'),
+  async (req, res) => {
+    try {
+      let data;
+      if (req.body.data) {
+        data = JSON.parse(req.body.data);
+      } else {
+        data = req.body;
+      }
 
-    if (req.file) {
-      data.image = `/api/uploads/cards/${req.file.filename}`;
+      if (req.file) {
+        data.image = `/api/uploads/cards/${req.file.filename}`;
+      }
+      const packData = { ...data, isGame: Boolean(data.isGame) };
+      const existing = await prisma.packCatalog.findUnique({ where: { id: packData.id } });
+      let pack;
+      if (existing) {
+        pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
+      } else {
+        pack = await prisma.packCatalog.create({ data: packData });
+      }
+      res.json(pack);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Помилка збереження паку.' });
     }
-    const packData = { ...data, isGame: Boolean(data.isGame) };
-    const existing = await prisma.packCatalog.findUnique({ where: { id: packData.id } });
-    let pack;
-    if (existing) {
-      pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
-    } else {
-      pack = await prisma.packCatalog.create({ data: packData });
-    }
-    res.json(pack);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Помилка збереження паку.' });
   }
-});
+);
 
 // Видалення паку
 app.delete('/api/admin/packs/:id', authenticate, checkAdmin, async (req, res) => {
@@ -1323,10 +1335,15 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
     else if (newPoints >= 2000) newLevel = 2;
 
     const payoutPerScore =
-      newLevel === 1 ? 86 :
-        newLevel === 2 ? 172 :
-          newLevel === 3 ? 230 :
-            newLevel === 4 ? 431 : 402;
+      newLevel === 1
+        ? 86
+        : newLevel === 2
+          ? 172
+          : newLevel === 3
+            ? 230
+            : newLevel === 4
+              ? 431
+              : 402;
 
     let coinsToGive = Math.floor(score * payoutPerScore * (1 + Math.floor(score / 5) * 0.1));
 
@@ -1428,8 +1445,8 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
         y: Number(y),
         name: name || 'Точка Арени',
         icon: icon || 'castle',
-        color: color || '#4f46e5'
-      }
+        color: color || '#4f46e5',
+      },
     });
     res.json({ success: true, point: newPoint });
   } catch (error) {
@@ -1446,7 +1463,6 @@ app.delete('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, 
     res.status(500).json({ error: 'Помилка видалення точки.' });
   }
 });
-
 
 app.get('/api/games/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -2321,7 +2337,12 @@ app.post(
       const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
       // Видаляємо стару аватарку, якщо вона локальна
-      if (user && user.avatarUrl && (user.avatarUrl.startsWith('/uploads/avatars/') || user.avatarUrl.startsWith('/api/uploads/avatars/'))) {
+      if (
+        user &&
+        user.avatarUrl &&
+        (user.avatarUrl.startsWith('/uploads/avatars/') ||
+          user.avatarUrl.startsWith('/api/uploads/avatars/'))
+      ) {
         const oldPath = path.join(__dirname, user.avatarUrl);
         if (fs.existsSync(oldPath)) {
           try {
@@ -2595,7 +2616,7 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
           // If a specific power is requested to sell
           if (item.power !== undefined && item.power !== null) {
             if (item.amount !== 1) {
-              throw new Error("Не можна продати більше 1 картки з конкретною силою за раз.");
+              throw new Error('Не можна продати більше 1 картки з конкретною силою за раз.');
             }
             const parsedPower = Number(item.power);
             const powerIndex = statsArray.findIndex((p) => Number(p) === parsedPower);
@@ -2661,5 +2682,123 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message || 'Помилка продажу карток.' });
+  }
+});
+
+// ----------------------------------------
+// КУЗНЯ (ФОРДЖ) - РЕРОЛ СИЛИ КАРТКИ
+// ----------------------------------------
+app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
+  const { cardId, currentPower } = req.body;
+
+  if (!cardId || currentPower === undefined || currentPower === null) {
+    return res.status(400).json({ error: 'Некоректні дані для кування.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+
+    const invItem = await prisma.inventoryItem.findUnique({
+      where: { userId_cardId: { userId: user.uid, cardId: cardId } },
+      include: { card: true },
+    });
+
+    if (!invItem || invItem.amount < 1) {
+      return res.status(400).json({ error: 'Цієї картки немає у вашому інвентарі.' });
+    }
+
+    let statsArray = [];
+    if (invItem.gameStats) {
+      statsArray =
+        typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+    }
+
+    const parsedPower = Number(currentPower);
+    const powerIndex = statsArray.findIndex((p) => Number(p) === parsedPower);
+    if (powerIndex === -1) {
+      return res.status(400).json({ error: 'Картку з такою силою не знайдено в інвентарі.' });
+    }
+
+    let cost = 100;
+    switch (invItem.card.rarity) {
+      case 'Звичайна':
+        cost = 100;
+        break;
+      case 'Рідкісна':
+        cost = 300;
+        break;
+      case 'Епічна':
+        cost = 1000;
+        break;
+      case 'Легендарна':
+        cost = 5000;
+        break;
+      case 'Унікальна':
+        cost = 15000;
+        break;
+    }
+
+    if (user.coins < cost) {
+      return res.status(400).json({ error: 'Недостатньо монет для кування!' });
+    }
+
+    const generatePower = (rarity) => {
+      let min = 0,
+        max = 0;
+      switch (rarity) {
+        case 'Унікальна':
+          min = 100;
+          max = 150;
+          break;
+        case 'Легендарна':
+          min = 50;
+          max = 125;
+          break;
+        case 'Епічна':
+          min = 25;
+          max = 100;
+          break;
+        case 'Рідкісна':
+          min = 10;
+          max = 80;
+          break;
+        case 'Звичайна':
+          min = 5;
+          max = 50;
+          break;
+        default:
+          return null;
+      }
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+
+    const newPower = generatePower(invItem.card.rarity) || parsedPower;
+
+    // Remove old power and add new power
+    statsArray.splice(powerIndex, 1);
+    statsArray.push(newPower);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { uid: user.uid },
+        data: { coins: { decrement: cost } },
+      });
+
+      await tx.inventoryItem.update({
+        where: { userId_cardId: { userId: user.uid, cardId: cardId } },
+        data: { gameStats: statsArray },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
+
+    res.json({ success: true, profile: updatedUser, newPower, cost });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка внутрішнього сервера під час кування.' });
   }
 });
