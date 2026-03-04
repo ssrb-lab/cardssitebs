@@ -74,7 +74,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
               <img
                 src={card.image}
                 alt={card.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transform-gpu will-change-transform"
                 loading="lazy"
               />
             </CardFrame>

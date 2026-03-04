@@ -297,7 +297,7 @@ export default function InventoryView({
                             ? setViewingGameCard({ ...item, _effectivePowers: powerValues })
                             : setViewingCard({ card: item.card, amount: item.amount })
                         }
-                        className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border}`}
+                        className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform`}
                       >
                         {Number(item.card.maxSupply) > 0 && (
                           <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
@@ -313,7 +313,7 @@ export default function InventoryView({
                           <img
                             src={item.card.image}
                             alt={item.card.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 transform-gpu will-change-transform"
                             loading="lazy"
                           />
                         </CardFrame>
