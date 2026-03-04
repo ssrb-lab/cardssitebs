@@ -2199,7 +2199,10 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
   const { cards } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
     const point = await prisma.arenaPoint.findUnique({ where: { id } });
 
     if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
@@ -2210,6 +2213,62 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
     if (!cards || !Array.isArray(cards) || cards.length !== 5) {
       return res.status(400).json({ error: 'Для бою необхідно рівно 5 карт.' });
+    }
+
+    // Validate that the user actually owns these 5 specific card instances
+    let userHasAllCards = true;
+    const requiredCardsCounts = {};
+    for (let c of cards) {
+      if (!requiredCardsCounts[c.id]) requiredCardsCounts[c.id] = {};
+      const p = c.power;
+      requiredCardsCounts[c.id][p] = (requiredCardsCounts[c.id][p] || 0) + 1;
+    }
+
+    for (const cardId in requiredCardsCounts) {
+      const invItem = user.inventory.find((item) => item.cardId === cardId);
+      if (!invItem) {
+        userHasAllCards = false;
+        break;
+      }
+
+      let currentStats = [];
+      if (typeof invItem.gameStats === 'string') {
+        try {
+          currentStats = JSON.parse(invItem.gameStats);
+        } catch (e) {}
+      } else if (Array.isArray(invItem.gameStats)) {
+        currentStats = invItem.gameStats;
+      }
+
+      const availablePowers = {};
+      for (let p of currentStats) {
+        availablePowers[p] = (availablePowers[p] || 0) + 1;
+      }
+
+      for (const powerRaw in requiredCardsCounts[cardId]) {
+        const requiredCount = requiredCardsCounts[cardId][powerRaw];
+        let countAvailable = availablePowers[powerRaw] || 0;
+        if (!countAvailable) {
+          countAvailable = availablePowers[Number(powerRaw)] || 0;
+        }
+
+        if (countAvailable < requiredCount) {
+          const assignedCount = currentStats.length;
+          const totalAmount = invItem.amount;
+          const unassignedCount = Math.max(0, totalAmount - assignedCount);
+
+          if (unassignedCount >= requiredCount) {
+            // Valid fallback
+          } else {
+            userHasAllCards = false;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!userHasAllCards) {
+      return res.status(400).json({ error: 'Ви не маєте обраних карт у своєму інвентарі!' });
     }
 
     if (user.coins < point.entryFee) {
@@ -2318,6 +2377,18 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       });
 
       if (attackerWon) {
+        if (point.crystalRatePerHour > 0 && point.ownerId && point.crystalsLastClaimedAt) {
+          const lastClaimed = new Date(point.crystalsLastClaimedAt).getTime();
+          const hoursElapsed = (Date.now() - lastClaimed) / (1000 * 60 * 60);
+          const earnedCrystals = Math.floor(hoursElapsed * point.crystalRatePerHour);
+          if (earnedCrystals > 0) {
+            await tx.user.update({
+              where: { uid: point.ownerId },
+              data: { crystals: { increment: earnedCrystals } },
+            });
+          }
+        }
+
         updatedPoint = await tx.arenaPoint.update({
           where: { id },
           data: {
@@ -2325,7 +2396,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             ownerNickname: user.nickname,
             capturedAt: new Date(),
             crystalsLastClaimedAt: new Date(),
-            defendingCards: cards, // Оновлюємо захисників на карти атакуючого, з їхнім початковим ХП!
+            defendingCards: cards.map((c) => ({ ...c, currentHp: undefined })), // Зберігаємо як є
           },
         });
       }
@@ -2343,6 +2414,46 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
   } catch (error) {
     console.error('Помилка бою на арені:', error);
     res.status(500).json({ error: 'Помилка бою.' });
+  }
+});
+
+app.post('/api/game/arena/points/:id/claim', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const point = await prisma.arenaPoint.findUnique({ where: { id } });
+    if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
+    if (point.ownerId !== req.user.uid) return res.status(403).json({ error: 'Це не ваша точка.' });
+
+    if (point.crystalRatePerHour <= 0 || !point.crystalsLastClaimedAt) {
+      return res.status(400).json({ error: 'Ця точка не генерує кристали.' });
+    }
+
+    const lastClaimed = new Date(point.crystalsLastClaimedAt).getTime();
+    const hoursElapsed = (Date.now() - lastClaimed) / (1000 * 60 * 60);
+    const earnedCrystals = Math.floor(hoursElapsed * point.crystalRatePerHour);
+
+    if (earnedCrystals <= 0) {
+      return res.status(400).json({ error: 'Ще недостатньо кристалів для збору (мінімум 1 год).' });
+    }
+
+    let updatedPoint;
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { uid: req.user.uid },
+        data: { crystals: { increment: earnedCrystals } },
+      });
+      const exactTimeOfEarned = lastClaimed + (earnedCrystals / point.crystalRatePerHour) * 3600000;
+      updatedPoint = await tx.arenaPoint.update({
+        where: { id },
+        data: { crystalsLastClaimedAt: new Date(exactTimeOfEarned) },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    res.json({ success: true, earnedCrystals, point: updatedPoint, profile: updatedUser });
+  } catch (error) {
+    console.error('Помилка збору кристалів:', error);
+    res.status(500).json({ error: 'Помилка збору кристалів.' });
   }
 });
 

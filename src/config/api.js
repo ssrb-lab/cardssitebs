@@ -799,3 +799,12 @@ export const battleArenaPointRequest = async (token, pointId, cards = []) => {
   return data;
 };
 
+export const claimArenaCrystalsRequest = async (token, pointId) => {
+  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
