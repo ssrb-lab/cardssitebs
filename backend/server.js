@@ -62,6 +62,9 @@ const uploadCard = multer({
 // SSE Clients for real-time game status updates
 let gameClients = [];
 
+// Активні ігри Crash
+const activeCrashGames = new Map();
+
 app.use(cors());
 app.use(express.json());
 
@@ -1420,6 +1423,102 @@ app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Помилка сервера.' });
+  }
+});
+
+// ----------------------------------------
+// CRASH
+// ----------------------------------------
+function generateCrashPoint() {
+  // Класичний алгоритм Crash (house edge ~ 1%)
+  const e = 2 ** 52;
+  const h = Math.floor(Math.random() * e);
+
+  if (h % 100 === 0) return 1.0; // 1% миттєвий краш
+
+  const result = Math.floor((100 * e - h) / (e - h)) / 100;
+  return Math.max(1.01, Math.min(result, 10000));
+}
+
+app.post('/api/game/crash/start', authenticate, async (req, res) => {
+  const { betAmount } = req.body;
+  const bet = parseInt(betAmount, 10);
+
+  if (isNaN(bet) || bet < 10) return res.status(400).json({ error: 'Мінімальна ставка 10 монет.' });
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (user.coins < bet) return res.status(400).json({ error: 'Недостатньо монет!' });
+
+    // Створюємо гру
+    const crashPoint = generateCrashPoint();
+    const gameId = Date.now().toString() + Math.random().toString(36).substring(7);
+
+    // Зберігаємо в пам'яті
+    activeCrashGames.set(gameId, {
+      userId: user.uid,
+      bet,
+      crashPoint,
+      startTime: Date.now(),
+      status: 'playing',
+    });
+
+    // Віднімаємо ставку
+    const updatedUser = await prisma.user.update({
+      where: { uid: user.uid },
+      data: { coins: { decrement: bet } },
+    });
+
+    // Очистка старих ігор з пам'яті:
+    if (activeCrashGames.size > 1000) {
+      for (let key of activeCrashGames.keys()) {
+        activeCrashGames.delete(key);
+        break;
+      }
+    }
+
+    // Повертаємо краш поінт.
+    res.json({ success: true, gameId, crashPoint, profile: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка сервера при старті Crash.' });
+  }
+});
+
+app.post('/api/game/crash/cashout', authenticate, async (req, res) => {
+  const { gameId, multiplier } = req.body;
+
+  try {
+    const game = activeCrashGames.get(gameId);
+    if (!game) return res.status(400).json({ error: 'Гру не знайдено або вже завершено.' });
+    if (game.userId !== req.user.uid) return res.status(403).json({ error: 'Це не ваша гра.' });
+    if (game.status !== 'playing') return res.status(400).json({ error: 'Гру вже завершено.' });
+
+    game.status = 'cashed_out';
+
+    // Античіт: час, який пройшов
+    const timeElapsedMs = Date.now() - game.startTime;
+    // Графік: M = e^(0.00006 * час) -> час = ln(M) / 0.00006. (0.00006 дає x2 за ~11 секунд)
+    const expectedTimeMs = Math.log(multiplier) / 0.00006;
+
+    // Похибка 1.5 сек на лаги
+    if (timeElapsedMs < expectedTimeMs - 1500) {
+      return res.status(400).json({ error: 'Підозрілий час виходу. Ставку анульовано.' });
+    }
+
+    if (multiplier <= game.crashPoint) {
+      const winAmount = Math.floor(game.bet * multiplier);
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { coins: { increment: winAmount } },
+      });
+      res.json({ success: true, winAmount, profile: updatedUser });
+    } else {
+      res.status(400).json({ error: 'Ви не встигли! Краш вже відбувся.' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка сервера під час Crash.' });
   }
 });
 

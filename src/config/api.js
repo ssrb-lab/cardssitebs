@@ -181,6 +181,37 @@ export const rerollPowerRequest = async (token, cardId, currentPower) => {
   return data;
 };
 
+// --- CRASH ---
+export const fetchCrashState = async (token) => {
+  const res = await fetch(`${API_URL}/game/crash/state`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка завантаження стану Crash');
+  return data;
+};
+
+export const placeCrashBet = async (token, betAmount) => {
+  const res = await fetch(`${API_URL}/game/crash/bet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ betAmount }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка ставки в Crash');
+  return data;
+};
+
+export const cashOutCrash = async (token) => {
+  const res = await fetch(`${API_URL}/game/crash/cashout`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка виведення коштів з Crash');
+  return data;
+};
+
 // --- РИНОК ---
 export const fetchMarket = async () => {
   const res = await fetch(`${API_URL}/game/market`);
@@ -582,6 +613,29 @@ export const claimBlackjackRewardRequest = async (token, result, betAmount) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ result, betAmount }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+// --- CRASH ---
+export const startCrashGameRequest = async (token, betAmount) => {
+  const res = await fetch(`${API_URL}/game/crash/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ betAmount }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const claimCrashRewardRequest = async (token, gameId, multiplier) => {
+  const res = await fetch(`${API_URL}/game/crash/cashout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ gameId, multiplier }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);

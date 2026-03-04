@@ -15,6 +15,7 @@ import {
   Dices,
   Trophy,
   Keyboard,
+  Rocket,
 } from 'lucide-react';
 import {
   fetchFarmState,
@@ -31,6 +32,7 @@ import GameFuse from '../components/GameFuse';
 import GameBlackjack from '../components/GameBlackjack';
 import GameArena from '../components/GameArena';
 import GameWordle from '../components/GameWordle';
+import GameCrash from '../components/GameCrash';
 
 export default function FarmView({
   profile,
@@ -338,6 +340,12 @@ export default function FarmView({
               >
                 Слівце
               </button>
+              <button
+                onClick={() => adminToggleBlock('crash')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs uppercase border ${blockedGames.includes('crash') ? 'bg-red-600 text-white border-red-500' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}
+              >
+                Краш
+              </button>
             </div>
           </div>
         )}
@@ -595,6 +603,38 @@ export default function FarmView({
               </button>
             )}
           </div>
+
+          <div
+            onClick={() => (blockedGames.includes('crash') ? null : setActiveGame('crash'))}
+            className={`bg-neutral-900 border ${blockedGames.includes('crash') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-rose-900/50 hover:border-rose-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+          >
+            <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Rocket
+                size={120}
+                className={blockedGames.includes('crash') ? 'text-neutral-500' : 'text-rose-500'}
+              />
+            </div>
+            <h3
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('crash') ? 'text-neutral-500' : 'text-white'}`}
+            >
+              <Rocket
+                className={blockedGames.includes('crash') ? 'text-neutral-500' : 'text-rose-500'}
+              />{' '}
+              Краш
+            </h3>
+            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+              Слідкуй за графіком та встигни забрати виграш до того, як ракета впаде!
+            </p>
+            {blockedGames.includes('crash') ? (
+              <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
+                <Lock size={16} /> Тимчасово недоступна
+              </div>
+            ) : (
+              <button className="bg-rose-600/20 text-rose-400 group-hover:bg-rose-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">
+                Грати
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -678,6 +718,17 @@ export default function FarmView({
         goBack={() => setActiveGame(null)}
         showToast={showToast}
         wordleEntryCost={wordleEntryCost}
+      />
+    );
+  }
+
+  if (activeGame === 'crash') {
+    return (
+      <GameCrash
+        profile={profile}
+        setProfile={setProfile}
+        goBack={() => setActiveGame(null)}
+        showToast={showToast}
       />
     );
   }
