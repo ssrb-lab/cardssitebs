@@ -221,17 +221,21 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.setLineDash([]); // Скидаємо пунктир
 
           // Розрахунок кута нахилу ракети
-          let angle = 0; // В градусах (x, y координати. y зростає вниз)
-          if (scaledPath.length > 1) {
-            const p1 = scaledPath[scaledPath.length - 2];
-            const p2 = scaledPath[scaledPath.length - 1];
-            // Math.atan2(y2 - y1, x2 - x1)
-            // Але так як Y йде зверху вниз, то чим вище - тим Y менший.
-            const dy = p2.y - p1.y;
-            const dx = p2.x - p1.x;
-            // Конвертація в градуси (+90 оскільки іконка ракети початково дивиться вгору (або під кутом 45).
-            // Іконка Lucide Rocket за замовчуванням дивиться вправо-вгору під 45 градусів.
-            // Нам треба компенсувати її базовий нахил
+          let angle = 45; // Початковий кут
+          if (simulatedTimeElapsed > 0) {
+            // Щоб уникнути "смикання" ракети через нестабільний масив точок,
+            // рахуємо чітку дотичну взявши точку рівно на 32мс позаду поточного часу.
+            const dt = Math.min(32, simulatedTimeElapsed);
+            const t1 = simulatedTimeElapsed - dt;
+            const m1 = Math.max(1.0, Math.exp(0.00006 * t1));
+
+            const px1 = t1 / currentMaxTime;
+            const x1 = 10 + width * 0.85 * px1;
+            const py1 = (m1 - 1) / (currentMaxM - 1);
+            const y1 = height - 10 - height * 0.8 * py1;
+
+            const dy = lastPoint.y - y1;
+            const dx = lastPoint.x - x1;
             angle = Math.atan2(dy, dx) * (180 / Math.PI) + 45;
           }
 
