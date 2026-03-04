@@ -15,6 +15,9 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
   const animationRef = useRef(null);
   const startTimeRef = useRef(0);
   const hasCashedOutRef = useRef(false);
+  const canvasRef = useRef(null);
+  const rocketRef = useRef(null);
+  const pathRef = useRef([]);
 
   useEffect(() => {
     return () => cancelAnimationFrame(animationRef.current);
@@ -35,10 +38,28 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
       setGameId(data.gameId);
       setStatus('playing');
       setMultiplier(1.0);
-      startTimeRef.current = Date.now();
+      pathRef.current = [];
+      const startTime = Date.now();
+      startTimeRef.current = startTime;
 
       const animate = () => {
-        const timeElapsed = Date.now() - startTimeRef.current;
+        if (!canvasRef.current || !rocketRef.current) return;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const rocket = rocketRef.current;
+
+        // Синхროнізуємо розмір canvas з його відображенням
+        if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
+          canvas.width = canvas.offsetWidth;
+          canvas.height = canvas.offsetHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const timeElapsed = Date.now() - startTime;
+
+        // Розрахунок множника
         const M = Math.max(1.0, Math.exp(0.00006 * timeElapsed));
 
         if (M >= data.crashPoint) {
@@ -48,10 +69,79 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           if (!hasCashedOutRef.current) {
             setWinStatus({ result: 'loss', amount: bet });
           }
+
+          // Останній кадр крашу
+          ctx.strokeStyle = '#ef4444'; // червоний
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
           return;
         }
 
         setMultiplier(M);
+
+        // --- Логіка відмальовки графіка ---
+
+        // Чим більший час, тим далі ракета рухається по осі Х (обмежено 85% ширини екрану)
+        const maxX = width * 0.85;
+        // 15000ms = 15s - десь за цей час ми досягаємо краю осі X, далі просто ліземо вгору
+        let progressX = Math.min(timeElapsed / 15000, 1);
+        // Додаємо плавності через easeOutQuad
+        progressX = progressX * (2 - progressX);
+
+        const currentX = 10 + maxX * progressX;
+
+        // Чим більший множник, тим вище ракета (обмещено 80% висоти)
+        // Логарифмічна шкала для висоти, щоб x100 не полетіло в космос миттєво
+        const maxM = 10; // Після x10 ракета просто залишається зверху
+        let progressY = Math.min((M - 1) / (maxM - 1), 1);
+        // Плавний старт на Х
+        progressY =
+          progressY < 0.5 ? 2 * progressY * progressY : -1 + (4 - 2 * progressY) * progressY;
+
+        const currentY = height - 10 - height * 0.8 * progressY;
+
+        pathRef.current.push({ x: currentX, y: currentY });
+
+        // Очищаємо canvas
+        ctx.clearRect(0, 0, width, height);
+
+        // Малюємо лінію
+        if (pathRef.current.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(pathRef.current[0].x, pathRef.current[0].y);
+          for (let i = 1; i < pathRef.current.length; i++) {
+            ctx.lineTo(pathRef.current[i].x, pathRef.current[i].y);
+          }
+
+          // Градієнт сліду
+          const gradient = ctx.createLinearGradient(0, height, width, 0);
+          gradient.addColorStop(0, '#f43f5e'); // rose-500
+          gradient.addColorStop(1, '#eab308'); // yellow-500
+
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = 6;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.shadowColor = 'rgba(234, 179, 8, 0.5)';
+          ctx.shadowBlur = 15;
+          ctx.stroke();
+
+          // Заливка під графіком
+          ctx.lineTo(currentX, height);
+          ctx.lineTo(10, height);
+          ctx.closePath();
+
+          const fillGradient = ctx.createLinearGradient(0, 0, 0, height);
+          fillGradient.addColorStop(0, 'rgba(244, 63, 94, 0.2)');
+          fillGradient.addColorStop(1, 'rgba(244, 63, 94, 0)');
+          ctx.fillStyle = fillGradient;
+          ctx.fill();
+        }
+
+        // Рухаємо саму ракету (DOM елемент)
+        rocket.style.transform = `translate(${currentX}px, ${currentY - height + 10}px)`;
+
         animationRef.current = requestAnimationFrame(animate);
       };
 
@@ -119,7 +209,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         )}
 
         {/* Екран гри */}
-        <div className="relative bg-neutral-950 rounded-2xl h-64 sm:h-80 w-full mb-6 border-2 flex-shrink-0 border-neutral-800 overflow-hidden flex flex-col justify-end items-center shadow-inner">
+        <div className="relative bg-neutral-950 rounded-2xl h-64 sm:h-80 w-full mb-6 border-2 flex-shrink-0 border-neutral-800 overflow-hidden shadow-inner">
           {/* Сітка на фоні */}
           <div
             className="absolute inset-0 opacity-[0.15]"
@@ -129,6 +219,13 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
               backgroundSize: '30px 30px',
               backgroundPosition: 'center bottom',
             }}
+          />
+
+          {/* Canvas для відмальовки сліду ракети */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full z-0"
+            style={{ opacity: status !== 'idle' ? 1 : 0 }}
           />
 
           {/* Множник в центрі екрану */}
@@ -152,22 +249,31 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             )}
           </div>
 
-          {/* Анімація ракети */}
-          {status !== 'idle' && (
-            <div
-              className="absolute left-[20%] transition-all duration-75 ease-linear pointer-events-none"
-              style={{ bottom: `${Math.min(80, (multiplier - 1) * 20)}%` }}
-            >
+          {/* Ракета (встановлюється через canvas) */}
+          <div
+            ref={rocketRef}
+            className="absolute pointer-events-none z-20 transition-opacity duration-300"
+            style={{
+              opacity: status !== 'idle' ? 1 : 0,
+              left: '10px',
+              bottom: '10px',
+            }}
+          >
+            <div className="relative -ml-4 -mb-4">
               {status === 'crashed' ? (
-                <Flame size={56} className="text-red-500 animate-ping -ml-2" />
+                <Flame size={56} className="text-red-500 animate-ping absolute bottom-0 left-0" />
               ) : (
                 <Rocket
                   size={48}
                   className={`text-white drop-shadow-[0_10px_15px_rgba(220,38,38,0.6)] ${multiplier > 5 ? 'animate-bounce' : ''}`}
+                  style={{
+                    transform: status === 'playing' ? 'rotate(45deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.5s ease-out',
+                  }}
                 />
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Результат раунду */}
