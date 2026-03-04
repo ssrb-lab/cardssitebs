@@ -390,7 +390,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
                   value={bet}
                   onChange={(e) => setBet(Number(e.target.value))}
                   disabled={status === 'playing' || isLoading}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 sm:py-4 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 placeholder-neutral-700 disabled:opacity-50"
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 sm:py-3 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 placeholder-neutral-700 disabled:opacity-50"
                   min="10"
                 />
                 <Coins
