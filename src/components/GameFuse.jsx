@@ -279,8 +279,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       phase === 'memorize'
         ? !isDamaged
         : !isDamaged ||
-          (!isDamaged && (isFound || memoryFlipped)) ||
-          (isDamaged && !isFound && !memoryFlipped);
+        (!isDamaged && (isFound || memoryFlipped)) ||
+        (isDamaged && !isFound && !memoryFlipped);
 
     // To handle the visual of clicking a wrong healthy fuse
     if (phase === 'play' && !isDamaged && memoryFlipped) {
@@ -323,7 +323,14 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 max-w-4xl mx-auto relative select-none">
-      <div className="flex justify-between items-center mb-4 px-2">
+      {/* Floating Memorize Alert */}
+      <div className={`absolute top-0 left-1/2 -translate-x-1/2 mt-2 z-20 transition-all duration-300 ${phase === 'memorize' && !isPaused ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+        <div className="bg-red-500/20 backdrop-blur-md text-red-500 px-4 py-2 rounded-xl border border-red-500/50 font-black shadow-lg flex items-center gap-2 animate-pulse whitespace-nowrap">
+          Запам'ятайте! {timeLeft}с
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center mb-4 px-2 mt-4 sm:mt-0">
         <button
           onClick={goBack}
           disabled={isProcessing}
@@ -332,11 +339,6 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           <ArrowLeft size={20} /> Покинути
         </button>
         <div className="flex items-center gap-4">
-          {phase === 'memorize' && !isPaused && (
-            <div className="bg-red-500/20 text-red-500 px-3 py-1.5 rounded-lg border border-red-500/50 font-bold flex items-center gap-2 animate-pulse">
-              Запам'ятайте! {timeLeft}с
-            </div>
-          )}
           <button
             onClick={togglePause}
             disabled={isProcessing || gameOver}
@@ -489,26 +491,20 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
             Забрати{' '}
             {Math.floor(
               score *
-                (progressInfo.level === 1
-                  ? 86
-                  : progressInfo.level === 2
-                    ? 172
-                    : progressInfo.level === 3
-                      ? 230
-                      : progressInfo.level === 4
-                        ? 431
-                        : 402) *
-                (1 + Math.floor(score / 5) * 0.1)
+              (progressInfo.level === 1
+                ? 86
+                : progressInfo.level === 2
+                  ? 172
+                  : progressInfo.level === 3
+                    ? 230
+                    : progressInfo.level === 4
+                      ? 431
+                      : 402) *
+              (1 + Math.floor(score / 5) * 0.1)
             )}{' '}
             монет
           </button>
 
-          <button
-            onClick={restartGame}
-            className="mt-4 text-neutral-400 hover:text-white font-bold underline"
-          >
-            Спробувати знову
-          </button>
         </div>
       )}
     </div>
