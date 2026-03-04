@@ -40,7 +40,7 @@ const uploadAvatar = multer({
 // Налаштування Multer для збереження карток та паків
 const cardsStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '..', 'public', 'cards');
+    const dir = path.join(__dirname, 'uploads', 'cards');
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -65,8 +65,9 @@ let gameClients = [];
 app.use(cors());
 app.use(express.json());
 
-// Роздача статичних файлів (аватарки)
+// Роздача статичних файлів (аватарки та картки)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Мідлвар для перевірки прав адміністратора
 const checkAdmin = async (req, res, next) => {
@@ -615,7 +616,7 @@ app.post('/api/admin/cards', authenticate, checkAdmin, uploadCard.single('imageF
     }
 
     if (req.file) {
-      data.image = `/cards/${req.file.filename}`;
+      data.image = `/api/uploads/cards/${req.file.filename}`;
     }
 
     // Переконуємося, що frame передається правильно (fallback на "normal")
@@ -656,7 +657,7 @@ app.post('/api/admin/packs', authenticate, checkAdmin, uploadCard.single('imageF
     }
 
     if (req.file) {
-      data.image = `/cards/${req.file.filename}`;
+      data.image = `/api/uploads/cards/${req.file.filename}`;
     }
     const packData = { ...data, isGame: Boolean(data.isGame) };
     const existing = await prisma.packCatalog.findUnique({ where: { id: packData.id } });
@@ -2316,11 +2317,11 @@ app.post(
         return res.status(400).json({ error: 'Файл не завантажено.' });
       }
 
-      const newAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+      const newAvatarUrl = `/api/uploads/avatars/${req.file.filename}`;
       const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
       // Видаляємо стару аватарку, якщо вона локальна
-      if (user && user.avatarUrl && user.avatarUrl.startsWith('/uploads/avatars/')) {
+      if (user && user.avatarUrl && (user.avatarUrl.startsWith('/uploads/avatars/') || user.avatarUrl.startsWith('/api/uploads/avatars/'))) {
         const oldPath = path.join(__dirname, user.avatarUrl);
         if (fs.existsSync(oldPath)) {
           try {
