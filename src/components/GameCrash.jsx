@@ -84,35 +84,47 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
         // Чим більший час, тим далі ракета рухається по осі Х (обмежено 85% ширини екрану)
         const maxX = width * 0.85;
-        // 15000ms = 15s - десь за цей час ми досягаємо краю осі X, далі просто ліземо вгору
-        let progressX = Math.min(timeElapsed / 15000, 1);
+        // 10000ms (10s) - за цей час ми досягаємо краю осі X, що збігається з підходом до x2
+        let progressX = Math.min(timeElapsed / 10000, 1);
         // Додаємо плавності через easeOutQuad
         progressX = progressX * (2 - progressX);
 
         const currentX = 10 + maxX * progressX;
 
-        // Чим більший множник, тим вище ракета (обмещено 80% висоти)
-        // Логарифмічна шкала для висоти, щоб x100 не полетіло в космос миттєво
-        const maxM = 10; // Після x10 ракета просто залишається зверху
-        let progressY = Math.min((M - 1) / (maxM - 1), 1);
-        // Плавний старт на Х
-        progressY =
-          progressY < 0.5 ? 2 * progressY * progressY : -1 + (4 - 2 * progressY) * progressY;
-
-        const currentY = height - 10 - height * 0.8 * progressY;
-
-        pathRef.current.push({ x: currentX, y: currentY });
+        // Зберігаємо не фізичні координати екрану, а "час" і "множник" для динамічного ремасштабування
+        pathRef.current.push({ x: currentX, m: M });
 
         // Очищаємо canvas
         ctx.clearRect(0, 0, width, height);
 
+        // --- Логіка відмальовки графіка ---
+        // Визначаємо динамічний масштаб для графіка.
+        // Замість фіксованого maxM, ми дозволяємо графіку адаптуватися до поточного множника.
+        // x2 досягається швидко, тому на початку масштаб Y менший, щоб ракета виглядала вище.
+        // За допомогою maxM ми контролюємо, яку частину висоти екрану займає поточний множник.
+        const currentMaxM = Math.max(2.0, M * 1.2);
+
+        // Перераховуємо ВСІ попередні точки з новим масштабом, щоб графік "стягувався"
+        const scaledPath = pathRef.current.map((p) => {
+          // Ретроспективно розраховуємо Y для кожної точки
+          let py = Math.min((p.m - 1) / (currentMaxM - 1), 1);
+          // Плавний старт на Х
+          py = py < 0.5 ? 2 * py * py : -1 + (4 - 2 * py) * py;
+          return {
+            x: p.x,
+            y: height - 10 - height * 0.8 * py,
+          };
+        });
+
         // Малюємо лінію
-        if (pathRef.current.length > 1) {
+        if (scaledPath.length > 1) {
           ctx.beginPath();
-          ctx.moveTo(pathRef.current[0].x, pathRef.current[0].y);
-          for (let i = 1; i < pathRef.current.length; i++) {
-            ctx.lineTo(pathRef.current[i].x, pathRef.current[i].y);
+          ctx.moveTo(scaledPath[0].x, scaledPath[0].y);
+          for (let i = 1; i < scaledPath.length; i++) {
+            ctx.lineTo(scaledPath[i].x, scaledPath[i].y);
           }
+
+          const lastPoint = scaledPath[scaledPath.length - 1];
 
           // Градієнт сліду
           const gradient = ctx.createLinearGradient(0, height, width, 0);
@@ -128,7 +140,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.stroke();
 
           // Заливка під графіком
-          ctx.lineTo(currentX, height);
+          ctx.lineTo(lastPoint.x, height);
           ctx.lineTo(10, height);
           ctx.closePath();
 
@@ -137,10 +149,10 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           fillGradient.addColorStop(1, 'rgba(244, 63, 94, 0)');
           ctx.fillStyle = fillGradient;
           ctx.fill();
-        }
 
-        // Рухаємо саму ракету (DOM елемент)
-        rocket.style.transform = `translate(${currentX}px, ${currentY - height + 10}px)`;
+          // Рухаємо саму ракету (DOM елемент) на останню відмальовану точку
+          rocket.style.transform = `translate(${lastPoint.x}px, ${lastPoint.y - height + 10}px)`;
+        }
 
         animationRef.current = requestAnimationFrame(animate);
       };
