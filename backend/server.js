@@ -1722,20 +1722,30 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
         playerState.earnedCoins = Math.floor(parsedBet * 2.5);
       }
 
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: {
-          coins: { decrement: parsedBet - playerState.earnedCoins },
-          blackjackState: null, // Clear state since game ended immediately
-        },
+      updatedUser = await prisma.$transaction(async (tx) => {
+        const u = await tx.user.findUnique({ where: { uid: req.user.uid } });
+        if (u.blackjackState) throw new Error('Race condition');
+
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: {
+            coins: { decrement: parsedBet - playerState.earnedCoins },
+            blackjackState: null, // Clear state since game ended immediately
+          },
+        });
       });
     } else {
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: {
-          coins: { decrement: parsedBet },
-          blackjackState: playerState,
-        },
+      updatedUser = await prisma.$transaction(async (tx) => {
+        const u = await tx.user.findUnique({ where: { uid: req.user.uid } });
+        if (u.blackjackState) throw new Error('Race condition');
+
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: {
+            coins: { decrement: parsedBet },
+            blackjackState: playerState,
+          },
+        });
       });
     }
 
@@ -1782,14 +1792,32 @@ app.post('/api/game/blackjack/hit', authenticate, async (req, res) => {
       state.gameResult = 'lose';
       state.earnedCoins = 0;
 
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: { blackjackState: null },
+      updatedUser = await prisma.$transaction(async (tx) => {
+        const u = await tx.user.findUnique({ where: { uid: req.user.uid } });
+        const currentState =
+          typeof u.blackjackState === 'string' ? JSON.parse(u.blackjackState) : u.blackjackState;
+        if (!currentState || currentState.playerHand.length !== state.playerHand.length - 1) {
+          throw new Error('Race condition detected');
+        }
+
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: { blackjackState: null },
+        });
       });
     } else {
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: { blackjackState: state },
+      updatedUser = await prisma.$transaction(async (tx) => {
+        const u = await tx.user.findUnique({ where: { uid: req.user.uid } });
+        const currentState =
+          typeof u.blackjackState === 'string' ? JSON.parse(u.blackjackState) : u.blackjackState;
+        if (!currentState || currentState.playerHand.length !== state.playerHand.length - 1) {
+          throw new Error('Race condition detected');
+        }
+
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: { blackjackState: state },
+        });
       });
     }
 
@@ -1848,21 +1876,30 @@ app.post('/api/game/blackjack/stand', authenticate, async (req, res) => {
 
     let updatedUser;
 
-    // Clear the active game state and award coins if any
-    if (state.earnedCoins > 0) {
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: {
-          coins: { increment: state.earnedCoins },
-          blackjackState: null,
-        },
-      });
-    } else {
-      updatedUser = await prisma.user.update({
-        where: { uid: user.uid },
-        data: { blackjackState: null },
-      });
-    }
+    updatedUser = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.findUnique({ where: { uid: req.user.uid } });
+      const currentState =
+        typeof u.blackjackState === 'string' ? JSON.parse(u.blackjackState) : u.blackjackState;
+      if (!currentState || currentState.gameState !== 'playing') {
+        throw new Error('Race condition detected');
+      }
+
+      // Clear the active game state and award coins if any
+      if (state.earnedCoins > 0) {
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: {
+            coins: { increment: state.earnedCoins },
+            blackjackState: null,
+          },
+        });
+      } else {
+        return await tx.user.update({
+          where: { uid: user.uid },
+          data: { blackjackState: null },
+        });
+      }
+    });
 
     res.json({ success: true, profile: updatedUser, state: cleanBlackjackStateForClient(state) });
   } catch (error) {
