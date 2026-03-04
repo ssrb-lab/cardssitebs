@@ -80,40 +80,33 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
         setMultiplier(M);
 
-        // --- Логіка відмальовки графіка ---
-
-        // Чим більший час, тим далі ракета рухається по осі Х (обмежено 85% ширини екрану)
-        const maxX = width * 0.85;
-        // 10000ms (10s) - за цей час ми досягаємо краю осі X, що збігається з підходом до x2
-        let progressX = Math.min(timeElapsed / 10000, 1);
-        // Додаємо плавності через easeOutQuad
-        progressX = progressX * (2 - progressX);
-
-        const currentX = 10 + maxX * progressX;
-
-        // Зберігаємо не фізичні координати екрану, а "час" і "множник" для динамічного ремасштабування
-        pathRef.current.push({ x: currentX, m: M });
+        // Зберігаємо не фізичні координати екрану, а координати [0...1] (прогрес часу і множника)
+        // замість жорсткої прив'язки до Х.
+        // Логіка: графік має відмальовувати реальну функцію M = e^(k*t).
+        pathRef.current.push({ time: timeElapsed, m: M });
 
         // Очищаємо canvas
         ctx.clearRect(0, 0, width, height);
 
         // --- Логіка відмальовки графіка ---
         // Визначаємо динамічний масштаб для графіка.
-        // Замість фіксованого maxM, ми дозволяємо графіку адаптуватися до поточного множника.
-        // x2 досягається швидко, тому на початку масштаб Y менший, щоб ракета виглядала вище.
-        // За допомогою maxM ми контролюємо, яку частину висоти екрану займає поточний множник.
-        const currentMaxM = Math.max(2.0, M * 1.2);
+        const currentMaxM = Math.max(2.0, M);
+        const currentMaxTime = Math.max(10000, timeElapsed); // Спочатку Х фіксований до 10 сек (доки йде розгін)
 
         // Перераховуємо ВСІ попередні точки з новим масштабом, щоб графік "стягувався"
         const scaledPath = pathRef.current.map((p) => {
-          // Ретроспективно розраховуємо Y для кожної точки
-          let py = Math.min((p.m - 1) / (currentMaxM - 1), 1);
-          // Плавний старт на Х
-          py = py < 0.5 ? 2 * py * py : -1 + (4 - 2 * py) * py;
-          return {
-            x: p.x,
-            y: height - 10 - height * 0.8 * py,
-          };
+          // X залежить тільки від часу. Коли час > 10с, графік починає стискатися по Х (ілюзія польоту вперед)
+          let px = p.time / currentMaxTime;
+          // Робимо відступ 10% справа, щоб ракета не билася в екран
+          const x = 10 + width * 0.85 * px;
+
+          // Y залежить від логарифмічного масштабу множника (створює приємну "горбинку" дуги)
+          // Замість прямої пропорції (M/maxM), яка робить кут, використовуємо плавний логарифм.
+          // Це зробить так, що на початку ракета рветься вгору, а потім переходить у плавний політ.
+          const progressY = Math.log(p.m) / Math.log(currentMaxM); // Нормалізовано [0...1]
+          const y = height - 10 - height * 0.8 * progressY;
+
+          return { x, y };
         });
 
         // Малюємо лінію
@@ -150,8 +143,23 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.fillStyle = fillGradient;
           ctx.fill();
 
-          // Рухаємо саму ракету (DOM елемент) на останню відмальовану точку
-          rocket.style.transform = `translate(${lastPoint.x}px, ${lastPoint.y - height + 10}px)`;
+          // Розрахунок кута нахилу ракети
+          let angle = 0; // В градусах (x, y координати. y зростає вниз)
+          if (scaledPath.length > 1) {
+            const p1 = scaledPath[scaledPath.length - 2];
+            const p2 = scaledPath[scaledPath.length - 1];
+            // Math.atan2(y2 - y1, x2 - x1)
+            // Але так як Y йде зверху вниз, то чим вище - тим Y менший.
+            const dy = p2.y - p1.y;
+            const dx = p2.x - p1.x;
+            // Конвертація в градуси (+90 оскільки іконка ракети початково дивиться вгору (або під кутом 45).
+            // Іконка Lucide Rocket за замовчуванням дивиться вправо-вгору під 45 градусів.
+            // Нам треба компенсувати її базовий нахил
+            angle = Math.atan2(dy, dx) * (180 / Math.PI) + 45;
+          }
+
+          // Рухаємо саму ракету (DOM елемент) на останню відмальовану точку з обертанням
+          rocket.style.transform = `translate(${lastPoint.x}px, ${lastPoint.y - height + 10}px) rotate(${angle}deg)`;
         }
 
         animationRef.current = requestAnimationFrame(animate);
@@ -278,10 +286,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
                 <Rocket
                   size={48}
                   className={`text-white drop-shadow-[0_10px_15px_rgba(220,38,38,0.6)] ${multiplier > 5 ? 'animate-bounce' : ''}`}
-                  style={{
-                    transform: status === 'playing' ? 'rotate(45deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.5s ease-out',
-                  }}
+                  style={{}}
                 />
               )}
             </div>
