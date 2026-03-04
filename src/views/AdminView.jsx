@@ -143,6 +143,9 @@ export default function AdminView({
     isGame: false,
   });
 
+  const [cardImageFile, setCardImageFile] = useState(null);
+  const [packImageFile, setPackImageFile] = useState(null);
+
   const [allAchievements, setAllAchievements] = useState([]);
   const [achievementForm, setAchievementForm] = useState({
     id: '',
@@ -562,6 +565,9 @@ export default function AdminView({
       isGame: !!packForm.isGame,
       category: packForm.category || 'Базові',
     };
+    if (packImageFile) {
+      newPackData.imageFile = packImageFile;
+    }
 
     try {
       const savedPack = await savePackToDb(getToken(), newPackData);
@@ -573,6 +579,7 @@ export default function AdminView({
       setPacksCatalog(updatedPacks);
       addSystemLog('Адмін', `${editingPack ? 'Оновлено' : 'Створено'} пак: ${packForm.name}`);
       setEditingPack(null);
+      setPackImageFile(null);
       setPackForm({
         id: '',
         name: '',
@@ -622,6 +629,9 @@ export default function AdminView({
       isGame: !!cardForm.isGame,
       pulledCount: editingCard ? editingCard.pulledCount || 0 : 0,
     };
+    if (cardImageFile) {
+      newCardData.imageFile = cardImageFile;
+    }
 
     try {
       const savedCard = await saveCardToDb(getToken(), newCardData);
@@ -633,6 +643,7 @@ export default function AdminView({
       setCardsCatalog(updatedCatalog);
       addSystemLog('Адмін', `${editingCard ? 'Оновлено' : 'Створено'} картку: ${cardForm.name}`);
       setEditingCard(null);
+      setCardImageFile(null);
       setCardForm({
         id: '',
         packId: packsCatalog[0]?.id || '',
@@ -2333,14 +2344,23 @@ export default function AdminView({
                 min="0"
                 required
               />
-              <input
-                type="text"
-                placeholder="URL Картинки"
-                value={packForm.image}
-                onChange={(e) => setPackForm({ ...packForm, image: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                required
-              />
+              <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 flex flex-col gap-2">
+                <input
+                  type="text"
+                  placeholder="URL Картинки (або файл)"
+                  value={packForm.image}
+                  onChange={(e) => setPackForm({ ...packForm, image: e.target.value })}
+                  className="bg-transparent text-white outline-none w-full text-sm"
+                  required={!packImageFile && !packForm.image}
+                />
+                <div className="h-px bg-neutral-800 w-full" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setPackImageFile(e.target.files[0])}
+                  className="text-xs text-neutral-400 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-900 file:text-purple-300 hover:file:bg-purple-800"
+                />
+              </div>
 
               <div className="sm:col-span-2 mt-2 p-4 border border-neutral-800 rounded-xl bg-neutral-950/50">
                 <h4 className="text-neutral-400 text-sm font-bold mb-3">
@@ -2416,6 +2436,7 @@ export default function AdminView({
                   type="button"
                   onClick={() => {
                     setEditingPack(null);
+                    setPackImageFile(null);
                     setPackForm({
                       id: '',
                       name: '',
@@ -2617,14 +2638,23 @@ export default function AdminView({
                 ))}
               </select>
 
-              <input
-                type="text"
-                placeholder="URL Картинки"
-                value={cardForm.image}
-                onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-4"
-                required
-              />
+              <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 flex flex-col gap-2 md:col-span-4">
+                <input
+                  type="text"
+                  placeholder="URL Картинки (або файл)"
+                  value={cardForm.image}
+                  onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })}
+                  className="bg-transparent text-white outline-none w-full text-sm"
+                  required={!cardImageFile && !cardForm.image}
+                />
+                <div className="h-px bg-neutral-800 w-full" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setCardImageFile(e.target.files[0])}
+                  className="text-xs text-neutral-400 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-900 file:text-purple-300 hover:file:bg-purple-800"
+                />
+              </div>
 
               <div className="md:col-span-4 flex flex-col sm:flex-row gap-4 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3">
                 <input
@@ -2680,6 +2710,7 @@ export default function AdminView({
                   type="button"
                   onClick={() => {
                     setEditingCard(null);
+                    setCardImageFile(null);
                     setCardForm({
                       id: '',
                       packId: packsCatalog[0]?.id || '',
@@ -2870,7 +2901,7 @@ export default function AdminView({
                     notifForm.targetUid === 'ALL'
                       ? 'Всі гравці (Глобальне)'
                       : allUsers.find((u) => u.uid === notifForm.targetUid)?.nickname ||
-                        notifForm.targetUid
+                      notifForm.targetUid
                   }
                   onChange={(e) => {
                     const val = e.target.value;

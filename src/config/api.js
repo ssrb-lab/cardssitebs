@@ -86,10 +86,25 @@ export const fetchCatalog = async () => {
 };
 
 export const saveCardToDb = async (token, cardData) => {
+  let body;
+  let headers = { Authorization: `Bearer ${token}` };
+
+  if (cardData.imageFile) {
+    const formData = new FormData();
+    formData.append('imageFile', cardData.imageFile);
+    // Remove imageFile from cardData before sending as JSON string
+    const { imageFile, ...restData } = cardData;
+    formData.append('data', JSON.stringify(restData));
+    body = formData;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(cardData);
+  }
+
   const res = await fetch(`${API_URL}/admin/cards`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(cardData),
+    headers,
+    body,
   });
   return res.json();
 };
@@ -103,10 +118,24 @@ export const deleteCardFromDb = async (token, cardId) => {
 };
 
 export const savePackToDb = async (token, packData) => {
+  let body;
+  let headers = { Authorization: `Bearer ${token}` };
+
+  if (packData.imageFile) {
+    const formData = new FormData();
+    formData.append('imageFile', packData.imageFile);
+    const { imageFile, ...restData } = packData;
+    formData.append('data', JSON.stringify(restData));
+    body = formData;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(packData);
+  }
+
   const res = await fetch(`${API_URL}/admin/packs`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(packData),
+    headers,
+    body,
   });
   return res.json();
 };

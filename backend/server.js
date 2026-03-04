@@ -37,6 +37,28 @@ const uploadAvatar = multer({
   },
 });
 
+// Налаштування Multer для збереження карток та паків
+const cardsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'public', 'cards');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `item-${Date.now()}-${Math.round(Math.random() * 1000)}${ext}`);
+  },
+});
+
+const uploadCard = multer({
+  storage: cardsStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Дозволені лише зображення'));
+  },
+});
+
 // SSE Clients for real-time game status updates
 let gameClients = [];
 
@@ -583,9 +605,18 @@ app.get('/api/catalog', async (req, res) => {
 });
 
 // Додавання/Редагування картки
-app.post('/api/admin/cards', authenticate, checkAdmin, async (req, res) => {
+app.post('/api/admin/cards', authenticate, checkAdmin, uploadCard.single('imageFile'), async (req, res) => {
   try {
-    const data = req.body;
+    let data;
+    if (req.body.data) {
+      data = JSON.parse(req.body.data);
+    } else {
+      data = req.body;
+    }
+
+    if (req.file) {
+      data.image = `/cards/${req.file.filename}`;
+    }
 
     // Переконуємося, що frame передається правильно (fallback на "normal")
     const cardData = { ...data, frame: data.frame || 'normal', isGame: Boolean(data.isGame) };
@@ -615,9 +646,18 @@ app.delete('/api/admin/cards/:id', authenticate, checkAdmin, async (req, res) =>
 });
 
 // Додавання/Редагування паку
-app.post('/api/admin/packs', authenticate, checkAdmin, async (req, res) => {
+app.post('/api/admin/packs', authenticate, checkAdmin, uploadCard.single('imageFile'), async (req, res) => {
   try {
-    const data = req.body;
+    let data;
+    if (req.body.data) {
+      data = JSON.parse(req.body.data);
+    } else {
+      data = req.body;
+    }
+
+    if (req.file) {
+      data.image = `/cards/${req.file.filename}`;
+    }
     const packData = { ...data, isGame: Boolean(data.isGame) };
     const existing = await prisma.packCatalog.findUnique({ where: { id: packData.id } });
     let pack;
