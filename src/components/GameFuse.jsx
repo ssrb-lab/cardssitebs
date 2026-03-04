@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Coins,
@@ -241,9 +241,20 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
     }
   };
 
-  const restartGame = () => {
-    localStorage.removeItem('fuseGameSave');
-    startGame(true);
+  const getEarnedCoins = () => {
+    return Math.floor(
+      score *
+        (progressInfo.level === 1
+          ? 86
+          : progressInfo.level === 2
+            ? 172
+            : progressInfo.level === 3
+              ? 230
+              : progressInfo.level === 4
+                ? 431
+                : 402) *
+        (1 + Math.floor(score / 5) * 0.1)
+    );
   };
 
   const claimReward = async () => {
@@ -273,14 +284,6 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
     // If in memorize phase, show actual state.
     // If in play phase, only show if it was clicked (memoryFlipped)
     const showDamaged = phase === 'memorize' ? isDamaged : isDamaged && (isFound || memoryFlipped);
-
-    // Show healthy fuse if it's healthy, OR if it's damaged but hidden in play phase
-    const showHealthy =
-      phase === 'memorize'
-        ? !isDamaged
-        : !isDamaged ||
-        (!isDamaged && (isFound || memoryFlipped)) ||
-        (isDamaged && !isFound && !memoryFlipped);
 
     // To handle the visual of clicking a wrong healthy fuse
     if (phase === 'play' && !isDamaged && memoryFlipped) {
@@ -324,7 +327,9 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 max-w-4xl mx-auto relative select-none">
       {/* Floating Memorize Alert */}
-      <div className={`absolute top-0 left-1/2 -translate-x-1/2 mt-2 z-20 transition-all duration-300 ${phase === 'memorize' && !isPaused ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+      <div
+        className={`absolute top-0 left-1/2 -translate-x-1/2 mt-2 z-20 transition-all duration-300 ${phase === 'memorize' && !isPaused ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
+      >
         <div className="bg-red-500/20 backdrop-blur-md text-red-500 px-4 py-2 rounded-xl border border-red-500/50 font-black shadow-lg flex items-center gap-2 animate-pulse whitespace-nowrap">
           Запам'ятайте! {timeLeft}с
         </div>
@@ -338,13 +343,23 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         >
           <ArrowLeft size={20} /> Покинути
         </button>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {score > 0 && !gameOver && (
+            <button
+              onClick={claimReward}
+              disabled={isProcessing || isPaused || phase === 'memorize'}
+              className="flex items-center gap-1 sm:gap-2 font-bold transition-colors px-2 sm:px-3 py-1.5 rounded-lg border text-yellow-500 hover:text-yellow-400 bg-yellow-900/20 border-yellow-900/50"
+            >
+              {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Coins size={16} />}
+              <span className="hidden sm:inline">Забрати</span> {getEarnedCoins()}
+            </button>
+          )}
           <button
             onClick={togglePause}
             disabled={isProcessing || gameOver}
-            className={`flex items-center gap-2 font-bold transition-colors px-3 py-1.5 rounded-lg border \${
-              isPaused 
-                ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20 border-yellow-900/50' 
+            className={`flex items-center gap-2 font-bold transition-colors px-3 py-1.5 rounded-lg border ${
+              isPaused
+                ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20 border-yellow-900/50'
                 : 'text-neutral-400 hover:text-white bg-neutral-900/20 border-neutral-800'
             }`}
           >
@@ -488,23 +503,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
             className="bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-8 rounded-2xl flex items-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.5)]"
           >
             {isProcessing ? <Loader2 size={20} className="animate-spin" /> : <Coins size={20} />}
-            Забрати{' '}
-            {Math.floor(
-              score *
-              (progressInfo.level === 1
-                ? 86
-                : progressInfo.level === 2
-                  ? 172
-                  : progressInfo.level === 3
-                    ? 230
-                    : progressInfo.level === 4
-                      ? 431
-                      : 402) *
-              (1 + Math.floor(score / 5) * 0.1)
-            )}{' '}
-            монет
+            Забрати {getEarnedCoins()} монет
           </button>
-
         </div>
       )}
     </div>
