@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw } from 'lucide-react';
 import { claim2048RewardRequest, start2048GameRequest, getToken } from '../config/api';
 
@@ -8,9 +9,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   const uidRef = useRef(0);
 
   const getEmptyBoard = () =>
-    Array(GRID_SIZE)
-      .fill()
-      .map(() => Array(GRID_SIZE).fill(null));
+    new Array(GRID_SIZE).fill().map(() => new Array(GRID_SIZE).fill(null));
   const createTile = (val) => ({ id: uidRef.current++, val, isNew: true, merged: false });
 
   const getRandomEmptyCell = (currentBoard) => {
@@ -34,7 +33,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   const startGame = async () => {
     setIsProcessing(true);
     try {
-      const data = await start2048GameRequest(getToken());
+      await start2048GameRequest(getToken());
 
       uidRef.current = 0;
       const newBoard = getEmptyBoard();
@@ -76,10 +75,13 @@ export default function Game2048({ setProfile, goBack, showToast }) {
         setGameWon(savedGameWon || false);
         setIsInitialized(true);
         return;
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
     }
 
     startGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Збереження стану при кожному ході
@@ -196,8 +198,8 @@ export default function Game2048({ setProfile, goBack, showToast }) {
         move('RIGHT');
       }
     };
-    window.addEventListener('keydown', handleKeyDown, { passive: false });
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown, { passive: false });
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [move]);
 
   let touchStartX = 0;
@@ -214,8 +216,8 @@ export default function Game2048({ setProfile, goBack, showToast }) {
     const dy = touchEndY - touchStartY;
     if (Math.abs(dx) > Math.abs(dy)) {
       if (Math.abs(dx) > 30) move(dx > 0 ? 'RIGHT' : 'LEFT');
-    } else {
-      if (Math.abs(dy) > 30) move(dy > 0 ? 'DOWN' : 'UP');
+    } else if (Math.abs(dy) > 30) {
+      move(dy > 0 ? 'DOWN' : 'UP');
     }
     touchStartX = 0;
     touchStartY = 0;
@@ -316,7 +318,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
             const j = idx % 4;
             return (
               <div
-                key={`bg-${idx}`}
+                key={`bg-${i}-${j}`}
                 className="absolute"
                 style={{
                   width: '25%',
@@ -394,3 +396,9 @@ export default function Game2048({ setProfile, goBack, showToast }) {
     </div>
   );
 }
+
+Game2048.propTypes = {
+  setProfile: PropTypes.func.isRequired,
+  goBack: PropTypes.func.isRequired,
+  showToast: PropTypes.func.isRequired,
+};
