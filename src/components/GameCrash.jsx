@@ -82,7 +82,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             const finalPath = pathRef.current.map((p) => {
               let px = p.time / currentMaxTime;
               const x = 10 + width * 0.85 * px;
-              const progressY = Math.log(p.m) / Math.log(currentMaxM);
+              const progressY = (p.m - 1) / (currentMaxM - 1);
               const y = height - 10 - height * 0.8 * progressY;
               return { x, y };
             });
@@ -127,10 +127,9 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           // Робимо відступ 10% справа, щоб ракета не билася в екран
           const x = 10 + width * 0.85 * px;
 
-          // Y залежить від логарифмічного масштабу множника (створює приємну "горбинку" дуги)
-          // Замість прямої пропорції (M/maxM), яка робить кут, використовуємо плавний логарифм.
-          // Це зробить так, що на початку ракета рветься вгору, а потім переходить у плавний політ.
-          const progressY = Math.log(p.m) / Math.log(currentMaxM); // Нормалізовано [0...1]
+          // Y залежить напряму від поточного значення M відносно currentMaxM
+          // Оскільки M росте експоненційно, графік теж буде експоненціально загинатися вгору.
+          const progressY = (p.m - 1) / (currentMaxM - 1);
           const y = height - 10 - height * 0.8 * progressY;
 
           return { x, y };
