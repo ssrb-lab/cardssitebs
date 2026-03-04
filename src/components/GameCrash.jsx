@@ -70,10 +70,37 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             setWinStatus({ result: 'loss', amount: bet });
           }
 
-          // Останній кадр крашу
-          ctx.strokeStyle = '#ef4444'; // червоний
-          ctx.lineWidth = 4;
-          ctx.stroke();
+          // Останній кадр крашу: перемальовуємо лінію червоним
+          // Окрім цього, треба не забути, що canvas поточного кадру міг не встигнути оновитись
+          // для M=crashPoint (бо M < crashPoint було в минулому).
+          // Але для простоти ми просто поверх малюємо червону лінію по існуючому path
+          ctx.beginPath();
+          if (pathRef.current && pathRef.current.length > 0) {
+            // Відтворюємо scaledPath для останнього M
+            const currentMaxM = Math.max(2.0, data.crashPoint);
+            const currentMaxTime = Math.max(10000, timeElapsed);
+            const finalPath = pathRef.current.map((p) => {
+              let px = p.time / currentMaxTime;
+              const x = 10 + width * 0.85 * px;
+              const progressY = Math.log(p.m) / Math.log(currentMaxM);
+              const y = height - 10 - height * 0.8 * progressY;
+              return { x, y };
+            });
+
+            if (finalPath.length > 0) {
+              ctx.moveTo(finalPath[0].x, finalPath[0].y);
+              for (let i = 1; i < finalPath.length; i++) {
+                ctx.lineTo(finalPath[i].x, finalPath[i].y);
+              }
+              ctx.strokeStyle = '#ef4444'; // червоний
+              ctx.lineWidth = 4;
+              ctx.stroke();
+
+              // Переміщуємо і ракету туди ж, щоб вогонь був у кінці лінії
+              const lastP = finalPath[finalPath.length - 1];
+              rocket.style.transform = `translate(${lastP.x}px, ${lastP.y - height + 10}px)`;
+            }
+          }
 
           return;
         }
@@ -142,6 +169,16 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           fillGradient.addColorStop(1, 'rgba(244, 63, 94, 0)');
           ctx.fillStyle = fillGradient;
           ctx.fill();
+
+          // Пунктирна лінія від ракети вниз
+          ctx.beginPath();
+          ctx.setLineDash([6, 6]);
+          ctx.moveTo(lastPoint.x, lastPoint.y);
+          ctx.lineTo(lastPoint.x, height);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.setLineDash([]); // Скидаємо пунктир
 
           // Розрахунок кута нахилу ракети
           let angle = 0; // В градусах (x, y координати. y зростає вниз)
