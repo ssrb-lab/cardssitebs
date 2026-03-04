@@ -169,7 +169,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.fillStyle = fillGradient;
           ctx.fill();
 
-          // Пунктирна лінія від ракети вниз
+          // Пунктирна лінія від самої ракети вниз
           ctx.beginPath();
           ctx.setLineDash([6, 6]);
           ctx.moveTo(lastPoint.x, lastPoint.y);
@@ -177,6 +177,31 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
           ctx.lineWidth = 2;
           ctx.stroke();
+
+          // Пунктирні лінії (слід), залишені на графіку кожні 0.2x
+          ctx.beginPath();
+          for (let markM = 1.2; markM <= M; markM += 0.2) {
+            // Знайдемо відповідну точку X і Y для цього множника markM
+            // X лінійно залежить від часу, який потрібен щоб досягти markM.
+            // Із M = exp(0.00006 * time), time = ln(M) / 0.00006
+            const markTime = Math.log(markM) / 0.00006;
+
+            // Якщо час маркера раптом більший за поточний час гри, пропускаємо (хоча цикл це страхує)
+            if (markTime > timeElapsed) continue;
+
+            const px = markTime / currentMaxTime;
+            const x = 10 + width * 0.85 * px;
+
+            const py = (markM - 1) / (currentMaxM - 1);
+            const y = height - 10 - height * 0.8 * py;
+
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, height);
+          }
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; // трохи тьмяніше за основний
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
           ctx.setLineDash([]); // Скидаємо пунктир
 
           // Розрахунок кута нахилу ракети
