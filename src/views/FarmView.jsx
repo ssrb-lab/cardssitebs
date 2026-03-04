@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   Dices,
   Trophy,
+  Keyboard,
 } from 'lucide-react';
 import {
   fetchFarmState,
@@ -568,7 +569,7 @@ export default function FarmView({
             className={`bg-neutral-900 border ${blockedGames.includes('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Gamepad2
+              <Keyboard
                 size={120}
                 className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
               />
@@ -576,10 +577,10 @@ export default function FarmView({
             <h3
               className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-white'}`}
             >
-              <Gamepad2
+              <Keyboard
                 className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
               />{' '}
-              Слівце 🇺🇦
+              Слівце
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Вгадайте українське слово з 5 літер! Тренуйте розум і заробляйте великі призи.

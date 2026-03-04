@@ -243,7 +243,7 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
           </div>
 
           <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-wider relative z-10">
-            Що таке Словечко?
+            Що таке Слівце?
           </h3>
           <p className="text-neutral-400 text-sm mb-6 leading-relaxed relative z-10">
             Вгадайте українське слово з 5 літер за 6 спроб. Після кожної спроби колір літер
@@ -283,7 +283,9 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
             {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <Play size={24} />}
             {dailyAttempts >= 5
               ? 'Ліміт вичерпано на сьогодні'
-              : `Почати гру ${cost > 0 ? `(${cost} монет)` : '(Безкоштовно)'}`}
+              : cost > 0
+                ? `Почати гру (${cost} монет)`
+                : 'Почати гру'}
           </button>
         </div>
       ) : (
