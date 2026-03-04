@@ -66,6 +66,9 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         const timeScale = hasCashedOutRef.current ? 5 : 1;
         simulatedTimeElapsed += deltaTime * timeScale;
 
+        // Зберігаємо поточний час в ref для фінального кадру
+        startTimeRef.current = simulatedTimeElapsed;
+
         // Розрахунок множника
         const M = Math.max(1.0, Math.exp(0.00006 * simulatedTimeElapsed));
 
@@ -77,70 +80,76 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             setWinStatus({ result: 'loss', amount: bet });
           }
 
-          // Останній кадр крашу: перемальовуємо лінію червоним
-          // Окрім цього, треба не забути, що canvas поточного кадру міг не встигнути оновитись
-          // для M=crashPoint (бо M < crashPoint було в минулому).
-          // Але для простоти ми просто поверх малюємо червону лінію по існуючому path
+          // Останній кадр крашу
+          const finalTime = Math.log(data.crashPoint) / 0.00006;
+          const currentMaxM = Math.max(2.0, data.crashPoint);
+          const currentMaxTime = Math.max(10000, finalTime);
+
           ctx.beginPath();
-          if (pathRef.current && pathRef.current.length > 0) {
-            // Відтворюємо scaledPath для останнього M
-            const currentMaxM = Math.max(2.0, data.crashPoint);
-            const currentMaxTime = Math.max(10000, simulatedTimeElapsed);
-            const finalPath = pathRef.current.map((p) => {
-              let px = p.time / currentMaxTime;
-              const x = 10 + width * 0.85 * px;
-              const progressY = (p.m - 1) / (currentMaxM - 1);
-              const y = height - 10 - height * 0.8 * progressY;
-              return { x, y };
-            });
+          let firstPoint = true;
+          let lastFinalP = { x: 0, y: 0 };
 
-            if (finalPath.length > 0) {
-              ctx.moveTo(finalPath[0].x, finalPath[0].y);
-              for (let i = 1; i < finalPath.length; i++) {
-                ctx.lineTo(finalPath[i].x, finalPath[i].y);
-              }
-              ctx.strokeStyle = '#ef4444'; // червоний
-              ctx.lineWidth = 4;
-              ctx.stroke();
+          // Малюємо математичну дугу до точки крашу
+          for (let t = 0; t <= finalTime; t += Math.max(16, finalTime / 100)) {
+            const tempM = Math.exp(0.00006 * t);
+            const px = t / currentMaxTime;
+            const x = 10 + width * 0.85 * px;
+            const progressY = (tempM - 1) / (currentMaxM - 1);
+            const y = height - 10 - height * 0.8 * progressY;
 
-              // Переміщуємо і ракету туди ж, щоб вогонь був у кінці лінії
-              const lastP = finalPath[finalPath.length - 1];
-              rocket.style.transform = `translate(${lastP.x}px, ${lastP.y - height + 10}px)`;
+            if (firstPoint) {
+              ctx.moveTo(x, y);
+              firstPoint = false;
+            } else {
+              ctx.lineTo(x, y);
             }
+            lastFinalP = { x, y };
           }
 
+          // Додаємо саму останню точну точку
+          const finalPx = finalTime / currentMaxTime;
+          const finalX = 10 + width * 0.85 * finalPx;
+          const finalProgressY = (data.crashPoint - 1) / (currentMaxM - 1);
+          const finalY = height - 10 - height * 0.8 * finalProgressY;
+          ctx.lineTo(finalX, finalY);
+
+          ctx.strokeStyle = '#ef4444'; // червоний
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          rocket.style.transform = `translate(${finalX}px, ${finalY - height + 10}px)`;
           return;
         }
 
         setMultiplier(M);
 
-        // Зберігаємо не фізичні координати екрану, а координати [0...1] (прогрес часу і множника)
-        // замість жорсткої прив'язки до Х.
-        // Логіка: графік має відмальовувати реальну функцію M = e^(k*t).
-        pathRef.current.push({ time: simulatedTimeElapsed, m: M });
-
         // Очищаємо canvas
         ctx.clearRect(0, 0, width, height);
 
-        // --- Логіка відмальовки графіка ---
-        // Визначаємо динамічний масштаб для графіка.
+        // --- Логіка відмальовки математичного графіка ---
         const currentMaxM = Math.max(2.0, M);
-        const currentMaxTime = Math.max(10000, simulatedTimeElapsed); // Спочатку Х фіксований до 10 сек (доки йде розгін)
+        const currentMaxTime = Math.max(10000, simulatedTimeElapsed);
 
-        // Перераховуємо ВСІ попередні точки з новим масштабом, щоб графік "стягувався"
-        const scaledPath = pathRef.current.map((p) => {
-          // X залежить тільки від часу. Коли час > 10с, графік починає стискатися по Х (ілюзія польоту вперед)
-          let px = p.time / currentMaxTime;
-          // Робимо відступ 10% справа, щоб ракета не билася в екран
+        const scaledPath = [];
+        // Будуємо криву повністю з нуля до поточного simulatedTimeElapsed
+        // Крок залежить від масштабу, візьмемо ~100 точок для плавності
+        const step = Math.max(16, simulatedTimeElapsed / 100);
+
+        for (let t = 0; t <= simulatedTimeElapsed; t += step) {
+          const tempM = Math.exp(0.00006 * t);
+          const px = t / currentMaxTime;
           const x = 10 + width * 0.85 * px;
-
-          // Y залежить напряму від поточного значення M відносно currentMaxM
-          // Оскільки M росте експоненційно, графік теж буде експоненціально загинатися вгору.
-          const progressY = (p.m - 1) / (currentMaxM - 1);
+          const progressY = (tempM - 1) / (currentMaxM - 1);
           const y = height - 10 - height * 0.8 * progressY;
+          scaledPath.push({ x, y, t });
+        }
 
-          return { x, y };
-        });
+        // Додаємо саму останню точку для максимальної точності кадру
+        const px = simulatedTimeElapsed / currentMaxTime;
+        const lastX = 10 + width * 0.85 * px;
+        const progressY = (M - 1) / (currentMaxM - 1);
+        const lastY = height - 10 - height * 0.8 * progressY;
+        scaledPath.push({ x: lastX, y: lastY, t: simulatedTimeElapsed });
 
         // Малюємо лінію
         if (scaledPath.length > 1) {
