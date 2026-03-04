@@ -79,7 +79,7 @@ const GHOST_STYLES = [
   'border-2 border-red-500/40 bg-red-500/10',
 ];
 
-const createEmptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+const createEmptyBoard = () => Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
 export default function GameTetris({ setProfile, goBack, showToast }) {
   const [board, setBoard] = useState(createEmptyBoard());
@@ -118,10 +118,11 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         if (sGameOver) localStorage.removeItem('tetris_state');
         return;
       } catch (e) {
-        console.error('Error loading tetris state');
+        console.error('Error loading tetris state', e);
       }
     }
     startGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save state
@@ -202,9 +203,9 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
 
     // Wall kick logic (try placing it without offset, then 1 left, 2 left, 1 right, 2 right)
     const offsets = [0, -1, 1, -2, 2];
-    for (let i = 0; i < offsets.length; i++) {
-      if (!checkCollision(rotated, board, offsets[i], 0)) {
-        offset = offsets[i];
+    for (const off of offsets) {
+      if (!checkCollision(rotated, board, off, 0)) {
+        offset = off;
         valid = true;
         break;
       }
@@ -276,10 +277,10 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   const moveDown = useCallback(() => {
     if (gameOver || isPaused || !currentPiece) return;
 
-    if (!checkCollision(currentPiece, board, 0, 1)) {
-      setCurrentPiece((prev) => ({ ...prev, y: prev.y + 1 }));
-    } else {
+    if (checkCollision(currentPiece, board, 0, 1)) {
       mergePiece();
+    } else {
+      setCurrentPiece((prev) => ({ ...prev, y: prev.y + 1 }));
     }
   }, [currentPiece, board, gameOver, isPaused, mergePiece]);
 
@@ -308,22 +309,19 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
 
   // Timer effect
   useEffect(() => {
-    if (isInitialized && !gameOver && !isPaused) {
-      timerRef.current = setInterval(() => {
-        setTimeElapsed((prev) => {
-          const newTime = prev + 1;
-          // Make speed increment much slower
-          // At 5 mins (300s): prev logic was 20 drops (300/15) * 10ms = 200ms faster (800 -> 600)
-          // At 10 mins (600s): prev logic was 40 drops (600/15) * 10ms = 400ms faster (800 -> 400)
-          // New logic: reach the 5-min speed (600ms) at 10 mins. Time elapsed 600s -> need 200ms drop.
-          // 600 / 30 = 20. 20 * 10 = 200. So every 30 seconds we drop 10ms.
-          if (newTime % 30 === 0) {
-            setDropSpeed((s) => Math.max(100, s - 10));
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
+    if (!isInitialized || gameOver || isPaused) return undefined;
+
+    const tick = () => {
+      setTimeElapsed((prev) => {
+        const newTime = prev + 1;
+        if (newTime % 30 === 0) {
+          setDropSpeed((s) => Math.max(100, s - 10));
+        }
+        return newTime;
+      });
+    };
+
+    timerRef.current = setInterval(tick, 1000);
     return () => clearInterval(timerRef.current);
   }, [isInitialized, gameOver, isPaused]);
 
@@ -386,8 +384,8 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [currentPiece, gameOver, isPaused, moveLeft, moveRight, moveDown, tryRotate, hardDrop]);
 
   // Format time (MM:SS)
@@ -404,35 +402,33 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   const getRenderBoard = () => {
     const renderBoard = board.map((row) => [...row]);
 
-    let ghostY = -1;
-    if (currentPiece) {
-      ghostY = currentPiece.y;
-      while (!checkCollision(currentPiece, board, 0, ghostY - currentPiece.y + 1)) {
-        ghostY++;
-      }
+    if (!currentPiece) return renderBoard;
+
+    let ghostY = currentPiece.y;
+    while (!checkCollision(currentPiece, board, 0, ghostY - currentPiece.y + 1)) {
+      ghostY++;
     }
 
-    if (currentPiece) {
-      for (let y = 0; y < currentPiece.shape.length; y++) {
-        for (let x = 0; x < currentPiece.shape[y].length; x++) {
-          if (currentPiece.shape[y][x]) {
-            // Ghost Piece
-            if (ghostY >= 0) {
-              const gbY = ghostY + y;
-              if (gbY >= 0 && gbY < ROWS && !renderBoard[gbY][currentPiece.x + x]) {
-                renderBoard[gbY][currentPiece.x + x] = -currentPiece.colorId;
-              }
-            }
+    currentPiece.shape.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (!cell) return;
 
-            // Current Piece
-            const boardY = currentPiece.y + y;
-            if (boardY >= 0 && boardY < ROWS) {
-              renderBoard[boardY][currentPiece.x + x] = currentPiece.colorId;
-            }
+        // Ghost Piece
+        if (ghostY >= 0) {
+          const gbY = ghostY + y;
+          if (gbY >= 0 && gbY < ROWS && !renderBoard[gbY][currentPiece.x + x]) {
+            renderBoard[gbY][currentPiece.x + x] = -currentPiece.colorId;
           }
         }
-      }
-    }
+
+        // Current Piece
+        const boardY = currentPiece.y + y;
+        if (boardY >= 0 && boardY < ROWS) {
+          renderBoard[boardY][currentPiece.x + x] = currentPiece.colorId;
+        }
+      });
+    });
+
     return renderBoard;
   };
 
@@ -545,20 +541,18 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
                 row.map((cellId, x) => {
                   const isGhost = cellId < 0;
                   const actualId = Math.abs(cellId);
+
+                  let cellClass = 'bg-transparent';
+                  if (actualId) {
+                    cellClass = isGhost
+                      ? GHOST_STYLES[actualId]
+                      : `bg-${COLORS[actualId]} ${NEON_GLOW[actualId]} border border-white/20`;
+                  }
+
                   return (
                     <div
                       key={`${y}-${x}`}
-                      className={`
-                        w-full h-full rounded-[2px] 
-                        transition-all duration-75 
-                        ${
-                          actualId
-                            ? isGhost
-                              ? GHOST_STYLES[actualId]
-                              : `bg-${COLORS[actualId]} ${NEON_GLOW[actualId]} border border-white/20`
-                            : 'bg-transparent'
-                        }
-                    `}
+                      className={`w-full h-full rounded-[2px] transition-all duration-75 ${cellClass}`}
                     />
                   );
                 })
