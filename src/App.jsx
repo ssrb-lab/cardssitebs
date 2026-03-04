@@ -309,7 +309,7 @@ export default function App() {
         try {
           const notifs = await fetchNotifications(getToken());
           setNotifications(notifs);
-        } catch (err) {}
+        } catch (err) { }
       } catch (e) {
         console.error('Помилка фонового опитування:', e);
       }
@@ -1113,6 +1113,10 @@ export default function App() {
               <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
                 <Coins size={18} className="text-yellow-500" />
                 <span className="text-yellow-500 font-black">{profile?.coins}</span>
+              </div>
+              <div className="bg-neutral-950 px-4 py-2 rounded-xl border border-neutral-800 flex gap-2 items-center">
+                <Gem size={18} className="text-fuchsia-500" />
+                <span className="text-fuchsia-500 font-black">{profile?.crystals || 0}</span>
               </div>
               <button
                 onClick={() => setCurrentView('premium')}

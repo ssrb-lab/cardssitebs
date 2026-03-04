@@ -515,6 +515,50 @@ app.get('/api/profile', authenticate, async (req, res) => {
 
     user = await checkAndUnbanUser(user);
 
+    // Passive Crystals Income Calculation
+    const ownedPoints = await prisma.arenaPoint.findMany({
+      where: { ownerId: user.uid }
+    });
+
+    let crystalsEarned = 0;
+    const now = new Date();
+
+    for (const point of ownedPoints) {
+      if (point.crystalRatePerHour > 0 && point.crystalsLastClaimedAt) {
+        // Calculate hours passed
+        const msPassed = now.getTime() - new Date(point.crystalsLastClaimedAt).getTime();
+        const hoursPassed = msPassed / (1000 * 60 * 60);
+
+        // Calculate whole crystals earned
+        const earnedFromThisPoint = Math.floor(hoursPassed * point.crystalRatePerHour);
+
+        if (earnedFromThisPoint > 0) {
+          crystalsEarned += earnedFromThisPoint;
+
+          // Move the claimedAt forward by exactly the amount of hours we just claimed
+          // This ensures fractional progress (e.g. 1.5 hours) isn't lost
+          const newClaimTime = new Date(new Date(point.crystalsLastClaimedAt).getTime() + ((earnedFromThisPoint / point.crystalRatePerHour) * 1000 * 60 * 60));
+
+          await prisma.arenaPoint.update({
+            where: { id: point.id },
+            data: { crystalsLastClaimedAt: newClaimTime }
+          });
+        }
+      }
+    }
+
+    if (crystalsEarned > 0) {
+      user = await prisma.user.update({
+        where: { uid: user.uid },
+        data: { crystals: { increment: crystalsEarned } },
+        include: {
+          inventory: true,
+          showcases: true,
+          _count: { select: { inventory: true } },
+        }
+      });
+    }
+
     // Отримуємо ачівки користувача з деталями (назва, іконка з AchievementSettings)
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId: user.uid },
@@ -1437,7 +1481,7 @@ app.get('/api/game/arena/points', authenticate, async (req, res) => {
 });
 
 app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) => {
-  const { x, y, name, icon, color } = req.body;
+  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour } = req.body;
   try {
     const newPoint = await prisma.arenaPoint.create({
       data: {
@@ -1446,6 +1490,9 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
         name: name || 'Точка Арени',
         icon: icon || 'castle',
         color: color || '#4f46e5',
+        entryFee: entryFee ? Number(entryFee) : 0,
+        cooldownMinutes: cooldownMinutes ? Number(cooldownMinutes) : 15,
+        crystalRatePerHour: crystalRatePerHour ? Number(crystalRatePerHour) : 0,
       },
     });
     res.json({ success: true, point: newPoint });
@@ -1461,6 +1508,127 @@ app.delete('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, 
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Помилка видалення точки.' });
+  }
+});
+
+app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { cards } = req.body; // Expect an array of exactly 5 cards
+
+  if (!Array.isArray(cards) || cards.length !== 5) {
+    return res.status(400).json({ error: 'Для захоплення точки необхідно обрати рівно 5 карт!' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true }
+    });
+    const point = await prisma.arenaPoint.findUnique({ where: { id } });
+
+    if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
+
+    // Validate that the user actually owns these 5 specific card instances
+    let userHasAllCards = true;
+
+    // Group required cards by ID to count power occurrences
+    const requiredCardsCounts = {};
+    for (let c of cards) {
+      if (!requiredCardsCounts[c.id]) requiredCardsCounts[c.id] = {};
+      const p = c.power;
+      requiredCardsCounts[c.id][p] = (requiredCardsCounts[c.id][p] || 0) + 1;
+    }
+
+    for (const cardId in requiredCardsCounts) {
+      const invItem = user.inventory.find(item => item.cardId === cardId);
+      if (!invItem) {
+        userHasAllCards = false;
+        break;
+      }
+
+      let currentStats = [];
+      if (typeof invItem.gameStats === 'string') {
+        try { currentStats = JSON.parse(invItem.gameStats); } catch (e) { }
+      } else if (Array.isArray(invItem.gameStats)) {
+        currentStats = invItem.gameStats;
+      }
+
+      const availablePowers = {};
+      for (let p of currentStats) {
+        availablePowers[p] = (availablePowers[p] || 0) + 1;
+      }
+
+      for (const powerRaw in requiredCardsCounts[cardId]) {
+        const requiredCount = requiredCardsCounts[cardId][powerRaw];
+        let countAvailable = availablePowers[powerRaw] || 0;
+        if (!countAvailable) {
+          countAvailable = availablePowers[Number(powerRaw)] || 0;
+        }
+
+        if (countAvailable < requiredCount) {
+          const assignedCount = currentStats.length;
+          const totalAmount = invItem.amount;
+          const unassignedCount = Math.max(0, totalAmount - assignedCount);
+
+          if (unassignedCount >= requiredCount) {
+            // Valid fallback
+          } else {
+            userHasAllCards = false;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!userHasAllCards) {
+      return res.status(400).json({ error: 'Ви не маєте обраних карт у своєму інвентарі!' });
+    }
+
+    if (!point.ownerId) {
+      // Точка пуста, перший гравець може її захопити
+      if (user.coins < point.entryFee) {
+        return res.status(400).json({ error: 'Недостатньо монет для захоплення цієї точки.' });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Знімаємо монети
+        await tx.user.update({
+          where: { uid: user.uid },
+          data: { coins: { decrement: point.entryFee } },
+        });
+
+        // Записуємо власника, час та карти (починаємо відлік кристалів з цієї хвилини)
+        await tx.arenaPoint.update({
+          where: { id },
+          data: {
+            ownerId: user.uid,
+            ownerNickname: user.nickname,
+            capturedAt: new Date(),
+            crystalsLastClaimedAt: new Date(),
+            defendingCards: cards // JSON object
+          },
+        });
+      });
+
+      const updatedUser = await prisma.user.findUnique({ where: { uid: user.uid } });
+      const updatedPoint = await prisma.arenaPoint.findUnique({ where: { id } });
+
+      return res.json({ success: true, message: 'Точка Успішно захоплена', profile: updatedUser, point: updatedPoint });
+    } else {
+      // Точка вже має власника
+      const capturedTime = new Date(point.capturedAt).getTime();
+      const cdMs = point.cooldownMinutes * 60 * 1000;
+      const cdUntil = capturedTime + cdMs;
+
+      if (Date.now() < cdUntil) {
+        return res.status(400).json({ error: 'Точка ще під захистом (Кулдаун).' });
+      }
+
+      return res.status(400).json({ error: 'Механіка битви ще в розробці. Слідкуйте за оновленнями!' });
+    }
+  } catch (error) {
+    console.error('Помилка захоплення точки:', error);
+    res.status(500).json({ error: 'Помилка захоплення точки.' });
   }
 });
 

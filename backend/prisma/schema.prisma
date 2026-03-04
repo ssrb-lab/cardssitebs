@@ -13,6 +13,7 @@ model User {
   email                String   @unique
   passwordHash         String
   coins                Int      @default(200)
+  crystals             Int      @default(0)
   totalCards           Int      @default(0)
   uniqueCardsCount     Int      @default(0)
   packsOpened          Int      @default(0)
@@ -207,11 +208,19 @@ model Notification {
 }
 
 model ArenaPoint {
-  id        String   @id @default(uuid())
-  x         Float
-  y         Float
-  name      String   @default("Точка Арени")
-  icon      String   @default("castle")
-  color     String   @default("#4f46e5")
-  createdAt DateTime @default(now())
+  id                 String    @id @default(uuid())
+  x                  Float
+  y                  Float
+  name               String    @default("Точка Арени")
+  icon               String    @default("castle")
+  color              String    @default("#4f46e5")
+  entryFee           Int       @default(0)
+  cooldownMinutes    Int       @default(15)
+  crystalRatePerHour Int       @default(0)
+  ownerId            String?
+  ownerNickname      String?
+  capturedAt         DateTime?
+  crystalsLastClaimedAt DateTime?
+  defendingCards     Json      @default("[]")
+  createdAt          DateTime  @default(now())
 }
