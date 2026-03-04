@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw, Heart, Zap, Pause, Play } from 'lucide-react';
+import {
+  ArrowLeft,
+  Coins,
+  Trophy,
+  Loader2,
+  RotateCcw,
+  Heart,
+  Zap,
+  Pause,
+  Play,
+} from 'lucide-react';
 import { claimFuseRewardRequest, startFuseGameRequest, getToken } from '../config/api';
 
 const GRID_SIZE = 25; // 5x5
@@ -269,8 +279,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       phase === 'memorize'
         ? !isDamaged
         : !isDamaged ||
-        (!isDamaged && (isFound || memoryFlipped)) ||
-        (isDamaged && !isFound && !memoryFlipped);
+          (!isDamaged && (isFound || memoryFlipped)) ||
+          (isDamaged && !isFound && !memoryFlipped);
 
     // To handle the visual of clicking a wrong healthy fuse
     if (phase === 'play' && !isDamaged && memoryFlipped) {
@@ -338,13 +348,6 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           >
             {isPaused ? <Play size={16} /> : <Pause size={16} />}
             {isPaused ? 'Продовжити' : 'Пауза'}
-          </button>
-          <button
-            onClick={restartGame}
-            disabled={isProcessing}
-            className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-bold transition-colors bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-900/50"
-          >
-            <RotateCcw size={16} /> Рестарт
           </button>
         </div>
       </div>
@@ -455,7 +458,8 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           <Pause size={60} className="text-yellow-500 mb-4" />
           <h2 className="text-3xl font-black mb-2 uppercase text-white">Пауза</h2>
           <p className="text-neutral-300 mb-6">
-            Гру призупинено. Коли ви повернетеся, положення запобіжників буде <strong>змінено</strong>.
+            Гру призупинено. Коли ви повернетеся, положення запобіжників буде{' '}
+            <strong>змінено</strong>.
           </p>
 
           <button
@@ -485,16 +489,16 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
             Забрати{' '}
             {Math.floor(
               score *
-              (progressInfo.level === 1
-                ? 86
-                : progressInfo.level === 2
-                  ? 172
-                  : progressInfo.level === 3
-                    ? 230
-                    : progressInfo.level === 4
-                      ? 431
-                      : 402) *
-              (1 + Math.floor(score / 5) * 0.1)
+                (progressInfo.level === 1
+                  ? 86
+                  : progressInfo.level === 2
+                    ? 172
+                    : progressInfo.level === 3
+                      ? 230
+                      : progressInfo.level === 4
+                        ? 431
+                        : 402) *
+                (1 + Math.floor(score / 5) * 0.1)
             )}{' '}
             монет
           </button>
