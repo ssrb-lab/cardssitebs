@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { formatDate, getCardStyle } from '../utils/helpers';
+import { formatDate, getCardStyle, isToday } from '../utils/helpers';
 import { getCroppedImg } from '../utils/cropImage';
 import {
   claimDailyRequest,
@@ -108,10 +108,7 @@ export default function ProfileView({
     }
   };
 
-  const canClaimDaily =
-    profile &&
-    (!profile.lastDailyClaim ||
-      new Date(profile.lastDailyClaim).getUTCDate() !== new Date().getUTCDate());
+  const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
   const mainShowcase = showcases?.find((s) => s.id === profile?.mainShowcaseId);
 
   const validShowcaseCards = [];
@@ -587,11 +584,10 @@ export default function ProfileView({
           <button
             onClick={claimDaily}
             disabled={!canClaimDaily || isProcessing}
-            className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${
-              canClaimDaily
+            className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${canClaimDaily
                 ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-yellow-950 shadow-[0_0_20px_rgba(249,115,22,0.4)]'
                 : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-            }`}
+              }`}
           >
             {canClaimDaily ? 'Отримати нагороду' : 'Вже отримано (Чекайте завтра)'}
           </button>

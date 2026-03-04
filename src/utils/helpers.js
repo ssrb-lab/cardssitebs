@@ -5,9 +5,9 @@ export const isToday = (dateString) => {
   const d = new Date(dateString);
   const today = new Date();
   return (
-    d.getDate() === today.getDate() &&
-    d.getMonth() === today.getMonth() &&
-    d.getFullYear() === today.getFullYear()
+    d.getUTCDate() === today.getUTCDate() &&
+    d.getUTCMonth() === today.getUTCMonth() &&
+    d.getUTCFullYear() === today.getUTCFullYear()
   );
 };
 
