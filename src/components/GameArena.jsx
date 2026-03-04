@@ -333,7 +333,6 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
             ownedGameCards.push({
               ...cardDetails,
               uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`, // Stable ID
-              statsIndex: idx,
               power: statObj.power,
               hp: statObj.hp,
             });

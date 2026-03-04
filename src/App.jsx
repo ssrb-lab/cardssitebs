@@ -1050,19 +1050,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
-      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm relative">
-        <a
-          href="https://send.monobank.ua/jar/3t5ULx6Qx2"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute left-4 top-2 z-[100] hidden lg:block origin-top-left hover:scale-[4] transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)] rounded-xl"
-        >
-          <img
-            src="/QR.avif"
-            alt="QR Code"
-            className="w-14 h-14 object-cover rounded-xl border border-neutral-700 shadow-lg hover:border-neutral-500"
-          />
-        </a>
+      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div
             className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer"
