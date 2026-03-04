@@ -460,8 +460,8 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   const renderBoard = getRenderBoard();
 
   return (
-    <div className="pb-1 sm:pb-10 animate-in fade-in zoom-in-95 w-full h-full max-w-lg mx-auto flex flex-col items-center justify-start sm:justify-center relative select-none pt-1 sm:pt-0">
-      <div className="flex w-full justify-between items-center mb-1 sm:mb-4 px-1 sm:px-0">
+    <div className="pb-1 sm:pb-10 animate-in fade-in zoom-in-95 w-full h-full overflow-hidden max-w-lg mx-auto flex flex-col items-center justify-start sm:justify-center relative select-none pt-1 sm:pt-0">
+      <div className="flex w-full justify-between items-center mb-1 sm:mb-4 px-1 sm:px-0 shrink-0">
         <button
           onClick={goBack}
           disabled={isProcessing}
@@ -487,7 +487,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         </div>
       </div>
 
-      <div className="flex w-full justify-between items-center mb-2 sm:mb-6 bg-neutral-900 border border-neutral-800 p-1.5 sm:p-4 rounded-xl sm:rounded-2xl px-2 sm:px-4">
+      <div className="flex w-full justify-between items-center mb-2 sm:mb-6 bg-neutral-900 border border-neutral-800 p-1.5 sm:p-4 rounded-xl sm:rounded-2xl px-2 sm:px-4 shrink-0">
         <div>
           <div className="text-[9px] sm:text-xs text-neutral-500 uppercase font-bold mb-0 sm:mb-1">
             Рахунок
@@ -515,7 +515,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       </div>
 
       <div className="flex justify-center w-full">
-        <div className="bg-neutral-950 p-2 sm:p-4 rounded-2xl border-4 border-neutral-800 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden">
+        <div className="bg-neutral-950 p-1 sm:p-4 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-neutral-800 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden shrink-0">
           <div className="relative">
             {/* Grid background styling using actual grid to ensure alignment */}
             <div
@@ -536,8 +536,8 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
               style={{
                 gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
                 gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
-                width: 'min(40vh, 85vw, 300px)',
-                height: 'min(80vh, 170vw, 600px)', // aspect ratio 1:2
+                width: 'min(28dvh, 70vw, 300px)',
+                height: 'min(56dvh, 140vw, 600px)', // aspect ratio 1:2
                 gap: '1px', // This gap perfectly aligns with the background grid
               }}
             >
@@ -576,7 +576,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         </div>
       </div>
 
-      <div className="mt-2 sm:mt-8 mb-1 sm:mb-4 px-2 w-full max-w-[240px] sm:max-w-xs mx-auto">
+      <div className="mt-1 sm:mt-8 mb-1 sm:mb-4 px-2 w-full max-w-[200px] sm:max-w-xs mx-auto shrink-0">
         <div className="grid grid-cols-3 gap-1.5 sm:gap-3 touch-manipulation">
           <div className="col-start-2">
             <button
