@@ -1052,7 +1052,7 @@ export default function App() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
       <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm relative">
         <a
-          href="#"
+          href="https://send.monobank.ua/jar/3t5ULx6Qx2"
           target="_blank"
           rel="noopener noreferrer"
           className="absolute left-4 top-1/2 -translate-y-1/2 z-[60] hidden lg:block hover:scale-105 transition-transform cursor-pointer"
