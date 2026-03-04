@@ -582,11 +582,29 @@ export const startBlackjackGameRequest = async (token, betAmount) => {
   return data;
 };
 
-export const claimBlackjackRewardRequest = async (token, result, betAmount) => {
-  const res = await fetch(`${API_URL}/game/blackjack/claim`, {
+export const hitBlackjackRequest = async (token) => {
+  const res = await fetch(`${API_URL}/game/blackjack/hit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ result, betAmount }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const standBlackjackRequest = async (token) => {
+  const res = await fetch(`${API_URL}/game/blackjack/stand`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const getBlackjackStateRequest = async (token) => {
+  const res = await fetch(`${API_URL}/game/blackjack/state`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);

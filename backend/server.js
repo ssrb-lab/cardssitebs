@@ -1246,12 +1246,13 @@ app.post('/api/game/2048/start', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
-    // Оновлюємо дату гри
+    // Записуємо час початку гри для античіту
     const now = new Date();
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
         last2048PlayDate: now,
+        activeMinigame: { game: '2048', startTime: now.toISOString() }
       },
     });
 
@@ -1269,6 +1270,25 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // ANTI-CHEAT CHECK
+    if (!user.activeMinigame) {
+      return res.status(400).json({ error: 'Гру не було розпочато легітимно!' });
+    }
+    const minigame = typeof user.activeMinigame === 'string' ? JSON.parse(user.activeMinigame) : user.activeMinigame;
+    if (minigame.game !== '2048') {
+      return res.status(400).json({ error: 'Неправильна активна гра!' });
+    }
+
+    const startTime = new Date(minigame.startTime).getTime();
+    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
+
+    // Припускаємо хардкорні 1500 очок в секунду як абсолютний фізичний ліміт
+    const maxPossibleScore = elapsedTimeSeconds * 1500;
+    if (score > maxPossibleScore && score > 2000) {
+      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (2048).`);
+      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
+    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
@@ -1303,6 +1323,7 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
         coins: { increment: coinsToGive },
         dailyFarmAmount: currentDailyFarm + coinsToGive,
         lastFarmDate: now,
+        activeMinigame: null // Cleared
       },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
@@ -1320,6 +1341,7 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
       where: { uid: user.uid },
       data: {
         lastTetrisPlayDate: now,
+        activeMinigame: { game: 'tetris', startTime: now.toISOString() }
       },
     });
 
@@ -1337,6 +1359,25 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // ANTI-CHEAT CHECK
+    if (!user.activeMinigame) {
+      return res.status(400).json({ error: 'Гру не було розпочато легітимно!' });
+    }
+    const minigame = typeof user.activeMinigame === 'string' ? JSON.parse(user.activeMinigame) : user.activeMinigame;
+    if (minigame.game !== 'tetris') {
+      return res.status(400).json({ error: 'Неправильна активна гра!' });
+    }
+
+    const startTime = new Date(minigame.startTime).getTime();
+    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
+
+    // Тетріс поїнти ростуть повільніше. Припустимо максимум 500 очок в секунду
+    const maxPossibleScore = elapsedTimeSeconds * 500;
+    if (score > maxPossibleScore && score > 1000) {
+      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Tetris).`);
+      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
+    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
@@ -1370,6 +1411,7 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
         coins: { increment: coinsToGive },
         dailyFarmAmount: currentDailyFarm + coinsToGive,
         lastFarmDate: now,
+        activeMinigame: null
       },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
@@ -1387,6 +1429,7 @@ app.post('/api/game/fuse/start', authenticate, async (req, res) => {
       where: { uid: user.uid },
       data: {
         lastFusePlayDate: now,
+        activeMinigame: { game: 'fuse', startTime: now.toISOString() }
       },
     });
 
@@ -1404,6 +1447,27 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // ANTI-CHEAT CHECK
+    if (!user.activeMinigame) {
+      return res.status(400).json({ error: 'Гру не було розпочато легітимно!' });
+    }
+    const minigame = typeof user.activeMinigame === 'string' ? JSON.parse(user.activeMinigame) : user.activeMinigame;
+    if (minigame.game !== 'fuse') {
+      return res.status(400).json({ error: 'Неправильна активна гра!' });
+    }
+
+    const startTime = new Date(minigame.startTime).getTime();
+    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
+
+    // Fuse score is basically fixed boards repaired. It takes at least 1-2 sec to memorize + 1 sec to click.
+    // Extremely fast play: maybe 1 board every 2 seconds. Thus max score = elapsedTimeSeconds / 2.
+    // Let's be lenient and say 1 board per 1 second absolute max.
+    const maxPossibleScore = elapsedTimeSeconds * 2;
+    if (score > maxPossibleScore && score > 5) {
+      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Fuse).`);
+      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
+    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
@@ -1456,6 +1520,7 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
         lastFarmDate: now,
         fuseRepairedPoints: newPoints,
         fuseLevel: newLevel,
+        activeMinigame: null
       },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
@@ -1467,6 +1532,70 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
 // ----------------------------------------
 // BLACKJACK
 // ----------------------------------------
+const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'];
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
+
+function getCardValue(rank) {
+  if (['jack', 'queen', 'king'].includes(rank)) return 10;
+  if (rank === 'ace') return 11;
+  return parseInt(rank, 10);
+}
+
+function getHandScore(hand) {
+  let score = 0;
+  let aces = 0;
+  for (const card of hand) {
+    score += card.value;
+    if (card.rank === 'ace') aces += 1;
+  }
+  while (score > 21 && aces > 0) {
+    score -= 10;
+    aces -= 1;
+  }
+  return score;
+}
+
+function createDeck() {
+  const newDeck = [];
+  const suitMap = { clubs: 'Clubs', diamonds: 'Diamonds', hearts: 'Hearts', spades: 'Spades' };
+  const rankMap = { jack: 'J', queen: 'Q', king: 'K', ace: 'A' };
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      newDeck.push({
+        suit,
+        rank,
+        value: getCardValue(rank),
+        image: `/png/card${suitMap[suit]}${rankMap[rank] || rank}.png`,
+      });
+    }
+  }
+  // Shuffle
+  for (let i = newDeck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
+  }
+  return newDeck;
+}
+
+app.get('/api/game/blackjack/state', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user.blackjackState) {
+      return res.json({ success: true, state: null });
+    }
+
+    // Convert DB state string to object if necessary
+    const state = typeof user.blackjackState === 'string'
+      ? JSON.parse(user.blackjackState)
+      : user.blackjackState;
+
+    res.json({ success: true, state });
+  } catch (error) {
+    console.error('Error fetching blackjack state:', error);
+    res.status(500).json({ error: 'Помилка сервера.' });
+  }
+});
+
 app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
   const { betAmount } = req.body;
 
@@ -1476,46 +1605,190 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    // Prevent starting a new game if one is active
+    if (user.blackjackState) {
+      const currentState = typeof user.blackjackState === 'string'
+        ? JSON.parse(user.blackjackState)
+        : user.blackjackState;
+
+      if (currentState.gameState && currentState.gameState !== 'betting') {
+        return res.status(400).json({ error: 'Ваша гра вже триває! Спочатку завершіть поточну гру.' });
+      }
+    }
+
     if (user.coins < parsedBet) return res.status(400).json({ error: 'Недостатньо монет!' });
 
-    const updatedUser = await prisma.user.update({
-      where: { uid: user.uid },
-      data: { coins: { decrement: parsedBet } },
-    });
+    // Deduct coins and create initial state
+    const deck = createDeck();
+    const playerHand = [deck.pop(), deck.pop()];
+    const dealerHand = [deck.pop(), deck.pop()];
 
-    res.json({ success: true, profile: updatedUser });
+    const playerState = {
+      deck,
+      playerHand,
+      dealerHand,
+      betAmount: parsedBet,
+      gameState: 'playing',
+      gameResult: null,
+      earnedCoins: 0,
+    };
+
+    const pScore = getHandScore(playerHand);
+    const dScore = getHandScore(dealerHand);
+
+    let updatedUser;
+
+    // Instant blackjack conditions
+    if (pScore === 21) {
+      playerState.gameState = 'game_over';
+      if (dScore === 21) {
+        playerState.gameResult = 'push';
+        playerState.earnedCoins = parsedBet;
+      } else {
+        playerState.gameResult = 'blackjack';
+        playerState.earnedCoins = Math.floor(parsedBet * 2.5);
+      }
+
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: {
+          coins: { decrement: parsedBet - playerState.earnedCoins },
+          blackjackState: null // Clear state since game ended immediately
+        },
+      });
+    } else {
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: {
+          coins: { decrement: parsedBet },
+          blackjackState: playerState
+        },
+      });
+    }
+
+    res.json({ success: true, profile: updatedUser, state: playerState });
   } catch (error) {
-    console.error(error);
+    console.error('Error starting blackjack:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
   }
 });
 
-app.post('/api/game/blackjack/claim', authenticate, async (req, res) => {
-  const { result, betAmount } = req.body;
-
-  const parsedBet = parseInt(betAmount, 10);
-  if (isNaN(parsedBet) || parsedBet < 10)
-    return res.status(400).json({ error: 'Неправильна ставка.' });
-
+app.post('/api/game/blackjack/hit', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
-    let coinsToGive = 0;
-    if (result === 'win') coinsToGive = parsedBet * 2;
-    if (result === 'blackjack') coinsToGive = Math.floor(parsedBet * 2.5);
-    if (result === 'push') coinsToGive = Math.floor(parsedBet);
-
-    if (coinsToGive > 0) {
-      const updatedUser = await prisma.user.update({
-        where: { uid: req.user.uid },
-        data: { coins: { increment: coinsToGive } },
-      });
-      res.json({ success: true, earned: coinsToGive, profile: updatedUser });
-    } else {
-      res.json({ success: true, earned: 0, profile: user });
+    if (!user.blackjackState) {
+      return res.status(400).json({ error: 'Немає активної гри.' });
     }
+
+    const state = typeof user.blackjackState === 'string'
+      ? JSON.parse(user.blackjackState)
+      : user.blackjackState;
+
+    if (state.gameState !== 'playing') {
+      return res.status(400).json({ error: 'Додаткові карти неможливі на цьому етапі.' });
+    }
+
+    const newDeck = [...state.deck];
+    const card = newDeck.pop();
+    const newHand = [...state.playerHand, card];
+
+    state.deck = newDeck;
+    state.playerHand = newHand;
+
+    let updatedUser;
+
+    // Check bust
+    if (getHandScore(newHand) > 21) {
+      state.gameState = 'game_over';
+      state.gameResult = 'lose';
+      state.earnedCoins = 0;
+
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: { blackjackState: null },
+      });
+    } else {
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: { blackjackState: state },
+      });
+    }
+
+    res.json({ success: true, profile: updatedUser, state });
   } catch (error) {
-    console.error(error);
+    console.error('Error in blackjack hit:', error);
+    res.status(500).json({ error: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/game/blackjack/stand', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+
+    if (!user.blackjackState) {
+      return res.status(400).json({ error: 'Немає активної гри.' });
+    }
+
+    const state = typeof user.blackjackState === 'string'
+      ? JSON.parse(user.blackjackState)
+      : user.blackjackState;
+
+    if (state.gameState !== 'playing') {
+      return res.status(400).json({ error: 'Неправильний етап гри.' });
+    }
+
+    // Dealer draws cards until 17
+    const newDeck = [...state.deck];
+    const dHand = [...state.dealerHand];
+
+    while (getHandScore(dHand) < 17) {
+      dHand.push(newDeck.pop());
+    }
+
+    state.deck = newDeck;
+    state.dealerHand = dHand;
+    state.gameState = 'game_over';
+
+    const pScore = getHandScore(state.playerHand);
+    const dScore = getHandScore(state.dealerHand);
+
+    if (dScore > 21) {
+      state.gameResult = 'win';
+      state.earnedCoins = state.betAmount * 2;
+    } else if (dScore > pScore) {
+      state.gameResult = 'lose';
+      state.earnedCoins = 0;
+    } else if (dScore < pScore) {
+      state.gameResult = 'win';
+      state.earnedCoins = state.betAmount * 2;
+    } else {
+      state.gameResult = 'push';
+      state.earnedCoins = Math.floor(state.betAmount);
+    }
+
+    let updatedUser;
+
+    // Clear the active game state and award coins if any
+    if (state.earnedCoins > 0) {
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: {
+          coins: { increment: state.earnedCoins },
+          blackjackState: null
+        },
+      });
+    } else {
+      updatedUser = await prisma.user.update({
+        where: { uid: user.uid },
+        data: { blackjackState: null },
+      });
+    }
+
+    res.json({ success: true, profile: updatedUser, state });
+  } catch (error) {
+    console.error('Error in blackjack stand:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
   }
 });

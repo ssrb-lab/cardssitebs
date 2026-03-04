@@ -46,9 +46,11 @@ model User {
   lastFusePlayDate     DateTime?
   fuseLevel            Int      @default(1)
   fuseRepairedPoints   Int      @default(0)
+  activeMinigame       Json?
   wordleState          Json?
   dailyWordleAttempts  Int      @default(0)
   lastWordlePlayDate   DateTime?
+  blackjackState       Json?
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
