@@ -460,4 +460,4 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
       </div>
     </div>
   );
-
+}
