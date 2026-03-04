@@ -1314,12 +1314,10 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
       console.log(
         `[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (2048).`
       );
-      return res
-        .status(400)
-        .json({
-          error:
-            'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
-        });
+      return res.status(400).json({
+        error:
+          'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
+      });
     }
 
     const now = new Date();
@@ -1413,12 +1411,10 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
       console.log(
         `[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Tetris).`
       );
-      return res
-        .status(400)
-        .json({
-          error:
-            'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
-        });
+      return res.status(400).json({
+        error:
+          'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
+      });
     }
 
     const now = new Date();
@@ -1513,12 +1509,10 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
       console.log(
         `[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Fuse).`
       );
-      return res
-        .status(400)
-        .json({
-          error:
-            'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
-        });
+      return res.status(400).json({
+        error:
+          'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!',
+      });
     }
 
     const now = new Date();
@@ -1629,6 +1623,28 @@ function createDeck() {
   return newDeck;
 }
 
+function cleanBlackjackStateForClient(state) {
+  if (!state) return null;
+  const clientState = { ...state };
+
+  // Ніколи не відправляємо залишок колоди
+  delete clientState.deck;
+
+  // Якщо гра ще триває, ховаємо другу карту дилера
+  if (
+    clientState.gameState === 'playing' &&
+    clientState.dealerHand &&
+    clientState.dealerHand.length > 1
+  ) {
+    clientState.dealerHand = [
+      clientState.dealerHand[0],
+      { image: '/png/cardBack_blue1.png', value: 0, rank: 'hidden', suit: 'hidden' },
+    ];
+  }
+
+  return clientState;
+}
+
 app.get('/api/game/blackjack/state', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
@@ -1642,7 +1658,7 @@ app.get('/api/game/blackjack/state', authenticate, async (req, res) => {
         ? JSON.parse(user.blackjackState)
         : user.blackjackState;
 
-    res.json({ success: true, state });
+    res.json({ success: true, state: cleanBlackjackStateForClient(state) });
   } catch (error) {
     console.error('Error fetching blackjack state:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
@@ -1723,7 +1739,11 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
       });
     }
 
-    res.json({ success: true, profile: updatedUser, state: playerState });
+    res.json({
+      success: true,
+      profile: updatedUser,
+      state: cleanBlackjackStateForClient(playerState),
+    });
   } catch (error) {
     console.error('Error starting blackjack:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
@@ -1773,7 +1793,7 @@ app.post('/api/game/blackjack/hit', authenticate, async (req, res) => {
       });
     }
 
-    res.json({ success: true, profile: updatedUser, state });
+    res.json({ success: true, profile: updatedUser, state: cleanBlackjackStateForClient(state) });
   } catch (error) {
     console.error('Error in blackjack hit:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
@@ -1844,7 +1864,7 @@ app.post('/api/game/blackjack/stand', authenticate, async (req, res) => {
       });
     }
 
-    res.json({ success: true, profile: updatedUser, state });
+    res.json({ success: true, profile: updatedUser, state: cleanBlackjackStateForClient(state) });
   } catch (error) {
     console.error('Error in blackjack stand:', error);
     res.status(500).json({ error: 'Помилка сервера.' });

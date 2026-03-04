@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Loader2, Coins, Play, RefreshCw, Hand, Plus, Minus, Info } from 'lucide-react';
-import { startBlackjackGameRequest, hitBlackjackRequest, standBlackjackRequest, getBlackjackStateRequest, getToken } from '../config/api';
+import {
+  startBlackjackGameRequest,
+  hitBlackjackRequest,
+  standBlackjackRequest,
+  getBlackjackStateRequest,
+  getToken,
+} from '../config/api';
 
 export default function GameBlackjack({ profile, setProfile, goBack, showToast }) {
-  const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
   const [betAmount, setBetAmount] = useState(10);
@@ -22,7 +27,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         const data = await getBlackjackStateRequest(getToken());
         if (data.state && data.state.gameState && data.state.gameState !== 'betting') {
           const { state } = data;
-          setDeck(state.deck || []);
           setPlayerHand(state.playerHand || []);
           setDealerHand(state.dealerHand || []);
           setBetAmount(state.betAmount || 10);
@@ -72,7 +76,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       setProfile(data.profile);
 
       const { state } = data;
-      setDeck(state.deck);
       setPlayerHand(state.playerHand);
       setDealerHand(state.dealerHand);
       setBetAmount(state.betAmount);
@@ -80,14 +83,17 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       setGameResult(state.gameResult);
       setEarnedCoins(state.earnedCoins);
 
-      if (state.gameResult === 'win' || state.gameResult === 'blackjack' || state.gameResult === 'push') {
+      if (
+        state.gameResult === 'win' ||
+        state.gameResult === 'blackjack' ||
+        state.gameResult === 'push'
+      ) {
         if (state.earnedCoins > 0 && state.gameResult !== 'push') {
           showToast(`Ви виграли ${state.earnedCoins} монет!`, 'success');
         }
       } else if (state.gameResult === 'lose') {
         showToast('Ви програли ставку.', 'error');
       }
-
     } catch (e) {
       showToast(e.message || 'Помилка початку гри.', 'error');
     } finally {
@@ -104,7 +110,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       setProfile(data.profile);
 
       const { state } = data;
-      setDeck(state.deck);
       setPlayerHand(state.playerHand);
       setGameState(state.gameState);
       setGameResult(state.gameResult);
@@ -131,7 +136,6 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
       setProfile(data.profile);
 
       const { state } = data;
-      setDeck(state.deck);
       setDealerHand(state.dealerHand);
       setGameState(state.gameState);
       setGameResult(state.gameResult);
@@ -249,14 +253,15 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         <div className="flex-1 flex items-center justify-center my-2 min-h-[40px]">
           {gameState === 'game_over' && (
             <div
-              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${gameResult === 'win'
+              className={`px-6 py-3 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-widest shadow-2xl animate-in zoom-in ${
+                gameResult === 'win'
                   ? 'bg-green-500 text-green-950'
                   : gameResult === 'blackjack'
                     ? 'bg-fuchsia-500 text-white'
                     : gameResult === 'push'
                       ? 'bg-blue-500 text-white'
                       : 'bg-red-600 text-white'
-                }`}
+              }`}
             >
               {gameResult === 'win'
                 ? 'Перемога!'
