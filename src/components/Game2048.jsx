@@ -273,8 +273,8 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   if (!isInitialized) return null;
 
   return (
-    <div className="pb-10 animate-in fade-in zoom-in-95 max-w-md mx-auto relative select-none">
-      <div className="flex justify-between items-center mb-4">
+    <div className="pb-1 sm:pb-10 pt-1 sm:pt-0 animate-in fade-in zoom-in-95 w-full h-full overflow-hidden max-w-md mx-auto flex flex-col items-center justify-start sm:justify-center relative select-none">
+      <div className="flex w-full justify-between items-center mb-2 sm:mb-4 px-1 sm:px-0 shrink-0">
         <button
           onClick={goBack}
           disabled={isProcessing}
@@ -291,7 +291,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
         </button>
       </div>
 
-      <div className="flex justify-between items-center mb-6 bg-neutral-900 border border-neutral-800 p-4 rounded-2xl">
+      <div className="flex w-full justify-between items-center mb-2 sm:mb-6 bg-neutral-900 border border-neutral-800 p-2 sm:p-4 rounded-xl sm:rounded-2xl px-3 sm:px-4 shrink-0">
         <div>
           <div className="text-xs text-neutral-500 uppercase font-bold mb-1">Поточний Рахунок</div>
           <div className="text-2xl font-black text-white">{score}</div>
@@ -305,11 +305,11 @@ export default function Game2048({ setProfile, goBack, showToast }) {
       </div>
 
       <div
-        className="bg-neutral-900 p-2 sm:p-3 rounded-2xl border border-neutral-800 touch-none shadow-xl"
+        className="bg-neutral-900 p-1.5 sm:p-3 rounded-xl sm:rounded-2xl border border-neutral-800 touch-none shadow-xl shrink-0 flex justify-center items-center"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="relative w-full aspect-square">
+        <div className="relative aspect-square" style={{ width: 'min(50dvh, 90vw, 400px)' }}>
           {/* ФОНОВІ КЛІТИНКИ (порожні) */}
           {Array.from({ length: 16 }).map((_, idx) => {
             const i = Math.floor(idx / 4);
@@ -354,7 +354,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
         </div>
       </div>
 
-      <div className="mt-6 text-center text-sm text-neutral-500">
+      <div className="mt-2 sm:mt-6 text-center text-[10px] sm:text-sm text-neutral-500 shrink-0 px-2">
         Використовуйте стрілочки (або свайпи на телефоні), щоб об'єднувати плитки.
       </div>
 
