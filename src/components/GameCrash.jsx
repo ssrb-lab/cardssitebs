@@ -384,7 +384,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
                 value={bet}
                 onChange={(e) => setBet(Number(e.target.value))}
                 disabled={status === 'playing' || isLoading}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 sm:py-4 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 placeholder-neutral-700 disabled:opacity-50"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 sm:py-4 text-white font-black text-lg outline-none focus:border-red-500 transition-colors pl-10 pr-28 placeholder-neutral-700 disabled:opacity-50"
                 min="10"
               />
               <Coins
@@ -392,7 +392,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
                 size={20}
               />
 
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
                 <button
                   disabled={status === 'playing' || isLoading}
                   onClick={() => setBet((b) => Math.max(10, Math.floor(b / 2)))}
