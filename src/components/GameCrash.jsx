@@ -37,10 +37,10 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
       if (setProfile) setProfile(data.profile);
       setGameId(data.gameId);
       setStatus('playing');
-      setMultiplier(1.0);
       pathRef.current = [];
-      const startTime = Date.now();
-      startTimeRef.current = startTime;
+
+      let lastFrameTime = Date.now();
+      let simulatedTimeElapsed = 0;
 
       const animate = () => {
         if (!canvasRef.current || !rocketRef.current) return;
@@ -57,10 +57,17 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
         const width = canvas.width;
         const height = canvas.height;
-        const timeElapsed = Date.now() - startTime;
+
+        const now = Date.now();
+        const deltaTime = now - lastFrameTime;
+        lastFrameTime = now;
+
+        // Якщо гравець вже забрав гроші, пришвидшуємо час у 5 разів
+        const timeScale = hasCashedOutRef.current ? 5 : 1;
+        simulatedTimeElapsed += deltaTime * timeScale;
 
         // Розрахунок множника
-        const M = Math.max(1.0, Math.exp(0.00006 * timeElapsed));
+        const M = Math.max(1.0, Math.exp(0.00006 * simulatedTimeElapsed));
 
         if (M >= data.crashPoint) {
           setMultiplier(data.crashPoint);
@@ -78,7 +85,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           if (pathRef.current && pathRef.current.length > 0) {
             // Відтворюємо scaledPath для останнього M
             const currentMaxM = Math.max(2.0, data.crashPoint);
-            const currentMaxTime = Math.max(10000, timeElapsed);
+            const currentMaxTime = Math.max(10000, simulatedTimeElapsed);
             const finalPath = pathRef.current.map((p) => {
               let px = p.time / currentMaxTime;
               const x = 10 + width * 0.85 * px;
@@ -110,7 +117,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         // Зберігаємо не фізичні координати екрану, а координати [0...1] (прогрес часу і множника)
         // замість жорсткої прив'язки до Х.
         // Логіка: графік має відмальовувати реальну функцію M = e^(k*t).
-        pathRef.current.push({ time: timeElapsed, m: M });
+        pathRef.current.push({ time: simulatedTimeElapsed, m: M });
 
         // Очищаємо canvas
         ctx.clearRect(0, 0, width, height);
@@ -118,7 +125,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         // --- Логіка відмальовки графіка ---
         // Визначаємо динамічний масштаб для графіка.
         const currentMaxM = Math.max(2.0, M);
-        const currentMaxTime = Math.max(10000, timeElapsed); // Спочатку Х фіксований до 10 сек (доки йде розгін)
+        const currentMaxTime = Math.max(10000, simulatedTimeElapsed); // Спочатку Х фіксований до 10 сек (доки йде розгін)
 
         // Перераховуємо ВСІ попередні точки з новим масштабом, щоб графік "стягувався"
         const scaledPath = pathRef.current.map((p) => {
