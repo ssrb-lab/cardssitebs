@@ -194,7 +194,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             const markTime = Math.log(markM) / 0.00006;
 
             // Якщо час маркера раптом більший за поточний час гри, пропускаємо (хоча цикл це страхує)
-            if (markTime > timeElapsed) continue;
+            if (markTime > simulatedTimeElapsed) continue;
 
             const px = markTime / currentMaxTime;
             const x = 10 + width * 0.85 * px;
