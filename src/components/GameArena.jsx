@@ -27,7 +27,7 @@ import {
   deleteArenaPointRequest,
   captureArenaPointRequest,
   battleArenaPointRequest,
-  claimArenaCrystalsRequest,
+
   getToken,
 } from '../config/api';
 
@@ -67,7 +67,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const [deck, setDeck] = useState(() => {
     try {
       const saved = localStorage.getItem('arenaDeck');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Filter out stale cards that don't have statsIndex
+        const valid = parsed.filter(c => c.statsIndex !== undefined && c.statsIndex !== null);
+        if (valid.length !== parsed.length) localStorage.removeItem('arenaDeck');
+        return valid;
+      }
+      return [];
     } catch {
       return [];
     }
@@ -120,6 +127,19 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       }
     };
     loadPoints();
+  }, []);
+
+  // Auto-polling: оновлюємо точки кожні 10 секунд для всіх гравців
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const data = await fetchArenaPointsRequest(getToken());
+        setPoints(data);
+      } catch (err) {
+        // Тиха помилка - не заважаємо користувачу
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const clampPan = (currentPan, currentZoom) => {
@@ -248,6 +268,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       if (selectedPoint?.id === pointId) {
         setSelectedPoint(updatedPoint); // trigger refresh
       }
+      // Оновлюємо профіль (з defendingInstances) одразу після захоплення
+      if (setProfile && data.profile) {
+        setProfile(data.profile);
+      }
       setDeck([]);
       showToast(data.message || 'Точку успішно захоплено!', 'success');
     } catch (error) {
@@ -280,26 +304,6 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     setSelectedPoint(null); // Close sidebar
   };
 
-  const handleClaimCrystals = async (pointId, e) => {
-    if (e) e.stopPropagation();
-
-    try {
-      const data = await claimArenaCrystalsRequest(getToken(), pointId);
-      const updatedPoint = data.point;
-
-      setPoints(points.map((p) => (p.id === pointId ? updatedPoint : p)));
-      if (selectedPoint?.id === pointId) {
-        setSelectedPoint(updatedPoint);
-      }
-      if (setProfile && data.profile) {
-        setProfile(data.profile);
-      }
-      showToast(`Успішно зібрано ${data.earnedCrystals} кристалів!`, 'success');
-    } catch (error) {
-      showToast(error.message || 'Помилка збору кристалів.', 'error');
-    }
-  };
-
   const ownedGameCards = [];
   if (profile?.inventory && cardsCatalog) {
     profile.inventory.forEach((invItem) => {
@@ -328,13 +332,17 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           effectiveStats.push(defaultStat);
         }
 
-        effectiveStats.forEach((statObj, idx) => {
+        // Truncate to actual amount (gameStats may have stale extra entries from sold/traded copies)
+        const limitedStats = effectiveStats.slice(0, invItem.amount);
+
+        limitedStats.forEach((statObj, idx) => {
           if (statObj.power > 0) {
             ownedGameCards.push({
               ...cardDetails,
               uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`, // Stable ID
               power: statObj.power,
               hp: statObj.hp,
+              statsIndex: idx,
             });
           }
         });
@@ -559,13 +567,22 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const isSelected = deck.find((c) => c.id === card.id);
                     if (isSelected) return null; // Hide from inventory if already in deck
 
+                    const isDefending = profile?.defendingInstances?.some(
+                      inst => inst.cardId === card.id && inst.statsIndex === card.statsIndex
+                    );
+
                     return (
                       <div
                         key={card.uniqueInstanceId}
-                        onClick={() => handleToggleCard(card)}
-                        className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 cursor-pointer hover:-translate-y-1 hover:border-indigo-500 transition-all ${getCardStyle(card.rarity).border}`}
-                        title={card.name}
+                        onClick={() => !isDefending && handleToggleCard(card)}
+                        className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 transition-all ${getCardStyle(card.rarity).border} ${isDefending ? 'grayscale opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:border-indigo-500'}`}
+                        title={isDefending ? "Захищає точку на Арені" : card.name}
                       >
+                        {isDefending && (
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
+                            Захищає
+                          </div>
+                        )}
                         <div className="absolute top-1 right-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1 border border-neutral-700 shadow-md">
                           <Zap size={8} className="text-yellow-400" /> {card.power}{' '}
                           <span className="text-red-500 ml-0.5">❤️</span>{' '}
@@ -750,7 +767,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               }}
             >
               <img
-                src="/arena map/mapa.png"
+                src="/arena map/mapa.avif"
                 alt="Arena Map"
                 className="max-w-none shadow-2xl rounded-sm object-contain select-none pointer-events-none"
                 draggable="false"
@@ -878,36 +895,17 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   </div>
                 )}
 
-                {selectedPoint.crystalRatePerHour > 0 &&
-                  (() => {
-                    let claimableCrystals = 0;
-                    if (selectedPoint.crystalsLastClaimedAt) {
-                      const lastClaimed = new Date(selectedPoint.crystalsLastClaimedAt).getTime();
-                      const hoursElapsed = (now - lastClaimed) / (1000 * 60 * 60);
-                      claimableCrystals = Math.floor(
-                        hoursElapsed * selectedPoint.crystalRatePerHour
-                      );
-                    }
-
-                    return (
-                      <div className="flex flex-col gap-2 mt-1 border-t border-neutral-800/50 pt-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-neutral-400">Фарм кристалів:</span>
-                          <span className="text-fuchsia-400 font-bold flex items-center gap-1">
-                            <Gem size={14} /> {selectedPoint.crystalRatePerHour} / год
-                          </span>
-                        </div>
-                        {selectedPoint.ownerId === profile?.uid && claimableCrystals > 0 && (
-                          <button
-                            onClick={(e) => handleClaimCrystals(selectedPoint.id, e)}
-                            className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2 mt-1 rounded-xl text-sm transition-colors shadow-[0_0_15px_rgba(217,70,239,0.2)] flex items-center justify-center gap-2"
-                          >
-                            <Gem size={16} /> Зібрати {claimableCrystals}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()}
+                {selectedPoint.crystalRatePerHour > 0 && (
+                  <div className="flex flex-col gap-2 mt-1 border-t border-neutral-800/50 pt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-400">Фарм кристалів:</span>
+                      <span className="text-fuchsia-400 font-bold flex items-center gap-1">
+                        <Gem size={14} /> {selectedPoint.crystalRatePerHour} / год
+                      </span>
+                    </div>
+                    <div className="text-xs text-neutral-500 italic">Нараховуються автоматично</div>
+                  </div>
+                )}
               </div>
 
               {/* Defending Cards Showcase */}

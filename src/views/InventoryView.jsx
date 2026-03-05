@@ -22,18 +22,18 @@ const RARITY_MIN_POWER = {
   Звичайна: 5,
 };
 
-// Повертає масив об'єктів { power, hp, isRecorded } для картки.
+// Повертає масив об'єктів { power, hp, isRecorded, statsIndex } для картки.
 // isRecorded=false: сила не записана в БД (мінімальний заповнювач).
 function getEffectivePowers(item, packsCatalog = []) {
-  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map(s => parseGameStat(s, item.card.rarity)) : [];
+  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map((s, idx) => ({ ...parseGameStat(s, item.card.rarity), statsIndex: idx })) : [];
   const pack = packsCatalog.find((p) => p.id === item.card.packId);
   const isGameCard = item.card.isGame || (pack && pack.isGame) || recorded.length > 0;
   if (!isGameCard) return [];
   const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
   const parsedDefault = parseGameStat(minPower, item.card.rarity);
-  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true }));
+  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true, statsIndex: v.statsIndex }));
   while (powers.length < item.amount) {
-    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false });
+    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: null });
   }
   return powers;
 }
@@ -286,6 +286,11 @@ export default function InventoryView({
                   const powers = getEffectivePowers(item, packsCatalog);
                   const isGameItem = powers.length > 0;
                   const powerValues = powers.map((p) => p.value);
+
+                  const defendingCountForCard = profile?.defendingInstances?.filter(inst => inst.cardId === item.card.id).length || 0;
+                  const basicDefendingDisabled = !isGameItem && (item.amount - 1 < defendingCountForCard);
+                  const allBasicDefending = !isGameItem && item.amount <= defendingCountForCard;
+
                   return (
                     <div
                       key={item.card.id}
@@ -296,10 +301,15 @@ export default function InventoryView({
                         onClick={() =>
                           isGameItem
                             ? setViewingGameCard({ ...item })
-                            : setViewingCard({ card: item.card, amount: item.amount })
+                            : (!allBasicDefending && setViewingCard({ card: item.card, amount: item.amount }))
                         }
-                        className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform`}
+                        className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
                       >
+                        {allBasicDefending && (
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[10px] px-2 py-1 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
+                            Захищає Арену
+                          </div>
+                        )}
                         {Number(item.card.maxSupply) > 0 && (
                           <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
                             {item.card.maxSupply}
@@ -370,11 +380,12 @@ export default function InventoryView({
                             {!isGameItem ? (
                               <>
                                 <button
+                                  disabled={basicDefendingDisabled}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     sellDuplicate(item.card.id);
                                   }}
-                                  className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-neutral-200 font-bold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                                  className={`w-full ${basicDefendingDisabled ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed' : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]'} text-xs py-2 rounded-lg font-bold transition-all`}
                                 >
                                   Продати (+{currentSellPrice}{' '}
                                   <Coins size={10} className="inline text-yellow-500" />)
@@ -382,22 +393,24 @@ export default function InventoryView({
                                 <div className="flex gap-1.5 w-full">
                                   {item.amount > 2 && (
                                     <button
+                                      disabled={basicDefendingDisabled}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         sellAllDuplicates(item.card.id);
                                       }}
-                                      className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50"
+                                      className={`flex-1 ${basicDefendingDisabled ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-neutral-800/80 hover:bg-red-900/50 text-neutral-400 hover:border-red-900/50 border-neutral-700'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
                                       title="Залишити лише 1"
                                     >
                                       Всі (-1)
                                     </button>
                                   )}
                                   <button
+                                    disabled={allBasicDefending}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setListingCard(item.card);
                                     }}
-                                    className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-[10px] py-1.5 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
+                                    className={`flex-1 ${allBasicDefending ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
                                   >
                                     На Ринок
                                   </button>
@@ -416,11 +429,12 @@ export default function InventoryView({
                                 </button>
                                 {item.amount > 2 && (
                                   <button
+                                    disabled={defendingCountForCard >= item.amount - 1}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       sellAllDuplicates(item.card.id);
                                     }}
-                                    className="w-full bg-neutral-800/80 hover:bg-red-900/50 text-[10px] py-1.5 rounded-lg text-neutral-400 font-bold transition-all border border-neutral-700 hover:border-red-900/50"
+                                    className={`w-full ${defendingCountForCard >= item.amount - 1 ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-neutral-800/80 hover:bg-red-900/50 text-neutral-400 hover:border-red-900/50 border-neutral-700'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
                                     title="Продати всі дублікати, залишити найсильнішу"
                                   >
                                     Всі (-1) 🗡
@@ -435,13 +449,14 @@ export default function InventoryView({
                               Один екземпляр
                             </div>
                             <button
+                              disabled={!isGameItem && allBasicDefending}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 isGameItem
                                   ? setViewingGameCard({ ...item })
                                   : setListingCard(item.card);
                               }}
-                              className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
+                              className={`w-full ${!isGameItem && allBasicDefending ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
                             >
                               {isGameItem ? 'Управління (Ігрова)' : 'Виставити на Ринок'}
                             </button>
@@ -717,11 +732,19 @@ export default function InventoryView({
                       const powerVal = powerObj.power;
                       const hpVal = powerObj.hp;
                       const isRec = powerObj.isRecorded;
+                      const isDefending = profile?.defendingInstances?.some(
+                        inst => inst.cardId === viewingGameCard.card.id && inst.statsIndex === powerObj.statsIndex
+                      );
                       return (
                         <div
                           key={idx}
-                          className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center text-center"
+                          className={`bg-neutral-950 border ${isDefending ? 'border-red-900/50 grayscale opacity-70' : 'border-neutral-800'} rounded-2xl p-4 flex flex-col items-center text-center relative`}
                         >
+                          {isDefending && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10 shadow-lg">
+                              Захищає Арену
+                            </div>
+                          )}
                           <div className="flex justify-center gap-4 mb-2">
                             <div className="flex flex-col items-center">
                               <div className="text-3xl font-black text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">
@@ -741,6 +764,7 @@ export default function InventoryView({
                           </div>
                           <div className="flex flex-col gap-2 w-full mt-auto">
                             <button
+                              disabled={isDefending}
                               onClick={async () => {
                                 const success = await sellDuplicate(
                                   viewingGameCard.card.id,
@@ -763,12 +787,13 @@ export default function InventoryView({
                                   }
                                 }
                               }}
-                              className="w-full bg-neutral-800 hover:bg-neutral-700 text-xs py-2 rounded-lg text-white font-bold transition-all"
+                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed' : 'bg-neutral-800 hover:bg-neutral-700 text-white'} text-xs py-2 rounded-lg font-bold transition-all`}
                             >
                               Продати (+{price}{' '}
                               <Coins size={10} className="inline text-yellow-500" />)
                             </button>
                             <button
+                              disabled={isDefending}
                               onClick={() => {
                                 setListingCard({
                                   ...viewingGameCard.card,
@@ -777,7 +802,7 @@ export default function InventoryView({
                                 });
                                 setViewingGameCard(null);
                               }}
-                              className="w-full bg-blue-900/40 hover:bg-blue-600 text-xs py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
+                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 border-neutral-700 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
                             >
                               На Ринок
                             </button>

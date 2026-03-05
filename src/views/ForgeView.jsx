@@ -46,6 +46,7 @@ export default function ForgeView({
           card: item.card,
           power: parsed.power,
           hp: parsed.hp,
+          statsIndex: index,
           uniqueKey: `${item.card.id}-${index}-${parsed.power}-${parsed.hp}`,
         });
       });
@@ -249,13 +250,15 @@ export default function ForgeView({
             const style = getCardStyle(item.card.rarity, rarities);
             const isSelected =
               selectedCard?.card.id === item.card.id && selectedCard?.power === item.power && selectedCard?.hp === item.hp;
+            const isDefending = profile?.defendingInstances?.some(inst => inst.cardId === item.card.id && inst.statsIndex === item.statsIndex);
 
             return (
               <div
                 key={item.uniqueKey}
-                onClick={() => !isForging && setSelectedCard(item)}
-                className={`flex flex-col items-center group cursor-pointer animate-in fade-in duration-300 relative ${isSelected ? '-translate-y-2' : ''}`}
+                onClick={() => !isForging && !isDefending && setSelectedCard(item)}
+                className={`flex flex-col items-center group animate-in fade-in duration-300 relative ${isSelected ? '-translate-y-2' : ''} ${isDefending ? 'grayscale opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 style={{ animationDelay: `${index * 15}ms`, fillMode: 'backwards' }}
+                title={isDefending ? "Захищає точку на Арені" : ""}
               >
                 <div
                   className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} hover:border-neutral-400`}`}

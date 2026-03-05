@@ -65,7 +65,7 @@ import RatingView from './views/RatingView';
 import PublicProfileView from './views/PublicProfileView';
 import AdminView from './views/AdminView';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cardgameapp.space/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function App() {
   const [user, setUser] = useState(undefined);

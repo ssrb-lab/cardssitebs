@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Keyboard, Loader2, Play } from 'lucide-react';
 import { getToken } from '../config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cardgameapp.space/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const UKRAINIAN_ALPHABET = [
   ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'],
@@ -274,10 +274,9 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
             onClick={startGame}
             disabled={isProcessing || dailyAttempts >= 5}
             className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg flex justify-center items-center gap-2 relative z-10
-              ${
-                dailyAttempts >= 5 || isProcessing
-                  ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-105'
+              ${dailyAttempts >= 5 || isProcessing
+                ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-105'
               }`}
           >
             {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <Play size={24} />}
