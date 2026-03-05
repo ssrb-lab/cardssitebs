@@ -827,7 +827,12 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
     if (!pack) return res.status(404).json({ error: 'Пак не знайдено' });
 
-    const totalCost = pack.cost * amount;
+    const amountToOpen = Number(amount);
+    if (!Number.isInteger(amountToOpen) || amountToOpen <= 0) {
+      return res.status(400).json({ error: 'Невірна кількість паків!' });
+    }
+
+    const totalCost = pack.cost * amountToOpen;
     if (user.coins < totalCost) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     if (pack.isPremiumOnly && (!user.isPremium || new Date(user.premiumUntil) < new Date())) {
@@ -3652,26 +3657,42 @@ app.post('/api/profile/change-nickname', authenticate, async (req, res) => {
   }
 });
 
-// Покупка преміум-товару
 app.post('/api/game/premium-shop/buy', authenticate, async (req, res) => {
   const { item } = req.body;
+
+  if (!item || !item.itemId) {
+    return res.status(400).json({ error: 'Недійсний товар!' });
+  }
+
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     if (!user.isPremium || new Date(user.premiumUntil) < new Date()) {
       return res.status(403).json({ error: 'Тільки для Преміум гравців!' });
     }
-    if (user.coins < item.price) return res.status(400).json({ error: 'Недостатньо монет!' });
+
+    // БЕЗПЕКА: Дістаємо ціну з бази даних, а не довіряємо клієнту
+    const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
+    const premiumItems = settings?.data?.premiumShopItems || [];
+    const realItem = premiumItems.find(i => i.id === item.itemId);
+
+    if (!realItem) {
+      return res.status(404).json({ error: 'Товар не знайдено в магазині!' });
+    }
+
+    const realPrice = Number(realItem.price);
+
+    if (user.coins < realPrice) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { decrement: item.price }, totalCards: { increment: 1 } },
+        data: { coins: { decrement: realPrice }, totalCards: { increment: 1 } },
       });
-      if (item.type === 'card') {
+      if (realItem.type === 'card') {
         await tx.inventoryItem.upsert({
-          where: { userId_cardId: { userId: user.uid, cardId: item.itemId } },
+          where: { userId_cardId: { userId: user.uid, cardId: realItem.id } },
           update: { amount: { increment: 1 } },
-          create: { userId: user.uid, cardId: item.itemId, amount: 1 },
+          create: { userId: user.uid, cardId: realItem.id, amount: 1 },
         });
       }
     });
@@ -3856,7 +3877,20 @@ app.get('/api/wordle/state', authenticate, async (req, res) => {
       dailyAttempts = 0;
     }
 
-    res.json({ state: user.wordleState, dailyAttempts });
+    // Безпека: Приховуємо слово, якщо гра ще не закінчилась
+    let safeState = user.wordleState;
+    if (typeof safeState === 'string') {
+      try { safeState = JSON.parse(safeState); } catch (e) { }
+    }
+
+    if (safeState && typeof safeState === 'object') {
+      safeState = { ...safeState }; // Shallow copy
+      if (safeState.status === 'playing') {
+        delete safeState.word;
+      }
+    }
+
+    res.json({ state: safeState, dailyAttempts });
   } catch (err) {
     res.status(500).json({ error: 'Помилка отримання стану Wordle.' });
   }
@@ -3910,9 +3944,13 @@ app.post('/api/wordle/start', authenticate, async (req, res) => {
       data: updateData,
     });
 
+    // Безпека: Ховаємо слово при старті гри, воно має бути на бекенді, але не у клієнта
+    const safeResponseState = { ...newState };
+    delete safeResponseState.word;
+
     res.json({
       success: true,
-      state: newState,
+      state: safeResponseState,
       profile: updatedUser,
       dailyAttempts: dailyAttempts + 1,
     });
@@ -4051,6 +4089,11 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
       for (const item of items) {
         const card = await tx.cardCatalog.findUnique({ where: { id: item.cardId } });
         if (!card) continue;
+
+        const sellAmount = Number(item.amount);
+        if (!Number.isInteger(sellAmount) || sellAmount <= 0) {
+          throw new Error('Невірна кількість для продажу!');
+        }
 
         if (card.maxSupply > 0) {
           throw new Error(
