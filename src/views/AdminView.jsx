@@ -98,6 +98,8 @@ export default function AdminView({
   const [viewingUser, setViewingUser] = useState(null);
   const [userInventory, setUserInventory] = useState([]);
   const [loadingUserInv, setLoadingUserInv] = useState(false);
+  const [invPackFilter, setInvPackFilter] = useState('all');
+  const [invSearchTerm, setInvSearchTerm] = useState('');
   const [adminUserSearchTerm, setAdminUserSearchTerm] = useState('');
 
   const [banModalUser, setBanModalUser] = useState(null);
@@ -322,6 +324,8 @@ export default function AdminView({
 
   const handleInspectUser = async (uid) => {
     setLoadingUserInv(true);
+    setInvPackFilter('all');
+    setInvSearchTerm('');
     const u = allUsers.find((x) => x.uid === uid);
     setViewingUser(u);
     if (u) {
@@ -1205,7 +1209,7 @@ export default function AdminView({
               onClick={() => setActiveTab('notifications')}
               className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'notifications' ? 'bg-blue-600 text-white' : 'text-blue-400/70 hover:bg-neutral-800'}`}
             >
-              <Mail size={18} /> Сповіщення
+              <Mail size={18} className="shrink-0" /> Сповіщення
             </button>
             <button
               onClick={() => setActiveTab('premiumShop')}
@@ -1360,8 +1364,8 @@ export default function AdminView({
                 </button>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
+              <div className="flex flex-col xl:flex-row gap-4 mb-6">
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-neutral-400 font-bold mb-1 block">
                       Встановити точний баланс:
@@ -1375,13 +1379,13 @@ export default function AdminView({
                   </div>
                   <button
                     onClick={setExactCoinsToUser}
-                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors h-10"
+                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors flex-1 min-h-[40px]"
                   >
                     Встановити
                   </button>
                 </div>
 
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-neutral-400 font-bold mb-1 block">
                       Рівень Босів (Фарм):
@@ -1394,17 +1398,17 @@ export default function AdminView({
                       className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-red-500"
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-1">
                     <button
                       onClick={setPlayerFarmLevel}
-                      className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg flex-1 transition-colors h-10"
+                      className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg flex-1 transition-colors min-h-[40px] whitespace-nowrap"
                     >
-                      Встановити рівень
+                      Рівень
                     </button>
                     {/* КНОПКА СКИНУТИ КД (В ДЕТАЛЬНОМУ ПРОФІЛІ) */}
                     <button
                       onClick={() => resetPlayerCooldown(viewingUser.uid, viewingUser.nickname)}
-                      className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg transition-colors h-10"
+                      className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg transition-colors min-h-[40px]"
                       title="Скинути таймер боса"
                     >
                       <Zap size={20} className="mx-auto" />
@@ -1412,17 +1416,17 @@ export default function AdminView({
                   </div>
                 </div>
 
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mt-4">
-                  <h4 className="font-bold text-neutral-300 mb-2">Ринок:</h4>
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
+                  <h4 className="font-bold text-neutral-300 mb-2 mt-1 xl:mt-0">Ринок:</h4>
                   <button
                     onClick={clearUserHistory}
-                    className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-2 rounded-xl transition-colors border border-red-900/50"
+                    className="w-full bg-red-900/40 hover:bg-red-900 text-red-400 hover:text-white font-bold py-2 rounded-xl transition-colors border border-red-900/50 flex-1 min-h-[40px]"
                   >
                     Очистити історію ринку цього гравця
                   </button>
                 </div>
 
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-yellow-500 font-bold mb-1 block">
                       +/- Монети:
@@ -1436,13 +1440,13 @@ export default function AdminView({
                   </div>
                   <button
                     onClick={giveCoinsToUser}
-                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors h-10"
+                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors flex-1 min-h-[40px] whitespace-nowrap"
                   >
                     Додати/Відняти
                   </button>
                 </div>
 
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-purple-400 font-bold mb-1 block">
                       +/- Кристали: (Поточне: {viewingUser.crystals})
@@ -1456,7 +1460,7 @@ export default function AdminView({
                   </div>
                   <button
                     onClick={giveCrystalsToUser}
-                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg w-full transition-colors h-10"
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg w-full transition-colors flex-1 min-h-[40px] whitespace-nowrap"
                   >
                     Додати/Відняти
                   </button>
@@ -1509,55 +1513,115 @@ export default function AdminView({
                 </div>
               </div>
 
+              {/* Фільтри інвентарю гравця */}
+              <div className="flex flex-col sm:flex-row gap-3 mb-4 mt-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Пошук картки за назвою..."
+                    value={invSearchTerm}
+                    onChange={(e) => setInvSearchTerm(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none"
+                  />
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 w-5 h-5" />
+                  <select
+                    value={invPackFilter}
+                    onChange={(e) => setInvPackFilter(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:border-purple-500 outline-none appearance-none"
+                  >
+                    <option value="all">Усі паки</option>
+                    {packsCatalog.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {loadingUserInv ? (
                 <div className="py-10 text-center text-neutral-500">
                   <Loader2 className="animate-spin mx-auto w-8 h-8" />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 mt-6">
-                  {userInventory.map((invItem) => {
-                    const c = cardsCatalog.find((cat) => cat.id === invItem.id);
-                    if (!c) return null;
-                    const style = getCardStyle(c.rarity, rarities);
-                    const effectClass = c.effect ? `effect-${c.effect}` : '';
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 mt-2">
+                  {userInventory
+                    .filter((invItem) => {
+                      const c = cardsCatalog.find((cat) => cat.id === invItem.id);
+                      if (!c) return false;
+                      const matchesSearch = invSearchTerm
+                        ? c.name.toLowerCase().includes(invSearchTerm.toLowerCase())
+                        : true;
+                      const matchesPack = invPackFilter === 'all' || c.packId === invPackFilter;
+                      return matchesSearch && matchesPack;
+                    })
+                    .map((invItem) => {
+                      const c = cardsCatalog.find((cat) => cat.id === invItem.id);
+                      if (!c) return null;
+                      const style = getCardStyle(c.rarity, rarities);
+                      const effectClass = c.effect ? `effect-${c.effect}` : '';
+                      const isGif = c.image && c.image.toLowerCase().endsWith('.gif');
 
-                    return (
-                      <div
-                        key={invItem.id}
-                        className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass} cursor-pointer transition-transform hover:-translate-y-1`}
-                        onClick={() => setViewingCard({ card: c, amount: invItem.amount })}
-                      >
-                        <CardFrame frame={c.frame}>
-                          <img
-                            src={c.image}
-                            alt={c.name}
-                            className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
-                            loading="lazy"
-                          />
-                        </CardFrame>
-                        <div className="text-[10px] font-bold text-white truncate w-full text-center mt-1">
-                          {c.name}
-                        </div>
-                        <div className="text-xs font-black text-yellow-500 mb-1 z-10">
-                          x{invItem.amount}
-                        </div>
+                      return (
+                        <div
+                          key={invItem.id}
+                          className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass} cursor-pointer transition-transform hover:-translate-y-1`}
+                          onClick={() => setViewingCard({ card: c, amount: invItem.amount })}
+                        >
+                          <CardFrame frame={c.frame}>
+                            {isGif ? (
+                              <canvas
+                                className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
+                                ref={(canvas) => {
+                                  if (!canvas || canvas.dataset.drawn) return;
+                                  canvas.dataset.drawn = 'true';
+                                  const img = new Image();
+                                  img.onload = () => {
+                                    setTimeout(() => {
+                                      canvas.width = img.naturalWidth;
+                                      canvas.height = img.naturalHeight;
+                                      const ctx = canvas.getContext('2d');
+                                      ctx.drawImage(img, 0, 0);
+                                    }, 150);
+                                  };
+                                  img.src = c.image;
+                                }}
+                              />
+                            ) : (
+                              <img
+                                src={c.image}
+                                alt={c.name}
+                                className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
+                                loading="lazy"
+                              />
+                            )}
+                          </CardFrame>
+                          <div className="text-[10px] font-bold text-white truncate w-full text-center mt-1">
+                            {c.name}
+                          </div>
+                          <div className="text-xs font-black text-yellow-500 mb-1 z-10">
+                            x{invItem.amount}
+                          </div>
 
-                        {/* Admin Action Overlay */}
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20 pointer-events-none">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats);
-                            }}
-                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-xl font-bold font-mono text-xs shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform pointer-events-auto"
-                            title="Управління (Ігрова) / Вилучити"
-                          >
-                            Управління
-                          </button>
+                          {/* Admin Action Overlay */}
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20 pointer-events-none">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats);
+                              }}
+                              className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-xl font-bold font-mono text-xs shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform pointer-events-auto"
+                              title="Управління (Ігрова) / Вилучити"
+                            >
+                              Управління
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                   {userInventory.length === 0 && (
                     <p className="col-span-full text-neutral-500">Інвентар порожній.</p>
                   )}
