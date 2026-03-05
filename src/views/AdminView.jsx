@@ -974,7 +974,7 @@ export default function AdminView({
   );
 
   return (
-    <div className="max-w-4xl mx-auto pb-10 relative">
+    <div className="max-w-[95%] xl:max-w-7xl mx-auto pb-10 relative">
       {/* МОДАЛКА БАНУ */}
       {banModalUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -1427,7 +1427,7 @@ export default function AdminView({
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mt-4">
                   <h4 className="font-bold text-neutral-300 mb-4">Статистика Гравця</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                     {[
                       { key: 'crystals', label: 'Кристали', current: viewingUser.crystals },
                       { key: 'totalCards', label: 'Всього карток', current: viewingUser.totalCards },
@@ -1473,7 +1473,7 @@ export default function AdminView({
                   <Loader2 className="animate-spin mx-auto w-8 h-8" />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 mt-6">
                   {userInventory.map((invItem) => {
                     const c = cardsCatalog.find((cat) => cat.id === invItem.id);
                     if (!c) return null;
@@ -1692,7 +1692,7 @@ export default function AdminView({
               <Settings className="text-blue-500" /> Глобальні Налаштування
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
                 <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">
                   Ціна Преміум-Акаунту (Монети):
@@ -1937,7 +1937,7 @@ export default function AdminView({
           </form>
 
           {/* Список існуючих Босів */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-8">
             {[...(bosses || [])]
               .sort((a, b) => a.level - b.level)
               .map((boss) => {
@@ -2069,7 +2069,7 @@ export default function AdminView({
             </button>
           </form>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {premiumShopItems.map((item) => {
               const cDef = cardsCatalog.find((c) => c.id === item.itemId);
               return (
@@ -2427,7 +2427,7 @@ export default function AdminView({
             </div>
           </form>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allAchievements.map((a) => {
               const pack = packsCatalog.find((p) => p.id === a.packId);
               return (
@@ -2486,7 +2486,7 @@ export default function AdminView({
             <h3 className="text-xl font-bold mb-4 text-purple-400">
               {editingPack ? `Редагування Паку` : 'Створити Пак'}
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
               <input
                 type="text"
                 placeholder="Назва Паку"
@@ -2584,7 +2584,7 @@ export default function AdminView({
                   <h4 className="text-neutral-400 text-sm font-bold mb-3">
                     Кастомні діапазони ХП і Сили для паку (залиште пустими для стандартних):
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                     {rarities.map((r) => (
                       <div key={`stats-${r.name}`} className="flex flex-col gap-1 p-2 bg-neutral-900 border border-neutral-700 rounded-lg">
                         <label className="text-xs font-bold text-center text-purple-400">{r.name}</label>
@@ -2698,7 +2698,7 @@ export default function AdminView({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredPacks.map((pack) => (
               <div
                 key={pack.id}
