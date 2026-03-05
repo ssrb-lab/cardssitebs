@@ -181,13 +181,12 @@ export default function AdminView({
   });
 
   const [adminStatsForm, setAdminStatsForm] = useState({
-    crystals: '',
-    totalCards: '',
-    uniqueCardsCount: '',
     packsOpened: '',
     coinsSpentOnPacks: '',
     coinsEarnedFromPacks: '',
   });
+
+  const [adminAddCrystalsAmount, setAdminAddCrystalsAmount] = useState(10);
 
   const [packSearchTerm, setPackSearchTerm] = useState('');
   const [cardSearchTerm, setCardSearchTerm] = useState('');
@@ -418,12 +417,29 @@ export default function AdminView({
         exact: false,
       });
       if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
-      showToast('Баланс змінено.', 'success');
+      showToast('Баланс монет змінено.', 'success');
       setViewingUser(data.profile);
       setAdminAddCoinsAmount(100);
       loadUsers();
     } catch {
       showToast('Помилка монет.', 'error');
+    }
+  };
+
+  const giveCrystalsToUser = async () => {
+    if (!adminAddCrystalsAmount) return;
+    try {
+      const data = await adminUserActionRequest(getToken(), 'crystals', viewingUser.uid, {
+        amount: adminAddCrystalsAmount,
+        exact: false,
+      });
+      if (viewingUser.uid === currentProfile.uid) setProfile(data.profile);
+      showToast('Баланс кристалів змінено.', 'success');
+      setViewingUser(data.profile);
+      setAdminAddCrystalsAmount(10);
+      loadUsers();
+    } catch {
+      showToast('Помилка кристалів.', 'error');
     }
   };
 
@@ -1407,8 +1423,8 @@ export default function AdminView({
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
                   <div>
-                    <label className="text-xs text-neutral-400 font-bold mb-1 block">
-                      Нарахувати / Відняти монети (можна з мінусом):
+                    <label className="text-xs text-yellow-500 font-bold mb-1 block">
+                      +/- Монети:
                     </label>
                     <input
                       type="number"
@@ -1425,6 +1441,26 @@ export default function AdminView({
                   </button>
                 </div>
 
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3 justify-end">
+                  <div>
+                    <label className="text-xs text-purple-400 font-bold mb-1 block">
+                      +/- Кристали: (Поточне: {viewingUser.crystals})
+                    </label>
+                    <input
+                      type="number"
+                      value={adminAddCrystalsAmount}
+                      onChange={(e) => setAdminAddCrystalsAmount(Number(e.target.value))}
+                      className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
+                    />
+                  </div>
+                  <button
+                    onClick={giveCrystalsToUser}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg w-full transition-colors h-10"
+                  >
+                    Додати/Відняти
+                  </button>
+                </div>
+
               </div>
 
               {/* Рядок зі Статистикою гравця (на всю ширину) */}
@@ -1432,11 +1468,8 @@ export default function AdminView({
                 <h4 className="font-bold text-purple-300 text-lg mb-6 flex items-center gap-2">
                   <span>📊</span> Статистика Гравця
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                   {[
-                    { key: 'crystals', label: 'Кристали', current: viewingUser.crystals },
-                    { key: 'totalCards', label: 'Всього карток', current: viewingUser.totalCards },
-                    { key: 'uniqueCardsCount', label: 'Унік. карток', current: viewingUser.uniqueCardsCount },
                     { key: 'packsOpened', label: 'Відкрито паків', current: viewingUser.packsOpened },
                     { key: 'coinsSpentOnPacks', label: 'Витрачено на паки', current: viewingUser.coinsSpentOnPacks },
                     { key: 'coinsEarnedFromPacks', label: 'Зароблено з паків', current: viewingUser.coinsEarnedFromPacks },

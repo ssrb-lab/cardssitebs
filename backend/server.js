@@ -3356,6 +3356,20 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
           data: { nickname: payload.nickname },
         });
         break;
+      case 'crystals':
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { crystals: payload.exact ? payload.amount : { increment: payload.amount } },
+        });
+        await prisma.notification.create({
+          data: {
+            userId: targetUid,
+            type: 'admin_action',
+            title: 'Зміна кристалів',
+            message: `Адміністратор змінив ваш баланс кристалів. ${payload.exact ? 'Новий баланс: ' + payload.amount : 'Різниця: ' + payload.amount}`,
+          },
+        });
+        break;
       case 'coins':
         updatedUser = await prisma.user.update({
           where: { uid: targetUid },
