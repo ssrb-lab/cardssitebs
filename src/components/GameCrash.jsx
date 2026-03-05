@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Rocket, Coins, Loader2, Play, Flame } from 'lucide-react';
-import { startCrashGameRequest, claimCrashRewardRequest } from '../config/api';
+import {
+  startCrashGameRequest,
+  claimCrashRewardRequest,
+  pollCrashStatusRequest,
+} from '../config/api';
 
 export default function GameCrash({ profile, setProfile, goBack, showToast }) {
   const [bet, setBet] = useState(10);
@@ -11,6 +15,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
   const [isLoading, setIsLoading] = useState(false);
   const [winStatus, setWinStatus] = useState(null);
   const [cashedOutAt, setCashedOutAt] = useState(null);
+  const [serverSeed, setServerSeed] = useState(null); // To store and show the original seed later
 
   const animationRef = useRef(null);
   const startTimeRef = useRef(0);
@@ -30,6 +35,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
     setIsLoading(true);
     setWinStatus(null);
     setCashedOutAt(null);
+    setServerSeed(null);
     hasCashedOutRef.current = false;
 
     try {
@@ -41,9 +47,36 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
       let lastFrameTime = Date.now();
       let simulatedTimeElapsed = 0;
+      let isCrashedFromServer = false;
+      let serverFinalCrashPoint = null;
+
+      // Start polling the server
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await pollCrashStatusRequest(
+            localStorage.getItem('token'),
+            data.gameId
+          );
+          if (statusRes.status === 'crashed') {
+            isCrashedFromServer = true;
+            serverFinalCrashPoint = statusRes.crashPoint;
+            setServerSeed(statusRes.serverSeed);
+            clearInterval(pollInterval);
+          } else if (statusRes.status === 'cashed_out') {
+            // Player successfully cashed out
+            // Continue polling to find out when the game actually crashes
+            // so we can stop the animation correctly
+          }
+        } catch (err) {
+          console.error('Polling error', err);
+        }
+      }, 500);
 
       const animate = () => {
-        if (!canvasRef.current || !rocketRef.current) return;
+        if (!canvasRef.current || !rocketRef.current) {
+          clearInterval(pollInterval);
+          return;
+        }
 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -62,32 +95,30 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         const deltaTime = now - lastFrameTime;
         lastFrameTime = now;
 
-        // Якщо гравець вже забрав гроші, пришвидшуємо час у 5 разів
-        const timeScale = hasCashedOutRef.current ? 5 : 1;
-        simulatedTimeElapsed += deltaTime * timeScale;
-
-        // Зберігаємо поточний час в ref для фінального кадру
+        // Якщо гравець вже забрав гроші, але гра ще не крашнулась, продовжуємо звичну анімацію
+        simulatedTimeElapsed += deltaTime;
         startTimeRef.current = simulatedTimeElapsed;
 
-        // Розрахунок множника
+        // Розрахунок поточного множника на клієнті
         const M = Math.max(1.0, Math.exp(0.00006 * simulatedTimeElapsed));
 
-        if (M >= data.crashPoint) {
-          setMultiplier(data.crashPoint);
+        if (isCrashedFromServer || (serverFinalCrashPoint && M >= serverFinalCrashPoint)) {
+          const finalCrashPoint = serverFinalCrashPoint || M;
+          setMultiplier(finalCrashPoint);
           setStatus('crashed');
-          setHistory((prev) => [data.crashPoint, ...prev].slice(0, 5));
+          setHistory((prev) => [finalCrashPoint, ...prev].slice(0, 5));
           if (!hasCashedOutRef.current) {
             setWinStatus({ result: 'loss', amount: bet });
           }
+          clearInterval(pollInterval);
 
           // Останній кадр крашу
-          const finalTime = Math.log(data.crashPoint) / 0.00006;
-          const currentMaxM = Math.max(2.0, data.crashPoint);
+          const finalTime = Math.log(finalCrashPoint) / 0.00006;
+          const currentMaxM = Math.max(2.0, finalCrashPoint);
           const currentMaxTime = Math.max(10000, finalTime);
 
           ctx.beginPath();
           let firstPoint = true;
-          let lastFinalP = { x: 0, y: 0 };
 
           // Малюємо математичну дугу до точки крашу
           for (let t = 0; t <= finalTime; t += Math.max(16, finalTime / 100)) {
@@ -103,13 +134,12 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             } else {
               ctx.lineTo(x, y);
             }
-            lastFinalP = { x, y };
           }
 
           // Додаємо саму останню точну точку
           const finalPx = finalTime / currentMaxTime;
           const finalX = 10 + width * 0.85 * finalPx;
-          const finalProgressY = (data.crashPoint - 1) / (currentMaxM - 1);
+          const finalProgressY = (finalCrashPoint - 1) / (currentMaxM - 1);
           const finalY = height - 10 - height * 0.8 * finalProgressY;
           ctx.lineTo(finalX, finalY);
 
@@ -131,8 +161,6 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         const currentMaxTime = Math.max(10000, simulatedTimeElapsed);
 
         const scaledPath = [];
-        // Будуємо криву повністю з нуля до поточного simulatedTimeElapsed
-        // Крок залежить від масштабу, візьмемо ~100 точок для плавності
         const step = Math.max(16, simulatedTimeElapsed / 100);
 
         for (let t = 0; t <= simulatedTimeElapsed; t += step) {
@@ -144,14 +172,12 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           scaledPath.push({ x, y, t });
         }
 
-        // Додаємо саму останню точку для максимальної точності кадру
         const px = simulatedTimeElapsed / currentMaxTime;
         const lastX = 10 + width * 0.85 * px;
         const progressY = (M - 1) / (currentMaxM - 1);
         const lastY = height - 10 - height * 0.8 * progressY;
         scaledPath.push({ x: lastX, y: lastY, t: simulatedTimeElapsed });
 
-        // Малюємо лінію
         if (scaledPath.length > 1) {
           ctx.beginPath();
           ctx.moveTo(scaledPath[0].x, scaledPath[0].y);
@@ -161,7 +187,6 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
           const lastPoint = scaledPath[scaledPath.length - 1];
 
-          // Градієнт сліду
           const gradient = ctx.createLinearGradient(0, height, width, 0);
           gradient.addColorStop(0, '#f43f5e'); // rose-500
           gradient.addColorStop(1, '#eab308'); // yellow-500
@@ -174,7 +199,6 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.shadowBlur = 15;
           ctx.stroke();
 
-          // Заливка під графіком
           ctx.lineTo(lastPoint.x, height);
           ctx.lineTo(10, height);
           ctx.closePath();
@@ -185,7 +209,6 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.fillStyle = fillGradient;
           ctx.fill();
 
-          // Пунктирна лінія від самої ракети вниз
           ctx.beginPath();
           ctx.setLineDash([6, 6]);
           ctx.moveTo(lastPoint.x, lastPoint.y);
@@ -194,37 +217,27 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
           ctx.lineWidth = 2;
           ctx.stroke();
 
-          // Пунктирні лінії (слід), залишені на графіку кожні 0.2x
           ctx.beginPath();
           for (let markM = 1.2; markM <= M; markM += 0.2) {
-            // Знайдемо відповідну точку X і Y для цього множника markM
-            // X лінійно залежить від часу, який потрібен щоб досягти markM.
-            // Із M = exp(0.00006 * time), time = ln(M) / 0.00006
             const markTime = Math.log(markM) / 0.00006;
-
-            // Якщо час маркера раптом більший за поточний час гри, пропускаємо (хоча цикл це страхує)
             if (markTime > simulatedTimeElapsed) continue;
 
             const px = markTime / currentMaxTime;
             const x = 10 + width * 0.85 * px;
-
             const py = (markM - 1) / (currentMaxM - 1);
             const y = height - 10 - height * 0.8 * py;
 
             ctx.moveTo(x, y);
             ctx.lineTo(x, height);
           }
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; // трохи тьмяніше за основний
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
           ctx.lineWidth = 1;
           ctx.stroke();
 
-          ctx.setLineDash([]); // Скидаємо пунктир
+          ctx.setLineDash([]);
 
-          // Розрахунок кута нахилу ракети
-          let angle = 45; // Початковий кут
+          let angle = 45;
           if (simulatedTimeElapsed > 0) {
-            // Щоб уникнути "смикання" ракети через нестабільний масив точок,
-            // рахуємо чітку дотичну взявши точку рівно на 32мс позаду поточного часу.
             const dt = Math.min(32, simulatedTimeElapsed);
             const t1 = simulatedTimeElapsed - dt;
             const m1 = Math.max(1.0, Math.exp(0.00006 * t1));
@@ -239,7 +252,6 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             angle = Math.atan2(dy, dx) * (180 / Math.PI) + 45;
           }
 
-          // Рухаємо саму ракету (DOM елемент) на останню відмальовану точку з обертанням
           rocket.style.transform = `translate(${lastPoint.x}px, ${lastPoint.y - height + 10}px) rotate(${angle}deg)`;
         }
 
@@ -265,9 +277,14 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
       const data = await claimCrashRewardRequest(localStorage.getItem('token'), gameId, currentM);
       if (setProfile) setProfile(data.profile);
       setWinStatus({ result: 'win', amount: data.winAmount });
+      if (data.serverSeed) {
+        setServerSeed(data.serverSeed);
+      }
       showToast(`Виграш: ${data.winAmount} монет!`, 'success');
     } catch (err) {
       showToast(err.message || 'Помилка!', 'error');
+      // If error is because the crash already happened, handle it by setting hasCashedOutRef to false
+      // so polling or next fetch catches it. The polling system will pick up the 'crashed' status anyway.
       hasCashedOutRef.current = false;
       setCashedOutAt(null);
     }
@@ -382,11 +399,18 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         {/* Результат раунду */}
         {winStatus && status === 'crashed' && (
           <div
-            className={`mb-4 p-4 rounded-xl text-center font-bold text-lg animate-in slide-in-from-bottom-2 ${winStatus.result === 'win' ? 'bg-green-900/40 text-green-400 border border-green-500/50' : 'bg-red-900/40 text-red-500 border border-red-500/50'}`}
+            className={`mb-4 p-4 rounded-xl text-center font-bold text-sm sm:text-base animate-in slide-in-from-bottom-2 ${winStatus.result === 'win' ? 'bg-green-900/40 text-green-400 border border-green-500/50' : 'bg-red-900/40 text-red-500 border border-red-500/50'}`}
           >
-            {winStatus.result === 'win'
-              ? `🎉 Ви виграли ${winStatus.amount} монет!`
-              : `💻 Ви програли ${winStatus.amount} монет.`}
+            <div className="text-lg">
+              {winStatus.result === 'win'
+                ? `🎉 Ви виграли ${winStatus.amount} монет!`
+                : `💻 Ви програли ${winStatus.amount} монет.`}
+            </div>
+            {serverSeed && (
+              <div className="mt-2 text-xs font-mono text-neutral-400 opacity-70 break-all select-all">
+                seed: {serverSeed}
+              </div>
+            )}
           </div>
         )}
 

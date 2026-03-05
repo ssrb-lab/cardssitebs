@@ -665,6 +665,15 @@ export const claimCrashRewardRequest = async (token, gameId, multiplier) => {
   return data;
 };
 
+export const pollCrashStatusRequest = async (token, gameId) => {
+  const res = await fetch(`${API_URL}/game/crash/${gameId}/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 export const fetchMarketHistoryRequest = async (token) => {
   const res = await fetch(`${API_URL}/profile/market-history`, {
     headers: { Authorization: `Bearer ${token}` },
