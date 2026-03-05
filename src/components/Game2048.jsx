@@ -361,7 +361,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
       </div>
 
       {gameOver && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center relative">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
           <button
             onClick={claimReward}
             disabled={isProcessing}

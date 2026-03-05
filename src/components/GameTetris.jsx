@@ -614,7 +614,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       </div>
 
       {gameOver && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center animate-in fade-in p-6 text-center shadow-[inset_0_0_100px_rgba(255,0,0,0.2)] relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center animate-in fade-in p-6 text-center shadow-[inset_0_0_100px_rgba(255,0,0,0.2)]">
           <button
             onClick={claimReward}
             disabled={isProcessing}
