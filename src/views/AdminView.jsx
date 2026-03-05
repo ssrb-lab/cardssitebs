@@ -332,6 +332,7 @@ export default function AdminView({
       setAdminSetCoinsAmount(u.coins || 0);
       setAdminNewNickname(u.nickname || '');
       setAdminSetFarmLevel(u.farmLevel || 1);
+      setAdminAddCrystalsAmount(u.crystals || 0);
     }
     try {
       const items = await fetchAdminUserInventory(getToken(), uid);
@@ -414,34 +415,18 @@ export default function AdminView({
     }
   };
 
-  const giveCoinsToUser = async () => {
-    if (!adminAddCoinsAmount) return;
-    try {
-      const data = await adminUserActionRequest(getToken(), 'coins', viewingUser.uid, {
-        amount: adminAddCoinsAmount,
-        exact: false,
-      });
-      if (viewingUser.uid === currentProfile.uid) setProfile(data.profile); // <--- ДОДАНО ОНОВЛЕННЯ
-      showToast('Баланс монет змінено.', 'success');
-      setViewingUser(data.profile);
-      setAdminAddCoinsAmount(100);
-      loadUsers();
-    } catch {
-      showToast('Помилка монет.', 'error');
-    }
-  };
 
-  const giveCrystalsToUser = async () => {
-    if (!adminAddCrystalsAmount) return;
+
+  const setExactCrystalsToUser = async () => {
+    if (adminAddCrystalsAmount === '' || isNaN(adminAddCrystalsAmount)) return;
     try {
       const data = await adminUserActionRequest(getToken(), 'crystals', viewingUser.uid, {
-        amount: adminAddCrystalsAmount,
-        exact: false,
+        amount: parseInt(adminAddCrystalsAmount),
+        exact: true,
       });
       if (viewingUser.uid === currentProfile.uid) setProfile(data.profile);
-      showToast('Баланс кристалів змінено.', 'success');
+      showToast('Точний баланс кристалів встановлено.', 'success');
       setViewingUser(data.profile);
-      setAdminAddCrystalsAmount(10);
       loadUsers();
     } catch {
       showToast('Помилка кристалів.', 'error');
@@ -1428,41 +1413,21 @@ export default function AdminView({
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
-                    <label className="text-xs text-yellow-500 font-bold mb-1 block">
-                      +/- Монети: (Поточне: {viewingUser.coins})
-                    </label>
-                    <input
-                      type="number"
-                      value={adminAddCoinsAmount}
-                      onChange={(e) => setAdminAddCoinsAmount(Number(e.target.value))}
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-yellow-500"
-                    />
-                  </div>
-                  <button
-                    onClick={giveCoinsToUser}
-                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors flex-1 min-h-[40px] whitespace-nowrap"
-                  >
-                    Додати/Відняти
-                  </button>
-                </div>
-
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
-                  <div>
                     <label className="text-xs text-purple-400 font-bold mb-1 block">
-                      +/- Кристали: (Поточне: {viewingUser.crystals})
+                      Встановити кристали:
                     </label>
                     <input
                       type="number"
                       value={adminAddCrystalsAmount}
-                      onChange={(e) => setAdminAddCrystalsAmount(Number(e.target.value))}
+                      onChange={(e) => setAdminAddCrystalsAmount(e.target.value)}
                       className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
                     />
                   </div>
                   <button
-                    onClick={giveCrystalsToUser}
+                    onClick={setExactCrystalsToUser}
                     className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg w-full transition-colors flex-1 min-h-[40px] whitespace-nowrap"
                   >
-                    Додати/Відняти
+                    Встановити
                   </button>
                 </div>
 
