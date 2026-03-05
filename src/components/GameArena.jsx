@@ -18,6 +18,8 @@ import {
   Landmark,
   Coins,
   Gem,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { getCardStyle, parseGameStat } from '../utils/helpers';
 import PlayerAvatar from './PlayerAvatar';
@@ -96,6 +98,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Admin state
   const [isAddingPoint, setIsAddingPoint] = useState(false);
@@ -499,112 +503,133 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 w-full h-[calc(100vh-100px)] min-h-0 pb-4">
+      <div className="flex flex-col lg:flex-row gap-6 w-full h-[calc(100vh-100px)] min-h-0 pb-4 relative overflow-hidden">
         {/* Left Panel - Deck Selection */}
-        <div className="w-full lg:w-1/3 xl:w-1/4 flex flex-col gap-4 relative">
-          {/* Block 1: Selected Cards */}
-          <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] shrink-0 h-min">
-            <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2 flex items-center gap-2">
-              <Swords size={20} className="text-indigo-500" /> Ваша Колода
-            </h3>
+        <div
+          className={`flex flex-col gap-4 relative transition-all duration-500 ease-in-out shrink-0 h-full
+            ${isSidebarOpen ? 'w-full lg:w-[400px] xl:w-[450px] 2xl:w-[500px] opacity-100 lg:translate-x-0' : 'w-0 opacity-0 lg:-ml-6 lg:-translate-x-full absolute lg:relative z-40'}
+          `}
+        >
+          {/* Inner wrapper to maintain exact width while collapsing */}
+          <div className="w-full lg:w-[400px] xl:w-[450px] 2xl:w-[500px] flex flex-col gap-4 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2 pb-4">
+            {/* Block 1: Selected Cards */}
+            <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] shrink-0 h-min">
+              <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2 flex items-center gap-2">
+                <Swords size={20} className="text-indigo-500" /> Ваша Колода
+              </h3>
 
-            <div className="text-indigo-300 text-sm font-bold mb-4 bg-indigo-900/30 py-2 px-3 rounded-lg flex justify-between items-center">
-              <span>Обрано карт:</span>
-              <span
-                className={`${deck.length === 5 ? 'text-green-400' : 'text-indigo-400'} text-lg`}
-              >
-                {deck.length} / 5
-              </span>
+              <div className="text-indigo-300 text-sm font-bold mb-4 bg-indigo-900/30 py-2 px-3 rounded-lg flex justify-between items-center">
+                <span>Обрано карт:</span>
+                <span
+                  className={`${deck.length === 5 ? 'text-green-400' : 'text-indigo-400'} text-lg`}
+                >
+                  {deck.length} / 5
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-2 w-full pt-1 pb-3">
+                {[...Array(5)].map((_, i) => {
+                  const card = deck[i];
+                  return card ? (
+                    <div
+                      key={card.uniqueInstanceId}
+                      onClick={() => handleToggleCard(card)}
+                      className="w-full aspect-[2/3] cursor-pointer group transition-all duration-200 shadow-lg relative"
+                    >
+                      <div className="w-full h-full rounded-xl overflow-hidden border-2 bg-neutral-900 group-hover:-translate-y-1 transition-transform border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                        <img src={card.image} className="w-full h-full object-cover" />
+                      </div>
+
+                      {/* Scale stats to prevent overflowing width */}
+                      <div className="absolute -bottom-2 inset-x-0 w-[110%] -ml-[5%] mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[8px] sm:text-[10px] xl:text-xs px-1 py-0.5 rounded-full z-10 flex items-center justify-center gap-0.5 shadow-md whitespace-nowrap">
+                        <Zap size={10} className="text-yellow-500 shrink-0" /> {card.power}{' '}
+                        <span className="text-red-500 shrink-0">❤️</span> {card.hp || card.power || 50}
+                      </div>
+
+                      <div className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <X size={12} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={`empty-${i}`}
+                      className="w-full aspect-[2/3] rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-950/50 flex items-center justify-center shadow-inner"
+                    ></div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar justify-between">
-              {[...Array(5)].map((_, i) => {
-                const card = deck[i];
-                return card ? (
-                  <div
-                    key={card.uniqueInstanceId}
-                    onClick={() => handleToggleCard(card)}
-                    className="relative w-16 sm:w-20 lg:w-24 aspect-[2/3] flex-shrink-0 cursor-pointer group transition-all duration-200 shadow-lg"
-                  >
-                    <div
-                      className={`w-full h-full rounded-xl overflow-hidden border-2 bg-neutral-900 group-hover:-translate-y-1 transition-transform border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]`}
-                    >
-                      <img src={card.image} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute -bottom-2 inset-x-0 w-max mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full z-10 flex items-center justify-center gap-1 shadow-md">
-                      <Zap size={10} className="text-yellow-500" /> {card.power}{' '}
-                      <span className="text-red-500 ml-0.5">❤️</span> {card.hp || card.power || 50}
-                    </div>
-                    <div className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                      <X size={12} />
-                    </div>
+            {/* Block 2: Inventory Cards */}
+            <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] flex-1 min-h-0">
+              <h3 className="text-lg font-black text-white uppercase tracking-wide mb-3 flex items-center gap-2">
+                Інвентар
+              </h3>
+
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {ownedGameCards.length === 0 ? (
+                  <div className="text-neutral-500 text-center py-10 font-medium">
+                    <ShieldAlert size={40} className="mx-auto mb-3 opacity-20" />У вас немає карт із
+                    силою для Арени.
                   </div>
                 ) : (
-                  <div
-                    key={`empty-${i}`}
-                    className="w-16 sm:w-20 lg:w-24 aspect-[2/3] flex-shrink-0 rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-950/50 flex items-center justify-center shadow-inner"
-                  ></div>
-                );
-              })}
-            </div>
-          </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                    {ownedGameCards.map((card) => {
+                      const isSelected = deck.find((c) => c.id === card.id);
+                      if (isSelected) return null; // Hide from inventory if already in deck
 
-          {/* Block 2: Inventory Cards */}
-          <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] flex-1 min-h-0">
-            <h3 className="text-lg font-black text-white uppercase tracking-wide mb-3 flex items-center gap-2">
-              Інвентар
-            </h3>
+                      const isDefending = profile?.defendingInstances?.some(
+                        inst => inst.cardId === card.id && inst.statsIndex === card.statsIndex
+                      );
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-              {ownedGameCards.length === 0 ? (
-                <div className="text-neutral-500 text-center py-10 font-medium">
-                  <ShieldAlert size={40} className="mx-auto mb-3 opacity-20" />У вас немає карт із
-                  силою для Арени.
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-                  {ownedGameCards.map((card) => {
-                    const isSelected = deck.find((c) => c.id === card.id);
-                    if (isSelected) return null; // Hide from inventory if already in deck
-
-                    const isDefending = profile?.defendingInstances?.some(
-                      inst => inst.cardId === card.id && inst.statsIndex === card.statsIndex
-                    );
-
-                    return (
-                      <div
-                        key={card.uniqueInstanceId}
-                        onClick={() => !isDefending && handleToggleCard(card)}
-                        className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 transition-all ${getCardStyle(card.rarity).border} ${isDefending ? 'grayscale opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:border-indigo-500'}`}
-                        title={isDefending ? "Захищає точку на Арені" : card.name}
-                      >
-                        {isDefending && (
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
-                            Захищає
+                      return (
+                        <div
+                          key={card.uniqueInstanceId}
+                          onClick={() => !isDefending && handleToggleCard(card)}
+                          className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 transition-all ${getCardStyle(card.rarity).border} ${isDefending ? 'grayscale opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:border-indigo-500'}`}
+                          title={isDefending ? "Захищає точку на Арені" : card.name}
+                        >
+                          {isDefending && (
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
+                              Захищає
+                            </div>
+                          )}
+                          <div className="absolute top-1 right-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1 border border-neutral-700 shadow-md">
+                            <Zap size={8} className="text-yellow-400" /> {card.power}{' '}
+                            <span className="text-red-500 ml-0.5">❤️</span>{' '}
+                            {card.hp || card.power || 50}
                           </div>
-                        )}
-                        <div className="absolute top-1 right-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1 border border-neutral-700 shadow-md">
-                          <Zap size={8} className="text-yellow-400" /> {card.power}{' '}
-                          <span className="text-red-500 ml-0.5">❤️</span>{' '}
-                          {card.hp || card.power || 50}
+                          <div className="w-full h-full relative group">
+                            <img
+                              src={card.image}
+                              className="w-full h-full object-cover pointer-events-none"
+                            />
+                          </div>
                         </div>
-                        <div className="w-full h-full relative group">
-                          <img
-                            src={card.image}
-                            className="w-full h-full object-cover pointer-events-none"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </div> {/* End inner fixed-width wrapper */}
         </div>
 
         {/* Center & Right Panel - Interactive Map Content */}
-        <div className="flex-1 bg-black border border-neutral-800/50 rounded-3xl flex flex-col relative shadow-inner overflow-hidden">
+        <div className="flex-1 bg-black border border-neutral-800/50 rounded-3xl flex flex-col relative shadow-inner overflow-hidden transition-all duration-500">
+
+          {/* Sidebar Toggle Button (Desktop only) */}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-[60] bg-neutral-900/90 border border-indigo-500/50 border-l-0 text-white p-1 rounded-r-xl shadow-[5px_0_15px_rgba(99,102,241,0.2)] hover:bg-indigo-900/80 transition-colors backdrop-blur-md hidden lg:flex items-center justify-center h-24 group outline-none"
+          >
+            {isSidebarOpen ? (
+              <ChevronLeft className="text-indigo-400 group-hover:scale-110 transition-transform" size={24} />
+            ) : (
+              <ChevronRight className="text-indigo-400 group-hover:scale-110 transition-transform" size={24} />
+            )}
+          </button>
+
           {/* Admin Map Toolbar */}
           {profile?.isAdmin && (
             <div className="absolute top-4 right-4 z-50 bg-neutral-900/90 backdrop-blur-md p-2 rounded-xl flex items-center gap-2 border border-neutral-800 shadow-xl">

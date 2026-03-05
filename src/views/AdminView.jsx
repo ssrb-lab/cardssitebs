@@ -974,7 +974,7 @@ export default function AdminView({
   );
 
   return (
-    <div className="max-w-[95%] xl:max-w-7xl mx-auto pb-10 relative">
+    <div className="w-full max-w-[98%] 2xl:max-w-[1800px] mx-auto pb-10 relative">
       {/* МОДАЛКА БАНУ */}
       {banModalUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -2548,16 +2548,20 @@ export default function AdminView({
                 />
               </div>
 
-              <div className="sm:col-span-2 mt-2 p-4 border border-neutral-800 rounded-xl bg-neutral-950/50">
-                <h4 className="text-neutral-400 text-sm font-bold mb-3">
-                  Кастомні шанси випадіння (залиште пустим, щоб використовувати глобальні):
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 mt-4 p-5 border border-neutral-800 rounded-2xl bg-neutral-950/40 shadow-inner">
+                <h4 className="text-neutral-300 text-sm font-bold mb-4 flex items-center gap-2">
+                  <span>🎯</span> Кастомні шанси випадіння
+                  <span className="text-neutral-500 font-normal text-xs ml-2">(залиште пустим для глобальних)</span>
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                   {rarities.map((r) => (
-                    <div key={r.name} className="flex flex-col">
-                      <label className={`text-xs font-bold mb-1`}>
-                        {r.name} (Глоб: {r.weight})
-                      </label>
+                    <div key={r.name} className="flex flex-col bg-neutral-900/50 p-3 rounded-xl border border-neutral-800/80">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className={`text-xs font-bold text-neutral-300`}>{r.name}</label>
+                        <span className="text-[10px] text-neutral-500 font-medium px-2 py-0.5 bg-neutral-800 rounded-full">
+                          Глоб: {r.weight}
+                        </span>
+                      </div>
                       <input
                         type="number"
                         step="0.01"
@@ -2572,7 +2576,7 @@ export default function AdminView({
                             },
                           })
                         }
-                        className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+                        className="bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-purple-500 outline-none transition-colors w-full"
                       />
                     </div>
                   ))}
@@ -2580,75 +2584,96 @@ export default function AdminView({
               </div>
 
               {packForm.isGame && (
-                <div className="sm:col-span-2 mt-2 p-4 border border-neutral-800 rounded-xl bg-neutral-950/50">
-                  <h4 className="text-neutral-400 text-sm font-bold mb-3">
-                    Кастомні діапазони ХП і Сили для паку (залиште пустими для стандартних):
+                <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 mt-4 p-5 border border-indigo-900/30 rounded-2xl bg-indigo-950/10 shadow-inner">
+                  <h4 className="text-indigo-300 text-sm font-bold mb-4 flex items-center gap-2">
+                    <Zap size={16} className="text-yellow-500" />
+                    Діапазони Характеристик (Сила / HP)
+                    <span className="text-indigo-500/70 font-normal text-xs ml-2">(залиште пустими для стандартних)</span>
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     {rarities.map((r) => (
-                      <div key={`stats-${r.name}`} className="flex flex-col gap-1 p-2 bg-neutral-900 border border-neutral-700 rounded-lg">
-                        <label className="text-xs font-bold text-center text-purple-400">{r.name}</label>
-                        <input
-                          type="number"
-                          placeholder="Min Power"
-                          value={packForm.statsRanges?.[r.name]?.minPower || ''}
-                          onChange={(e) => updatePackStatsRange(r.name, 'minPower', e.target.value)}
-                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Max Power"
-                          value={packForm.statsRanges?.[r.name]?.maxPower || ''}
-                          onChange={(e) => updatePackStatsRange(r.name, 'maxPower', e.target.value)}
-                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Min HP"
-                          value={packForm.statsRanges?.[r.name]?.minHp || ''}
-                          onChange={(e) => updatePackStatsRange(r.name, 'minHp', e.target.value)}
-                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Max HP"
-                          value={packForm.statsRanges?.[r.name]?.maxHp || ''}
-                          onChange={(e) => updatePackStatsRange(r.name, 'maxHp', e.target.value)}
-                          className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-white text-[10px]"
-                        />
+                      <div key={`stats-${r.name}`} className="flex flex-col gap-3 p-3.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl relative overflow-hidden group hover:border-indigo-500/50 transition-colors">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <label className="text-sm font-bold text-center text-indigo-300 mb-1">{r.name}</label>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Min Сила</span>
+                            <input
+                              type="number"
+                              placeholder="Auto"
+                              value={packForm.statsRanges?.[r.name]?.minPower || ''}
+                              onChange={(e) => updatePackStatsRange(r.name, 'minPower', e.target.value)}
+                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-yellow-500 outline-none w-full"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Max Сила</span>
+                            <input
+                              type="number"
+                              placeholder="Auto"
+                              value={packForm.statsRanges?.[r.name]?.maxPower || ''}
+                              onChange={(e) => updatePackStatsRange(r.name, 'maxPower', e.target.value)}
+                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-yellow-500 outline-none w-full"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Min HP</span>
+                            <input
+                              type="number"
+                              placeholder="Auto"
+                              value={packForm.statsRanges?.[r.name]?.minHp || ''}
+                              onChange={(e) => updatePackStatsRange(r.name, 'minHp', e.target.value)}
+                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-red-500 outline-none w-full"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Max HP</span>
+                            <input
+                              type="number"
+                              placeholder="Auto"
+                              value={packForm.statsRanges?.[r.name]?.maxHp || ''}
+                              onChange={(e) => updatePackStatsRange(r.name, 'maxHp', e.target.value)}
+                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-red-500 outline-none w-full"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
-                <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                <label className="flex items-center gap-3 text-sm text-neutral-300 font-medium cursor-pointer hover:bg-neutral-800/50 bg-neutral-900/50 p-3 rounded-lg border border-neutral-800 transition-colors">
                   <input
                     type="checkbox"
                     checked={packForm.isHidden || false}
                     onChange={(e) => setPackForm({ ...packForm, isHidden: e.target.checked })}
-                    className="w-5 h-5 accent-purple-600"
+                    className="w-4 h-4 accent-purple-500 rounded"
                   />
-                  Приховати пак від гравців (не видаляти)
+                  Приховати пак (без видалення)
                 </label>
-                <label className="flex items-center gap-2 text-fuchsia-400 font-bold cursor-pointer bg-fuchsia-950/20 p-4 rounded-xl border border-fuchsia-900/50">
+                <label className="flex items-center gap-3 text-sm text-fuchsia-300 font-medium cursor-pointer hover:bg-fuchsia-900/20 bg-fuchsia-950/10 p-3 rounded-lg border border-fuchsia-900/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={packForm.isPremiumOnly || false}
                     onChange={(e) => setPackForm({ ...packForm, isPremiumOnly: e.target.checked })}
-                    className="w-5 h-5 accent-fuchsia-600"
+                    className="w-4 h-4 accent-fuchsia-500 rounded"
                   />
-                  <Gem size={18} /> Тільки для Преміум гравців
+                  <div className="flex items-center gap-1.5"><Gem size={16} /> Тільки Преміум</div>
                 </label>
-                <label className="flex items-center gap-2 text-green-400 font-bold cursor-pointer bg-green-950/20 p-4 rounded-xl border border-green-900/50">
+                <label className="flex items-center gap-3 text-sm text-green-300 font-medium cursor-pointer hover:bg-green-900/20 bg-green-950/10 p-3 rounded-lg border border-green-900/30 transition-colors">
                   <input
                     type="checkbox"
                     checked={packForm.isGame || false}
                     onChange={(e) => setPackForm({ ...packForm, isGame: e.target.checked })}
-                    className="w-5 h-5 accent-green-600"
+                    className="w-4 h-4 accent-green-500 rounded"
                   />
-                  Ігровий Пак (Дає сили карткам)
+                  Ігровий Пак (Сили)
                 </label>
               </div>
             </div>
@@ -2913,13 +2938,13 @@ export default function AdminView({
                 )}
               </div>
 
-              <div className="md:col-span-4 mt-2">
-                <label className="flex items-center gap-2 text-white font-bold cursor-pointer bg-neutral-950 p-4 rounded-xl border border-neutral-800 w-full md:w-1/3">
+              <div className="md:col-span-4 mt-4 mb-2">
+                <label className="inline-flex items-center gap-3 text-sm text-green-300 font-medium cursor-pointer hover:bg-green-900/20 bg-green-950/10 px-4 py-3 rounded-lg border border-green-900/30 transition-colors w-full sm:w-auto">
                   <input
                     type="checkbox"
                     checked={cardForm.isGame || false}
                     onChange={(e) => setCardForm({ ...cardForm, isGame: e.target.checked })}
-                    className="w-5 h-5 accent-green-600"
+                    className="w-4 h-4 accent-green-500 rounded"
                   />
                   Ігрова картка (Отримує силу при випадінні)
                 </label>
