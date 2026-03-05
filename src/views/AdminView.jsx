@@ -1425,36 +1425,43 @@ export default function AdminView({
                   </button>
                 </div>
 
-                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mt-4">
-                  <h4 className="font-bold text-neutral-300 mb-4">Статистика Гравця</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                    {[
-                      { key: 'crystals', label: 'Кристали', current: viewingUser.crystals },
-                      { key: 'totalCards', label: 'Всього карток', current: viewingUser.totalCards },
-                      { key: 'uniqueCardsCount', label: 'Унік. карток', current: viewingUser.uniqueCardsCount },
-                      { key: 'packsOpened', label: 'Відкрито паків', current: viewingUser.packsOpened },
-                      { key: 'coinsSpentOnPacks', label: 'Витрачено на паки', current: viewingUser.coinsSpentOnPacks },
-                      { key: 'coinsEarnedFromPacks', label: 'Зароблено з паків', current: viewingUser.coinsEarnedFromPacks },
-                    ].map(({ key, label, current }) => (
-                      <div key={key}>
-                        <label className="text-[10px] text-neutral-400 font-bold mb-1 block">{label} (Поточне: {current})</label>
-                        <input
-                          type="number"
-                          placeholder="Нове значення..."
-                          value={adminStatsForm[key]}
-                          onChange={(e) => setAdminStatsForm({ ...adminStatsForm, [key]: e.target.value })}
-                          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-white outline-none focus:border-purple-500 text-sm"
-                        />
+              </div>
+
+              {/* Рядок зі Статистикою гравця (на всю ширину) */}
+              <div className="bg-neutral-950 p-6 rounded-xl border border-purple-900/40 shadow-inner mb-6 w-full">
+                <h4 className="font-bold text-purple-300 text-lg mb-6 flex items-center gap-2">
+                  <span>📊</span> Статистика Гравця
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                  {[
+                    { key: 'crystals', label: 'Кристали', current: viewingUser.crystals },
+                    { key: 'totalCards', label: 'Всього карток', current: viewingUser.totalCards },
+                    { key: 'uniqueCardsCount', label: 'Унік. карток', current: viewingUser.uniqueCardsCount },
+                    { key: 'packsOpened', label: 'Відкрито паків', current: viewingUser.packsOpened },
+                    { key: 'coinsSpentOnPacks', label: 'Витрачено на паки', current: viewingUser.coinsSpentOnPacks },
+                    { key: 'coinsEarnedFromPacks', label: 'Зароблено з паків', current: viewingUser.coinsEarnedFromPacks },
+                  ].map(({ key, label, current }) => (
+                    <div key={key} className="bg-neutral-900/50 p-3 rounded-lg border border-neutral-800 flex flex-col justify-between">
+                      <div className="mb-2">
+                        <label className="text-xs text-neutral-300 font-bold block mb-1">{label}</label>
+                        <span className="text-[10px] text-neutral-500 bg-neutral-800 px-2 py-0.5 rounded-full inline-block">Поточне: {current}</span>
                       </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={savePlayerStats}
-                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-xl transition-colors shadow-lg"
-                  >
-                    Зберегти Статистику
-                  </button>
+                      <input
+                        type="number"
+                        placeholder="Нове значення..."
+                        value={adminStatsForm[key] || ''}
+                        onChange={(e) => setAdminStatsForm({ ...adminStatsForm, [key]: e.target.value })}
+                        className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500 transition-colors"
+                      />
+                    </div>
+                  ))}
                 </div>
+                <button
+                  onClick={savePlayerStats}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 text-lg rounded-xl transition-colors shadow-lg"
+                >
+                  Зберегти Статистику
+                </button>
               </div>
 
               <div>
