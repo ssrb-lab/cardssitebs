@@ -180,6 +180,15 @@ export default function AdminView({
     attachedCardAmount: 1,
   });
 
+  const [adminStatsForm, setAdminStatsForm] = useState({
+    crystals: '',
+    totalCards: '',
+    uniqueCardsCount: '',
+    packsOpened: '',
+    coinsSpentOnPacks: '',
+    coinsEarnedFromPacks: '',
+  });
+
   const [packSearchTerm, setPackSearchTerm] = useState('');
   const [cardSearchTerm, setCardSearchTerm] = useState('');
   const [cardPackFilter, setCardPackFilter] = useState('all');
@@ -459,6 +468,23 @@ export default function AdminView({
       loadUsers();
     } catch {
       showToast('Помилка встановлення рівня.', 'error');
+    }
+  };
+
+  const savePlayerStats = async () => {
+    try {
+      const payload = {};
+      Object.keys(adminStatsForm).forEach((key) => {
+        if (adminStatsForm[key] !== '') payload[key] = Number(adminStatsForm[key]);
+      });
+      if (Object.keys(payload).length === 0) return;
+      const data = await adminUserActionRequest(getToken(), 'stats', viewingUser.uid, payload);
+      showToast('Статистику гравця оновлено.', 'success');
+      setViewingUser(data.profile);
+      loadUsers();
+      setAdminStatsForm({ crystals: '', totalCards: '', uniqueCardsCount: '', packsOpened: '', coinsSpentOnPacks: '', coinsEarnedFromPacks: '' });
+    } catch (e) {
+      showToast(e.message || 'Помилка збереження статистики.', 'error');
     }
   };
 
@@ -1396,6 +1422,37 @@ export default function AdminView({
                     className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold px-4 py-2 rounded-lg w-full transition-colors h-10"
                   >
                     Додати/Відняти
+                  </button>
+                </div>
+
+                <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mt-4">
+                  <h4 className="font-bold text-neutral-300 mb-4">Статистика Гравця</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                    {[
+                      { key: 'crystals', label: 'Кристали', current: viewingUser.crystals },
+                      { key: 'totalCards', label: 'Всього карток', current: viewingUser.totalCards },
+                      { key: 'uniqueCardsCount', label: 'Унік. карток', current: viewingUser.uniqueCardsCount },
+                      { key: 'packsOpened', label: 'Відкрито паків', current: viewingUser.packsOpened },
+                      { key: 'coinsSpentOnPacks', label: 'Витрачено на паки', current: viewingUser.coinsSpentOnPacks },
+                      { key: 'coinsEarnedFromPacks', label: 'Зароблено з паків', current: viewingUser.coinsEarnedFromPacks },
+                    ].map(({ key, label, current }) => (
+                      <div key={key}>
+                        <label className="text-[10px] text-neutral-400 font-bold mb-1 block">{label} (Поточне: {current})</label>
+                        <input
+                          type="number"
+                          placeholder="Нове значення..."
+                          value={adminStatsForm[key]}
+                          onChange={(e) => setAdminStatsForm({ ...adminStatsForm, [key]: e.target.value })}
+                          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-white outline-none focus:border-purple-500 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={savePlayerStats}
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-xl transition-colors shadow-lg"
+                  >
+                    Зберегти Статистику
                   </button>
                 </div>
               </div>

@@ -3398,6 +3398,29 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
       case 'delete':
         await prisma.user.delete({ where: { uid: targetUid } });
         return res.json({ success: true, deleted: true });
+      case 'stats':
+        {
+          const statsData = {};
+          if (payload.crystals !== undefined) statsData.crystals = Number(payload.crystals);
+          if (payload.totalCards !== undefined) statsData.totalCards = Number(payload.totalCards);
+          if (payload.uniqueCardsCount !== undefined) statsData.uniqueCardsCount = Number(payload.uniqueCardsCount);
+          if (payload.packsOpened !== undefined) statsData.packsOpened = Number(payload.packsOpened);
+          if (payload.coinsSpentOnPacks !== undefined) statsData.coinsSpentOnPacks = Number(payload.coinsSpentOnPacks);
+          if (payload.coinsEarnedFromPacks !== undefined) statsData.coinsEarnedFromPacks = Number(payload.coinsEarnedFromPacks);
+          updatedUser = await prisma.user.update({
+            where: { uid: targetUid },
+            data: statsData,
+          });
+          await prisma.notification.create({
+            data: {
+              userId: targetUid,
+              type: 'admin_action',
+              title: 'Оновлення статистики',
+              message: `Адміністратор оновив вашу ігрову статистику.`,
+            },
+          });
+        }
+        break;
       case 'giveCard':
         {
           const cardObj = await prisma.cardCatalog.findUnique({ where: { id: payload.cardId } });
