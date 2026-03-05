@@ -1497,9 +1497,8 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
       }
     }
 
-    if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
-    }
+    // Вже не викидаємо помилку, якщо `currentDailyFarm >= 500000`.
+    // Прогрес у грі буде зберігатися, але монети не будуть нараховуватись, якщо ліміт вичерпано.
 
     const newPoints = (user.fuseRepairedPoints || 0) + score;
     let newLevel = 1;

@@ -9,6 +9,7 @@ import {
   Zap,
   Pause,
   Play,
+  X,
 } from 'lucide-react';
 import { claimFuseRewardRequest, startFuseGameRequest, getToken } from '../config/api';
 
@@ -244,22 +245,22 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
   const getEarnedCoins = () => {
     return Math.floor(
       score *
-        (progressInfo.level === 1
-          ? 86
-          : progressInfo.level === 2
-            ? 172
-            : progressInfo.level === 3
-              ? 230
-              : progressInfo.level === 4
-                ? 431
-                : 402) *
-        (1 + Math.floor(score / 5) * 0.1)
+      (progressInfo.level === 1
+        ? 86
+        : progressInfo.level === 2
+          ? 172
+          : progressInfo.level === 3
+            ? 230
+            : progressInfo.level === 4
+              ? 431
+              : 402) *
+      (1 + Math.floor(score / 5) * 0.1)
     );
   };
 
   const claimReward = async () => {
     if (score < 1) {
-      showToast('Рахунок має бути хоча б 1!');
+      showToast('Ви не полагодили жодної плати!');
       return goBack();
     }
     setIsProcessing(true);
@@ -268,7 +269,11 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       if (setProfile && data.profile) {
         setProfile(data.profile);
       }
-      showToast(`Ви отримали ${data.earned} монет за ремонт!`, 'success');
+      if (data.earned > 0) {
+        showToast(`Ви отримали ${data.earned} монет за ремонт!`, 'success');
+      } else {
+        showToast('Ліміт фарму вичерпано, але прогрес гри збережено!', 'success');
+      }
       localStorage.removeItem('fuseGameSave');
       goBack();
     } catch (e) {
@@ -357,11 +362,10 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
           <button
             onClick={togglePause}
             disabled={isProcessing || gameOver}
-            className={`flex items-center gap-2 font-bold transition-colors px-3 py-1.5 rounded-lg border ${
-              isPaused
-                ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20 border-yellow-900/50'
-                : 'text-neutral-400 hover:text-white bg-neutral-900/20 border-neutral-800'
-            }`}
+            className={`flex items-center gap-2 font-bold transition-colors px-3 py-1.5 rounded-lg border ${isPaused
+              ? 'text-yellow-400 hover:text-yellow-300 bg-yellow-900/20 border-yellow-900/50'
+              : 'text-neutral-400 hover:text-white bg-neutral-900/20 border-neutral-800'
+              }`}
           >
             {isPaused ? <Play size={16} /> : <Pause size={16} />}
             {isPaused ? 'Продовжити' : 'Пауза'}
@@ -490,7 +494,14 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       )}
 
       {gameOver && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center relative">
+          <button
+            onClick={claimReward}
+            disabled={isProcessing}
+            className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors p-2 z-50"
+          >
+            <X size={28} />
+          </button>
           <Trophy size={60} className="text-yellow-500 mb-4" />
           <h2 className="text-3xl font-black mb-2 uppercase text-white">Гру закінчено!</h2>
           <p className="text-neutral-300 mb-6">

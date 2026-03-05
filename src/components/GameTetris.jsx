@@ -9,6 +9,7 @@ import {
   ArrowLeft as LeftIcon,
   ArrowRight as RightIcon,
   ArrowUp,
+  X,
 } from 'lucide-react';
 import { claimTetrisRewardRequest, startTetrisGameRequest, getToken } from '../config/api';
 
@@ -434,7 +435,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
 
   const claimReward = async () => {
     if (score < 50) {
-      showToast('Рахунок має бути хоча б 50!');
+      showToast('Мінімальний рахунок для отримання нагороди - 50!');
       localStorage.removeItem('tetris_state');
       return goBack();
     }
@@ -613,7 +614,14 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       </div>
 
       {gameOver && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center animate-in fade-in p-6 text-center shadow-[inset_0_0_100px_rgba(255,0,0,0.2)]">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center animate-in fade-in p-6 text-center shadow-[inset_0_0_100px_rgba(255,0,0,0.2)] relative">
+          <button
+            onClick={claimReward}
+            disabled={isProcessing}
+            className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors p-2 z-50"
+          >
+            <X size={28} />
+          </button>
           <Trophy
             size={60}
             className="text-yellow-500 mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]"

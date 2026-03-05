@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Coins, Trophy, Loader2, RotateCcw, X } from 'lucide-react';
 import { claim2048RewardRequest, start2048GameRequest, getToken } from '../config/api';
 
 const GRID_SIZE = 4;
@@ -229,7 +229,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
 
   const claimReward = async () => {
     if (score < 100) {
-      showToast('Рахунок має бути хоча б 100!');
+      showToast('Мінімальний рахунок для отримання нагороди - 100!');
       return goBack();
     }
     setIsProcessing(true);
@@ -361,7 +361,14 @@ export default function Game2048({ setProfile, goBack, showToast }) {
       </div>
 
       {gameOver && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center relative">
+          <button
+            onClick={claimReward}
+            disabled={isProcessing}
+            className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors p-2"
+          >
+            <X size={28} />
+          </button>
           {gameWon ? (
             <Trophy size={80} className="text-fuchsia-500 mb-4 animate-bounce" />
           ) : (
