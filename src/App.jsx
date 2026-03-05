@@ -1318,6 +1318,7 @@ export default function App() {
             premiumShopItems={premiumShopItems}
             setViewingPlayerProfile={setViewingPlayerProfile}
             setCurrentView={setCurrentView}
+            setViewingCard={setViewingCard}
             bosses={bosses}
             setBosses={setBosses}
             wordleEntryCost={wordleEntryCost}

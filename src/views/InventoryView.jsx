@@ -299,9 +299,7 @@ export default function InventoryView({
                     >
                       <div
                         onClick={() =>
-                          isGameItem
-                            ? setViewingGameCard({ ...item })
-                            : (!allBasicDefending && setViewingCard({ card: item.card, amount: item.amount }))
+                          !allBasicDefending && setViewingCard({ card: item.card, amount: item.amount })
                         }
                         className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
                       >

@@ -53,7 +53,6 @@ import {
 import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
 import PlayerAvatar from '../components/PlayerAvatar';
-import Card from '../components/Card';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon, { ACHIEVEMENT_PRESETS } from '../components/AchievementIcon';
 
@@ -77,6 +76,7 @@ export default function AdminView({
   premiumShopItems,
   setViewingPlayerProfile,
   setCurrentView,
+  setViewingCard,
   bosses,
   wordleEntryCost,
 }) {
@@ -1522,13 +1522,25 @@ export default function AdminView({
                     const effectClass = c.effect ? `effect-${c.effect}` : '';
 
                     return (
-                      <div key={invItem.id} className="relative group">
-                        <Card
-                          card={c}
-                          showQuantity={true}
-                          quantity={invItem.amount}
-                          rarities={rarities}
-                        />
+                      <div
+                        key={invItem.id}
+                        className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass} cursor-pointer transition-transform hover:-translate-y-1`}
+                        onClick={() => setViewingCard({ card: c, amount: invItem.amount })}
+                      >
+                        <CardFrame frame={c.frame}>
+                          <img
+                            src={c.image}
+                            alt={c.name}
+                            className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
+                            loading="lazy"
+                          />
+                        </CardFrame>
+                        <div className="text-[10px] font-bold text-white truncate w-full text-center mt-1">
+                          {c.name}
+                        </div>
+                        <div className="text-xs font-black text-yellow-500 mb-1 z-10">
+                          x{invItem.amount}
+                        </div>
 
                         {/* Admin Action Overlay */}
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20 pointer-events-none">
