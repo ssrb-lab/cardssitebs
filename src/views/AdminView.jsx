@@ -1429,7 +1429,7 @@ export default function AdminView({
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-yellow-500 font-bold mb-1 block">
-                      +/- Монети:
+                      +/- Монети: (Поточне: {viewingUser.coins})
                     </label>
                     <input
                       type="number"
