@@ -53,6 +53,7 @@ import {
 import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
 import PlayerAvatar from '../components/PlayerAvatar';
+import Card from '../components/Card';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon, { ACHIEVEMENT_PRESETS } from '../components/AchievementIcon';
 
@@ -1521,30 +1522,25 @@ export default function AdminView({
                     const effectClass = c.effect ? `effect-${c.effect}` : '';
 
                     return (
-                      <div
-                        key={invItem.id}
-                        className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass}`}
-                      >
-                        <img
-                          src={c.image}
-                          alt={c.name}
-                          className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
-                          loading="lazy"
+                      <div key={invItem.id} className="relative group">
+                        <Card
+                          card={c}
+                          showQuantity={true}
+                          quantity={invItem.amount}
+                          rarities={rarities}
                         />
-                        <div className="text-[10px] font-bold text-white truncate w-full text-center">
-                          {c.name}
-                        </div>
-                        <div className="text-xs font-black text-yellow-500 mb-1 z-10">
-                          x{invItem.amount}
-                        </div>
 
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                        {/* Admin Action Overlay */}
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20 pointer-events-none">
                           <button
-                            onClick={() => removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats)}
-                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-full font-bold shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform"
-                            title="Вилучити"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats);
+                            }}
+                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-xl font-bold font-mono text-xs shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform pointer-events-auto"
+                            title="Управління (Ігрова) / Вилучити"
                           >
-                            <Trash2 size={18} />
+                            Управління
                           </button>
                         </div>
                       </div>
