@@ -1293,15 +1293,7 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Неправильна активна гра!' });
     }
 
-    const startTime = new Date(minigame.startTime).getTime();
-    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
 
-    // Припускаємо хардкорні 1500 очок в секунду як абсолютний фізичний ліміт
-    const maxPossibleScore = elapsedTimeSeconds * 1500;
-    if (score > maxPossibleScore && score > 2000) {
-      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (2048).`);
-      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
-    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
@@ -1382,15 +1374,7 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Неправильна активна гра!' });
     }
 
-    const startTime = new Date(minigame.startTime).getTime();
-    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
 
-    // Тетріс поїнти ростуть повільніше. Припустимо максимум 500 очок в секунду
-    const maxPossibleScore = elapsedTimeSeconds * 500;
-    if (score > maxPossibleScore && score > 1000) {
-      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Tetris).`);
-      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
-    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
@@ -1470,17 +1454,7 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Неправильна активна гра!' });
     }
 
-    const startTime = new Date(minigame.startTime).getTime();
-    const elapsedTimeSeconds = (Date.now() - startTime) / 1000;
 
-    // Fuse score is basically fixed boards repaired. It takes at least 1-2 sec to memorize + 1 sec to click.
-    // Extremely fast play: maybe 1 board every 2 seconds. Thus max score = elapsedTimeSeconds / 2.
-    // Let's be lenient and say 1 board per 1 second absolute max.
-    const maxPossibleScore = elapsedTimeSeconds * 2;
-    if (score > maxPossibleScore && score > 5) {
-      console.log(`[Anti-Cheat] UID ${user.uid} tried claiming ${score} in ${elapsedTimeSeconds}s (Fuse).`);
-      return res.status(400).json({ error: 'Підозра на використання стороннього ПЗ (Занадто високий результат за короткий час)!' });
-    }
 
     const now = new Date();
     let currentDailyFarm = user.dailyFarmAmount || 0;
