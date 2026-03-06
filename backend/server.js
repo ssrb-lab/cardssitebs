@@ -17,6 +17,7 @@ const authenticate = require('./middleware/auth');
 
 const prisma = new PrismaClient();
 const app = express();
+app.set('trust proxy', 1); // Довіряємо Cloudflare / Nginx proxy для rate_limit
 
 // Налаштування Multer для збереження аватарок
 const avatarStorage = multer.diskStorage({
@@ -550,7 +551,9 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
 
     // Setup nodemailer
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // Use STARTTLS for port 587 because Hetzner blocks 465
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
