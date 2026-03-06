@@ -814,6 +814,15 @@ export default function App() {
     try {
       const existing = dbInventory.find((i) => i.id === cardId);
       const cardData = cardsCatalog.find((c) => c.id === cardId);
+
+      // Ігноруємо лімітовані картки
+      if (cardData?.maxSupply > 0) {
+        showToast('Лімітовані картки можна продати лише на ринку гравцям.', 'error');
+        actionLock.current = false;
+        setIsProcessing(false);
+        return;
+      }
+
       const isGameCard = cardData?.isGame;
       const keepAmount = isGameCard ? 3 : 1;
 
@@ -863,6 +872,8 @@ export default function App() {
 
       const duplicates = baseList.filter((item) => {
         const keepAmount = item.card?.isGame ? 3 : 1;
+        // Ігноруємо лімітовані картки (вони продаються лише на ринку)
+        if (item.card?.maxSupply > 0) return false;
         return item.amount > keepAmount;
       });
       if (duplicates.length === 0) {

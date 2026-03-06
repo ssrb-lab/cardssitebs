@@ -1785,7 +1785,13 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
 app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
-  if (score < 50) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
+  if (score < 50) {
+    // Дозволяємо вийти з гри при малому рахунку, просто очищаємо стан
+    try {
+      await prisma.user.update({ where: { uid: req.user.uid }, data: { activeMinigame: null } });
+    } catch (e) { /* ignore */ }
+    return res.json({ reward: 0, message: 'Гру закрито.' });
+  }
 
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
