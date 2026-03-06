@@ -1785,8 +1785,6 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
 app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
   const { score } = req.body;
 
-  if (score < 50) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
-
   try {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
@@ -1800,6 +1798,14 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
         : user.activeMinigame;
     if (minigame.game !== 'tetris') {
       return res.status(400).json({ error: 'Неправильна активна гра!' });
+    }
+
+    if (score < 50) {
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { activeMinigame: null },
+      });
+      return res.json({ success: true, earned: 0, profile: updatedUser });
     }
 
     const now = new Date();

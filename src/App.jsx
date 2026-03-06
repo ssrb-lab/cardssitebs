@@ -47,6 +47,7 @@ import {
 import NotificationsModal from './components/NotificationsModal';
 import { GoogleLogin } from '@react-oauth/google';
 import { isToday, getCardWeight } from './utils/helpers';
+import { useStore } from './store';
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from './config/constants';
 
 import logo1 from './assets/logo1.png';
@@ -69,61 +70,59 @@ import AdminView from './views/AdminView';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function App() {
-  const [user, setUser] = useState(undefined);
-  const [profile, setProfile] = useState(null);
-  const [dbInventory, setDbInventory] = useState([]);
-  const [marketListings, setMarketListings] = useState([]);
-  const [showcases, setShowcases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  const user = useStore(s => s.user);
+  const profile = useStore(s => s.profile);
+  const dbInventory = useStore(s => s.dbInventory);
+  const marketListings = useStore(s => s.marketListings);
+  const showcases = useStore(s => s.showcases);
+  const loading = useStore(s => s.loading);
+  const isProcessing = useStore(s => s.isProcessing);
+  const needsRegistration = useStore(s => s.needsRegistration);
+  const authMode = useStore(s => s.authMode);
+  const dbError = useStore(s => s.dbError);
+  const bosses = useStore(s => s.bosses);
+  const cardsCatalog = useStore(s => s.cardsCatalog);
+  const packsCatalog = useStore(s => s.packsCatalog);
+  const achievementsCatalog = useStore(s => s.achievementsCatalog);
+  const cardStats = useStore(s => s.cardStats);
+  const rarities = useStore(s => s.rarities);
+  const dailyRewards = useStore(s => s.dailyRewards);
+  const premiumDailyRewards = useStore(s => s.premiumDailyRewards);
+  const premiumPrice = useStore(s => s.premiumPrice);
+  const premiumDurationDays = useStore(s => s.premiumDurationDays);
+  const premiumShopItems = useStore(s => s.premiumShopItems);
+  const wordleEntryCost = useStore(s => s.wordleEntryCost);
+  const currentView = useStore(s => s.currentView);
+  const selectedPackId = useStore(s => s.selectedPackId);
+  const openingPackId = useStore(s => s.openingPackId);
+  const isRouletteSpinning = useStore(s => s.isRouletteSpinning);
+  const rouletteItems = useStore(s => s.rouletteItems);
+  const pulledCards = useStore(s => s.pulledCards);
+  const viewingCard = useStore(s => s.viewingCard);
+  const viewingPlayerProfile = useStore(s => s.viewingPlayerProfile);
+  const toastMsg = useStore(s => s.toastMsg);
+  const listingCard = useStore(s => s.listingCard);
+  const showTerms = useStore(s => s.showTerms);
+  const showPrivacy = useStore(s => s.showPrivacy);
+  const notifications = useStore(s => s.notifications);
+  const showNotifications = useStore(s => s.showNotifications);
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  const {
+      setUser, setProfile, setDbInventory, setMarketListings, setShowcases, setLoading,
+      setIsProcessing, setNeedsRegistration, setAuthMode, setDbError, setBosses,
+      setCardsCatalog, setPacksCatalog, setAchievementsCatalog, setCardStats,
+      setDailyRewards, setPremiumDailyRewards, setPremiumPrice, setPremiumDurationDays,
+      setPremiumShopItems, setWordleEntryCost, setCurrentView, setSelectedPackId,
+      setOpeningPackId, setIsRouletteSpinning, setRouletteItems, setPulledCards,
+      setViewingCard, setViewingPlayerProfile, setToastMsg, setListingCard,
+      setShowTerms, setShowPrivacy, setNotifications, setShowNotifications, showToast
+  } = useStore.getState();
+
   const actionLock = useRef(false);
   const lastCheckRef = useRef(null);
 
-  const [needsRegistration, setNeedsRegistration] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgotPassword', 'resetPassword'
-  const [dbError, setDbError] = useState('');
-
-  const [bosses, setBosses] = useState([]);
-  const [cardsCatalog, setCardsCatalog] = useState([]);
-  const [packsCatalog, setPacksCatalog] = useState([]);
-  const [achievementsCatalog, setAchievementsCatalog] = useState([]);
-  const [cardStats, setCardStats] = useState({});
-  const [rarities] = useState(DEFAULT_RARITIES);
-  const [dailyRewards, setDailyRewards] = useState([1000, 2000, 3000, 4000, 5000, 6000, 7000]);
-  const [premiumDailyRewards, setPremiumDailyRewards] = useState([
-    2000, 4000, 6000, 8000, 10000, 12000, 15000,
-  ]);
-  const [premiumPrice, setPremiumPrice] = useState(10000);
-  const [premiumDurationDays, setPremiumDurationDays] = useState(30);
-  const [premiumShopItems, setPremiumShopItems] = useState([]);
-  const [wordleEntryCost, setWordleEntryCost] = useState(0);
-
-  const [currentView, setCurrentView] = useState(() => {
-    // Намагаємось отримати збережену вкладку, якщо її немає — за замовчуванням "shop"
-    return localStorage.getItem('lastActiveView') || 'shop';
-  });
-
-  // Додаємо useEffect, який буде зберігати вкладку в localStorage щоразу, коли вона змінюється
-  useEffect(() => {
-    localStorage.setItem('lastActiveView', currentView);
-  }, [currentView]);
-  const [selectedPackId, setSelectedPackId] = useState(null);
-  const [openingPackId, setOpeningPackId] = useState(null);
-  const [isRouletteSpinning, setIsRouletteSpinning] = useState(false);
-  const [rouletteItems, setRouletteItems] = useState([]);
-  const [pulledCards, setPulledCards] = useState([]);
-  const [viewingCard, setViewingCard] = useState(null);
-  const [viewingPlayerProfile, setViewingPlayerProfile] = useState(null);
-  const [toastMsg, setToastMsg] = useState({ text: '', type: '' });
-  const [listingCard, setListingCard] = useState(null);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
-
   const canClaimDaily = profile && !isToday(profile.lastDailyClaim);
 
   const checkIsPremiumActive = (prof) => {
@@ -413,15 +412,6 @@ export default function App() {
     setAuthMode('login');
     setNeedsRegistration(true);
     setLoading(false);
-  };
-
-  // Use a ref to store the timeout ID so it persists across renders
-  const toastTimeoutRef = useRef(null);
-
-  const showToast = (msg, type = 'error') => {
-    setToastMsg({ text: msg, type });
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => setToastMsg({ text: '', type: '' }), 3000);
   };
 
   const reloadMarket = async () => {
@@ -814,6 +804,15 @@ export default function App() {
     try {
       const existing = dbInventory.find((i) => i.id === cardId);
       const cardData = cardsCatalog.find((c) => c.id === cardId);
+
+      // Ігноруємо лімітовані картки
+      if (cardData?.maxSupply > 0) {
+        showToast('Лімітовані картки можна продати лише на ринку гравцям.', 'error');
+        actionLock.current = false;
+        setIsProcessing(false);
+        return;
+      }
+
       const isGameCard = cardData?.isGame;
       const keepAmount = isGameCard ? 3 : 1;
 
@@ -863,6 +862,8 @@ export default function App() {
 
       const duplicates = baseList.filter((item) => {
         const keepAmount = item.card?.isGame ? 3 : 1;
+        // Ігноруємо лімітовані картки (вони продаються лише на ринку)
+        if (item.card?.maxSupply > 0) return false;
         return item.amount > keepAmount;
       });
       if (duplicates.length === 0) {
