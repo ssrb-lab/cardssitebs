@@ -78,7 +78,9 @@ export default function FarmView({
     loadStatuses();
 
     const API_URL = import.meta.env.VITE_API_URL || '/api';
-    const eventSource = new EventSource(`${API_URL}/games/stream`);
+    // Генеруємо унікальний ID клієнта для цього підключення
+    const clientId = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
+    const eventSource = new EventSource(`${API_URL}/games/stream?clientId=${clientId}`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -96,8 +98,19 @@ export default function FarmView({
       }
     };
 
+    // Налаштовуємо Heartbeat інтервал для підтримки з'єднання
+    const HEARTBEAT_INTERVAL = 25000; // 25 секунд
+    const heartbeatTimer = setInterval(() => {
+      fetch(`${API_URL}/games/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId })
+      }).catch((err) => console.warn('SSE Heartbeat failed:', err));
+    }, HEARTBEAT_INTERVAL);
+
     return () => {
       eventSource.close();
+      clearInterval(heartbeatTimer);
     };
   }, []);
 

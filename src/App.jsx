@@ -86,6 +86,7 @@ export default function App() {
   const [dbError, setDbError] = useState('');
 
   const [bosses, setBosses] = useState([]);
+  const [statsRanges, setStatsRanges] = useState({});
   const [cardsCatalog, setCardsCatalog] = useState([]);
   const [packsCatalog, setPacksCatalog] = useState([]);
   const [achievementsCatalog, setAchievementsCatalog] = useState([]);
@@ -226,6 +227,7 @@ export default function App() {
     try {
       const settings = await fetchSettings();
       setBosses(settings.bosses || DEFAULT_BOSSES);
+      setStatsRanges(settings.statsRanges || {});
       setDailyRewards(settings.dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
       setPremiumDailyRewards(
         settings.premiumDailyRewards || [2000, 4000, 6000, 8000, 10000, 12000, 15000]
@@ -1327,6 +1329,7 @@ export default function App() {
             isPremiumActive={isPremiumActive}
             isAdmin={profile?.isAdmin}
             isProcessing={isProcessing}
+            statsRanges={statsRanges}
           />
         )}
         {currentView === 'premium' && (

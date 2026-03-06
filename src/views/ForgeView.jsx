@@ -22,11 +22,14 @@ const RARITY_POWER_RANGES = {
 
 export default function ForgeView({
   inventory,
+  cardsCatalog,
+  packsCatalog,
   rarities,
   profile,
   showToast,
   getToken,
   reloadProfile,
+  statsRanges,
 }) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [isForging, setIsForging] = useState(false);
@@ -184,11 +187,53 @@ export default function ForgeView({
               <div className="flex justify-between items-center mb-6">
                 <div className="flex flex-col">
                   <span className="text-neutral-400 font-bold uppercase text-sm">Вартість:</span>
-                  {selectedCard && (
-                    <span className="text-neutral-500 text-xs mt-1">
-                      Можлива сила: {RARITY_POWER_RANGES[selectedCard.card.rarity]}
-                    </span>
-                  )}
+                  {selectedCard && (() => {
+                    let minP = 5, maxP = 50;
+                    let minH = 10, maxH = 100;
+                    const c = selectedCard.card;
+                    const packInfo = packsCatalog?.find(p => p.id === c.packId);
+                    
+                    let packRanges = {};
+                    if (packInfo?.statsRanges) {
+                       if (typeof packInfo.statsRanges === 'string') {
+                          try { packRanges = JSON.parse(packInfo.statsRanges); } catch (e) {}
+                       } else {
+                          packRanges = packInfo.statsRanges;
+                       }
+                    }
+                    
+                    if (c.minPower !== null && c.maxPower !== null) {
+                       minP = c.minPower; maxP = c.maxPower;
+                    } else if (packRanges && packRanges[c.rarity] && packRanges[c.rarity].minPower !== undefined && packRanges[c.rarity].maxPower !== undefined && packRanges[c.rarity].minPower !== '' && packRanges[c.rarity].maxPower !== '') {
+                       minP = Number(packRanges[c.rarity].minPower);
+                       maxP = Number(packRanges[c.rarity].maxPower);
+                    } else {
+                       const RARITY_POWER_RANGES = { Звичайна: [5, 50], Рідкісна: [10, 80], Епічна: [25, 100], Легендарна: [50, 125], Унікальна: [100, 150] };
+                       const rng = RARITY_POWER_RANGES[c.rarity] || [5, 50];
+                       minP = rng[0]; maxP = rng[1];
+                    }
+                    
+                    if (c.minHp !== null && c.maxHp !== null) {
+                       minH = c.minHp; maxH = c.maxHp;
+                    } else if (packRanges && packRanges[c.rarity] && packRanges[c.rarity].minHp !== undefined && packRanges[c.rarity].maxHp !== undefined && packRanges[c.rarity].minHp !== '' && packRanges[c.rarity].maxHp !== '') {
+                       minH = Number(packRanges[c.rarity].minHp);
+                       maxH = Number(packRanges[c.rarity].maxHp);
+                    } else {
+                       minH = minP * 2;
+                       maxH = maxP * 2;
+                    }
+
+                    return (
+                      <div className="flex flex-col mt-1 gap-1">
+                        <span className="text-neutral-500 text-xs">
+                          Можлива сила: ⚡ {minP}–{maxP}
+                        </span>
+                        <span className="text-neutral-500 text-xs">
+                          Можливі HP: ❤️ {minH}–{maxH}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2 bg-yellow-950/30 px-4 py-2 rounded-xl border border-yellow-900/40">
                   <Coins size={24} className="text-yellow-500" />

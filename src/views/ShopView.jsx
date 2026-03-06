@@ -22,6 +22,14 @@ import { getCardStyle, getCardWeight, playCardSound } from '../utils/helpers';
 import { SELL_PRICE } from '../config/constants';
 import CardFrame from '../components/CardFrame';
 
+const RARITY_POWER_RANGES = {
+  Звичайна: '5–50',
+  Рідкісна: '10–80',
+  Епічна: '25–100',
+  Легендарна: '50–125',
+  Унікальна: '100–150',
+};
+
 export default function ShopView({
   profile,
   packs,
@@ -42,6 +50,7 @@ export default function ShopView({
   isAdmin,
   isProcessing,
   isPremiumActive,
+  statsRanges,
 }) {
   const [roulettePos, setRoulettePos] = useState(0);
   const [rouletteOffset, setRouletteOffset] = useState(0);
@@ -470,6 +479,51 @@ export default function ShopView({
                     >
                       {card.rarity}
                     </div>
+                    {selectedPack.isGame && (() => {
+                      let minP = 5, maxP = 50;
+                      let minH = 10, maxH = 100;
+                      
+                      let packRanges = {};
+                      if (selectedPack.statsRanges) {
+                         if (typeof selectedPack.statsRanges === 'string') {
+                            try { packRanges = JSON.parse(selectedPack.statsRanges); } catch (e) {}
+                         } else {
+                            packRanges = selectedPack.statsRanges;
+                         }
+                      }
+                      
+                      if (card.minPower !== null && card.maxPower !== null) {
+                         minP = card.minPower; maxP = card.maxPower;
+                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minPower !== undefined && packRanges[card.rarity].maxPower !== undefined && packRanges[card.rarity].minPower !== '' && packRanges[card.rarity].maxPower !== '') {
+                         minP = Number(packRanges[card.rarity].minPower);
+                         maxP = Number(packRanges[card.rarity].maxPower);
+                      } else {
+                         const RARITY_POWER_RANGES = { Звичайна: [5, 50], Рідкісна: [10, 80], Епічна: [25, 100], Легендарна: [50, 125], Унікальна: [100, 150] };
+                         const rng = RARITY_POWER_RANGES[card.rarity] || [5, 50];
+                         minP = rng[0]; maxP = rng[1];
+                      }
+                      
+                      if (card.minHp !== null && card.maxHp !== null) {
+                         minH = card.minHp; maxH = card.maxHp;
+                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minHp !== undefined && packRanges[card.rarity].maxHp !== undefined && packRanges[card.rarity].minHp !== '' && packRanges[card.rarity].maxHp !== '') {
+                         minH = Number(packRanges[card.rarity].minHp);
+                         maxH = Number(packRanges[card.rarity].maxHp);
+                      } else {
+                         minH = minP * 2;
+                         maxH = maxP * 2;
+                      }
+
+                      return (
+                        <div className="flex flex-col items-center justify-center gap-0.5 mt-0.5 mb-1 opacity-80">
+                           <div className="text-[10px] sm:text-xs font-bold text-yellow-500 flex items-center justify-center gap-0.5 shadow-sm">
+                             <Zap size={10} strokeWidth={2.5} /> {minP}–{maxP}
+                           </div>
+                           <div className="text-[10px] sm:text-xs font-bold text-red-500 flex items-center justify-center gap-0.5 shadow-sm">
+                             ❤️ {minH}–{maxH}
+                           </div>
+                        </div>
+                      );
+                    })()}
                     <div
                       className="font-bold text-xs leading-tight text-white truncate w-full group-hover:text-yellow-100 transition-colors"
                       title={card.name}

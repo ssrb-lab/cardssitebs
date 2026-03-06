@@ -2965,12 +2965,57 @@ app.post('/api/game/arena/points/:id/claim', authenticate, async (req, res) => {
   }
 });
 
+// Налаштування інтервалів для SSE Heartbeat
+const HEARTBEAT_TIMEOUT = 60000; // 60 секунд (допустимий поріг неактивності)
+const GARBAGE_COLLECTOR_INTERVAL = 30000; // Перевіряти кожні 30 секунд
+
+// Garbage Collector для очищення мертвих SSE-з'єднань
+const sseGarbageCollector = setInterval(() => {
+  const now = Date.now();
+  gameClients = gameClients.filter((client) => {
+    if (now - client.lastActivity > HEARTBEAT_TIMEOUT) {
+      if (!client.writableEnded) {
+        client.end();
+      }
+      console.log(`[SSE] Видалено неактивного клієнта: ${client.id}`);
+      return false;
+    }
+    return true;
+  });
+}, GARBAGE_COLLECTOR_INTERVAL);
+
+process.on('SIGTERM', () => clearInterval(sseGarbageCollector));
+process.on('SIGINT', () => clearInterval(sseGarbageCollector));
+
+// Ендпоінт для отримання heartbeat від клієнтів
+app.post('/api/games/heartbeat', (req, res) => {
+  // Отримуємо ID клієнта. Оскільки це відкритий GET без auth, беремо clientId з тіла
+  const clientId = req.body?.clientId; 
+
+  if (!clientId) {
+    return res.status(400).json({ error: 'Client ID is missing' });
+  }
+
+  // Знаходимо клієнта і оновлюємо timestamp
+  const client = gameClients.find((c) => c.id === clientId);
+  if (client) {
+    client.lastActivity = Date.now();
+  }
+  
+  res.status(200).send('OK');
+});
+
 app.get('/api/games/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   res.write(`data: {"type": "CONNECTED"}\n\n`);
+
+  // Отримуємо унікальний ідентифікатор клієнта
+  const clientId = req.query.clientId || Date.now().toString();
+  res.id = clientId;
+  res.lastActivity = Date.now();
 
   gameClients.push(res);
 
@@ -2983,7 +3028,8 @@ app.get('/api/games/status', async (req, res) => {
   try {
     const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     const blockedGames = settings?.data?.blockedGames || [];
-    res.json({ blockedGames });
+    const statsRanges = settings?.data?.statsRanges || {};
+    res.json({ blockedGames, statsRanges });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Помилка завантаження статусів ігор.' });
