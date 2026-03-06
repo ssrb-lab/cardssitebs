@@ -74,7 +74,6 @@ export default function Game2048({ setProfile, goBack, showToast }) {
         setGameOver(savedGameOver);
         setGameWon(savedGameWon || false);
         setIsInitialized(true);
-        start2048GameRequest(getToken()).catch(console.error);
         return;
       } catch {
         // ignore

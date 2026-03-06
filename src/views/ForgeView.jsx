@@ -41,8 +41,6 @@ export default function ForgeView({
         return;
       }
       item.gameStats.forEach((statVal, index) => {
-        // Пропускаємо картки, що знаходяться у сейфі
-        if (statVal && statVal.inSafe) return;
         const parsed = parseGameStat(statVal, item.card.rarity);
         cards.push({
           card: item.card,

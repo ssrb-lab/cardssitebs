@@ -1229,7 +1229,42 @@ export default function AdminView({
       {/* --- Вкладка: ГРАВЦІ --- */}
       {activeTab === 'users' && (
         <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-4 relative">
+          {!viewingUser && (
+            <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 mb-6 flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+              <div className="flex-1 w-full text-left">
+                <span className="text-white font-bold flex items-center gap-2">
+                  <Coins className="text-yellow-500" /> Швидко видати собі монети:
+                </span>
+              </div>
+              <button
+                onClick={() => giveCoinsToSelf(1000)}
+                className="bg-yellow-600 hover:bg-yellow-500 w-full sm:w-auto px-6 py-2.5 rounded-xl text-yellow-950 font-bold transition-colors shadow-lg"
+              >
+                + 1000
+              </button>
+              <button
+                onClick={() => giveCoinsToSelf(5000)}
+                className="bg-yellow-600 hover:bg-yellow-500 w-full sm:w-auto px-6 py-2.5 rounded-xl text-yellow-950 font-bold transition-colors shadow-lg"
+              >
+                + 5000
+              </button>
 
+              <div className="w-full sm:w-px h-px sm:h-8 bg-neutral-800 mx-2"></div>
+
+              <button
+                onClick={syncAllProfiles}
+                disabled={isSyncing}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-colors shadow-lg flex items-center justify-center gap-2"
+              >
+                {isSyncing ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Database size={18} />
+                )}
+                Синхронізувати Профілі
+              </button>
+            </div>
+          )}
 
           {viewingUser ? (
             <div className="animate-in fade-in slide-in-from-right-4">

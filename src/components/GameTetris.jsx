@@ -116,11 +116,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         setGameOver(sGameOver);
         setTimeElapsed(sTimeElapsed || 0);
         setIsInitialized(true);
-        if (sGameOver) {
-          localStorage.removeItem('tetris_state');
-        } else {
-          startTetrisGameRequest(getToken()).catch(console.error);
-        }
+        if (sGameOver) localStorage.removeItem('tetris_state');
         return;
       } catch (e) {
         console.error('Error loading tetris state', e);
@@ -438,13 +434,16 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   };
 
   const claimReward = async () => {
+    if (score < 50) {
+      showToast('Мінімальний рахунок для отримання нагороди - 50!');
+      localStorage.removeItem('tetris_state');
+      return goBack();
+    }
     setIsProcessing(true);
     try {
       const data = await claimTetrisRewardRequest(getToken(), score);
       setProfile(data.profile);
-      if (score >= 50) {
-        showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
-      }
+      showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
       localStorage.removeItem('tetris_state');
       goBack();
     } catch (e) {
