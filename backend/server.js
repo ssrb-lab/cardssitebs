@@ -503,8 +503,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: 'supportbscard@gmail.com',
-        pass: 'wfxs olow emyd qglp' // App Password instead of regular password
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
       }
     });
 
