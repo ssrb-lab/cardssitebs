@@ -42,6 +42,7 @@ import {
   deleteShowcaseRequest,
   saveShowcaseCardsRequest,
   fetchNotifications,
+  toggleSafeRequest,
 } from './config/api';
 import NotificationsModal from './components/NotificationsModal';
 import { GoogleLogin } from '@react-oauth/google';
@@ -532,7 +533,12 @@ export default function App() {
 
           setTimeout(() => {
             setIsRouletteSpinning(false);
-            const sortedResults = [...results].sort(
+            const mappedResults = results.map(c => ({
+              ...c,
+              generatedPower: c.generatedStats?.power,
+              generatedHp: c.generatedStats?.hp
+            }));
+            const sortedResults = [...mappedResults].sort(
               (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
             );
             setPulledCards(sortedResults);
@@ -554,7 +560,12 @@ export default function App() {
           }, 5000);
         } else {
           setOpeningPackId(null);
-          const sortedResults = [...results].sort(
+          const mappedResults = results.map(c => ({
+            ...c,
+            generatedPower: c.generatedStats?.power,
+            generatedHp: c.generatedStats?.hp
+          }));
+          const sortedResults = [...mappedResults].sort(
             (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
           );
           setPulledCards(sortedResults);
@@ -693,6 +704,29 @@ export default function App() {
       }
     } catch (e) {
       showToast(e.message || 'Помилка продажу.');
+    } finally {
+      actionLock.current = false;
+      setIsProcessing(false);
+    }
+  };
+
+  const toggleSafe = async (cardId, statsIndex, amount, isSafe) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setIsProcessing(true);
+    try {
+      const data = await toggleSafeRequest(getToken(), cardId, statsIndex, amount, isSafe);
+      setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(
+        data.profile.inventory.map((i) => ({
+          id: i.cardId,
+          amount: i.amount,
+          gameStats: i.gameStats,
+        }))
+      );
+      showToast(isSafe ? 'Додано до сейфу 🔒' : 'Забрано з сейфу 🔓', 'success');
+    } catch (e) {
+      showToast(e.message || 'Помилка!', 'error');
     } finally {
       actionLock.current = false;
       setIsProcessing(false);
@@ -1224,8 +1258,8 @@ export default function App() {
             sellDuplicate={sellDuplicate}
             sellAllDuplicates={sellAllDuplicates}
             sellEveryDuplicate={sellEveryDuplicate}
+            toggleSafe={toggleSafe}
             sellPrice={SELL_PRICE}
-            createShowcase={createShowcase}
             deleteShowcase={deleteShowcase}
             setMainShowcase={setMainShowcase}
             saveShowcaseCards={saveShowcaseCards}

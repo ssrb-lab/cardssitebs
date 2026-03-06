@@ -170,6 +170,17 @@ export const sellCardsRequest = async (token, items) => {
   return data;
 };
 
+export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSafe) => {
+  const res = await fetch(`${API_URL}/game/inventory/safe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, statsIndex, amount, isSafe }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка сейфу');
+  return data;
+};
+
 export const rerollPowerRequest = async (token, cardId, currentPower, currentHp) => {
   const response = await fetch(`${API_URL}/game/forge/reroll`, {
     method: 'POST',

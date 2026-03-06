@@ -99,6 +99,10 @@ model CardCatalog {
   weight      Float?
   frame       String?  @default("normal")
   isGame      Boolean  @default(false)
+  minPower    Int?
+  maxPower    Int?
+  minHp       Int?
+  maxHp       Int?
 
   inventoryItems InventoryItem[]
   marketListings MarketListing[]

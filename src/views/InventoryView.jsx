@@ -9,6 +9,8 @@ import {
   GripHorizontal,
   ArrowLeft,
   Volume2,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { getCardStyle, getCardWeight, playCardSound, parseGameStat } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
@@ -25,15 +27,15 @@ const RARITY_MIN_POWER = {
 // Повертає масив об'єктів { power, hp, isRecorded, statsIndex } для картки.
 // isRecorded=false: сила не записана в БД (мінімальний заповнювач).
 function getEffectivePowers(item, packsCatalog = []) {
-  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map((s, idx) => ({ ...parseGameStat(s, item.card.rarity), statsIndex: idx })) : [];
+  const recorded = Array.isArray(item.gameStats) ? item.gameStats.map((s, idx) => ({ ...parseGameStat(s, item.card.rarity), statsIndex: idx, inSafe: !!s?.inSafe })) : [];
   const pack = packsCatalog.find((p) => p.id === item.card.packId);
-  const isGameCard = item.card.isGame || (pack && pack.isGame) || recorded.length > 0;
+  const isGameCard = item.card.isGame || (pack && pack.isGame);
   if (!isGameCard) return [];
   const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
   const parsedDefault = parseGameStat(minPower, item.card.rarity);
-  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true, statsIndex: v.statsIndex }));
+  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true, statsIndex: v.statsIndex, inSafe: v.inSafe }));
   while (powers.length < item.amount) {
-    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: null });
+    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: null, inSafe: false });
   }
   return powers;
 }
@@ -57,6 +59,7 @@ export default function InventoryView({
   profile,
   cardsCatalog,
   cardStats,
+  toggleSafe,
 }) {
   const [tab, setTab] = useState('cards'); // "cards" or "showcases"
 
@@ -72,13 +75,43 @@ export default function InventoryView({
   // Стейт для вікна дублікатів ігрових карток
   const [viewingGameCard, setViewingGameCard] = useState(null);
 
+  // Стейт для Сейфу
+  const [isSafeOpen, setIsSafeOpen] = useState(false);
+  const [safeTransferModal, setSafeTransferModal] = useState(null);
+
   const categories = ['all', ...new Set(packsCatalog.map((p) => p.category || 'Базові'))];
   const relevantPacks =
     filterCategory === 'all'
       ? packsCatalog
       : packsCatalog.filter((p) => (p.category || 'Базові') === filterCategory);
 
-  let filteredInventory = inventory.filter((item) => {
+  // Витягуємо картки з Сейфу
+  const safeCards = [];
+  const inventoryMinusSafe = inventory.map(item => {
+    const pack = packsCatalog.find(p => p.id === item.card.packId);
+    const isGame = item.card.isGame || (pack && pack.isGame);
+    let playableAmount = item.amount;
+
+    if (isGame) {
+      const powers = getEffectivePowers(item, packsCatalog);
+      const safePowers = powers.filter(p => p.inSafe);
+      safePowers.forEach(sp => {
+        safeCards.push({ card: item.card, isGameCard: true, power: sp.power, hp: sp.hp, statsIndex: sp.statsIndex, isRecorded: sp.isRecorded, count: 1 });
+      });
+      playableAmount = powers.filter(p => !p.inSafe).length;
+      return { ...item, amount: playableAmount };
+    } else {
+      const statsArray = Array.isArray(item.gameStats) ? item.gameStats : (typeof item.gameStats === 'string' ? JSON.parse(item.gameStats) : []);
+      const safeCount = statsArray.filter(s => s && s.inSafe).length;
+      if (safeCount > 0) {
+        safeCards.push({ card: item.card, isGameCard: false, count: safeCount });
+      }
+      playableAmount = Math.max(0, item.amount - safeCount);
+      return { ...item, amount: playableAmount };
+    }
+  }).filter(i => i.amount > 0);
+
+  let filteredInventory = inventoryMinusSafe.filter((item) => {
     const pack = packsCatalog.find((p) => p.id === item.card.packId);
     const cat = pack ? pack.category || 'Базові' : 'Базові';
 
@@ -182,7 +215,7 @@ export default function InventoryView({
 
   return (
     <div className="pb-10">
-      <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-sm mx-auto mb-6">
+      <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-md mx-auto mb-6 relative z-40">
         <button
           onClick={() => setTab('cards')}
           className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${tab === 'cards' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
@@ -194,6 +227,13 @@ export default function InventoryView({
           className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${tab === 'showcases' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
         >
           <Star size={16} /> Мої Вітрини
+        </button>
+        <button
+          onClick={() => setIsSafeOpen(!isSafeOpen)}
+          className={`px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 border-l border-neutral-700 ml-1 ${isSafeOpen ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' : 'text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800'}`}
+          title="Сейф (захист від продажу)"
+        >
+          {isSafeOpen ? <Unlock size={18} /> : <Lock size={18} />}
         </button>
       </div>
 
@@ -298,9 +338,18 @@ export default function InventoryView({
                       style={{ animationDelay: `${index * 15}ms`, fillMode: 'backwards' }}
                     >
                       <div
-                        onClick={() =>
-                          !allBasicDefending && setViewingCard({ card: item.card, amount: item.amount })
-                        }
+                        onClick={() => {
+                          if (allBasicDefending) return;
+                          if (isSafeOpen) {
+                            if (!isGameItem) {
+                              setSafeTransferModal({ item, isEnteringSafe: true, maxAmount: item.amount });
+                            } else {
+                              setViewingGameCard({ ...item });
+                            }
+                          } else {
+                            setViewingCard({ card: item.card, amount: item.amount });
+                          }
+                        }}
                         className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
                       >
                         {allBasicDefending && (
@@ -308,7 +357,12 @@ export default function InventoryView({
                             Захищає Арену
                           </div>
                         )}
-                        {Number(item.card.maxSupply) > 0 && (
+                        {safeCards.some(sc => sc.card.id === item.card.id) && (
+                          <div className="absolute top-1 left-1 bg-yellow-900/90 text-yellow-500 font-black text-[10px] px-1.5 py-1.5 rounded-full z-10 border border-yellow-700 shadow-xl" title="Має екземпляри у сейфі">
+                            <Lock size={12} strokeWidth={3} />
+                          </div>
+                        )}
+                        {Number(item.card.maxSupply) > 0 && !safeCards.some(sc => sc.card.id === item.card.id) && (
                           <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700 shadow-xl">
                             {item.card.maxSupply}
                           </div>
@@ -345,26 +399,26 @@ export default function InventoryView({
                       </div>
                       <div className="w-full flex flex-col items-center text-center px-1">
                         <div
-                          className={`text-[10px] font-black uppercase tracking-widest mb-1 ${style.text}`}
+                          className={`text-[10px] font-black uppercase tracking-widest mb-0.5 mt-1 ${style.text}`}
                         >
                           {item.card.rarity}
                         </div>
                         <div
-                          className="font-bold text-sm leading-tight text-white mb-1 line-clamp-1 w-full group-hover:text-yellow-100 transition-colors"
+                          className="font-bold text-sm leading-tight text-white mb-0.5 line-clamp-1 w-full group-hover:text-yellow-100 transition-colors"
                           title={item.card.name}
                         >
                           {item.card.name}
                         </div>
 
                         {isGameItem && (
-                          <div className="flex flex-col items-center justify-center gap-0.5 mb-2 mt-0.5">
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-yellow-500">
-                              <Zap size={10} />
+                          <div className="flex flex-col items-center justify-center gap-0.5 mb-2">
+                            <div className="flex items-center gap-1 text-xs font-bold text-yellow-500">
+                              <Zap size={12} strokeWidth={2.5} />
                               {powers.length === 1
                                 ? `${powers[0].power}`
                                 : `${Math.min(...powers.map(p => p.power))}–${Math.max(...powers.map(p => p.power))}`}
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-red-500">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-red-500">
                               ❤️
                               {powers.length === 1
                                 ? `${powers[0].hp}`
@@ -374,7 +428,7 @@ export default function InventoryView({
                         )}
 
                         {item.amount > 1 ? (
-                          <div className="w-full flex flex-col gap-1.5">
+                          <div className="w-full flex flex-col gap-1.5 mt-0.5">
                             {!isGameItem ? (
                               <>
                                 <button
@@ -442,10 +496,7 @@ export default function InventoryView({
                             )}
                           </div>
                         ) : (
-                          <div className="w-full flex flex-col gap-1.5">
-                            <div className="w-full text-xs py-1.5 text-neutral-500 font-medium">
-                              Один екземпляр
-                            </div>
+                          <div className="w-full flex flex-col gap-1.5 mt-0.5">
                             <button
                               disabled={!isGameItem && allBasicDefending}
                               onClick={(e) => {
@@ -726,16 +777,17 @@ export default function InventoryView({
 
                 <div className="p-6">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {powers.map((powerObj, idx) => {
+                    {powers.filter(p => !p.inSafe).map((powerObj, displayIdx) => {
+                      const idx = powerObj.statsIndex; // <- ВИКОРИСТОВУЄМО ОРИГІНАЛЬНИЙ ІНДЕКС
                       const powerVal = powerObj.power;
                       const hpVal = powerObj.hp;
                       const isRec = powerObj.isRecorded;
                       const isDefending = profile?.defendingInstances?.some(
-                        inst => inst.cardId === viewingGameCard.card.id && inst.statsIndex === powerObj.statsIndex
+                        inst => inst.cardId === viewingGameCard.card.id && inst.statsIndex === idx
                       );
                       return (
                         <div
-                          key={idx}
+                          key={displayIdx}
                           className={`bg-neutral-950 border ${isDefending ? 'border-red-900/50 grayscale opacity-70' : 'border-neutral-800'} rounded-2xl p-4 flex flex-col items-center text-center relative`}
                         >
                           {isDefending && (
@@ -804,6 +856,30 @@ export default function InventoryView({
                             >
                               На Ринок
                             </button>
+                            <button
+                              disabled={isDefending}
+                              onClick={async () => {
+                                await toggleSafe(viewingGameCard.card.id, idx, 1, true);
+                                const newPowers = [...powers];
+                                newPowers[idx].inSafe = true;
+                                const remaining = newPowers.filter(p => !p.inSafe).length;
+
+                                if (remaining <= 0) {
+                                  setViewingGameCard(null);
+                                } else {
+                                  setViewingGameCard({
+                                    ...viewingGameCard,
+                                    amount: remaining,
+                                    gameStats: newPowers
+                                      .filter(p => p.isRecorded)
+                                      .map(p => ({ power: p.power, hp: p.hp, inSafe: p.inSafe })),
+                                  });
+                                }
+                              }}
+                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 border-neutral-700 cursor-not-allowed' : 'bg-yellow-900/40 hover:bg-yellow-600 text-yellow-400 hover:text-white border-yellow-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
+                            >
+                              <Lock size={12} className="inline mr-1 mb-0.5" /> В Сейф
+                            </button>
                           </div>
                         </div>
                       );
@@ -814,6 +890,117 @@ export default function InventoryView({
             </div>
           );
         })()}
+
+      {/* МОДАЛКА ПЕРЕКАЗУ В СЕЙФ/З СЕЙФУ ДЛЯ НЕІГРОВИХ КАРТОК */}
+      {safeTransferModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
+            <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
+              {safeTransferModal.isEnteringSafe ? <Lock className="text-yellow-500" /> : <Unlock className="text-yellow-500" />}
+              {safeTransferModal.isEnteringSafe ? 'Сховати в Сейф' : 'Дістати з Сейфу'}
+            </h3>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const amt = parseInt(e.target.amount.value, 10);
+              if (amt > 0 && amt <= safeTransferModal.maxAmount) {
+                toggleSafe(safeTransferModal.item.card.id, null, amt, safeTransferModal.isEnteringSafe);
+                setSafeTransferModal(null);
+              }
+            }}>
+              <p className="text-sm text-neutral-400 mb-4">
+                Скільки карток "{safeTransferModal.item.card.name}" {safeTransferModal.isEnteringSafe ? 'покласти в сейф' : 'повернути в інвентар'}?
+                (Доступно: {safeTransferModal.maxAmount})
+              </p>
+              <input
+                type="number"
+                name="amount"
+                min="1"
+                max={safeTransferModal.maxAmount}
+                defaultValue="1"
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white font-bold mb-4 focus:outline-none focus:border-yellow-500"
+              />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setSafeTransferModal(null)} className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 rounded-xl transition-colors">
+                  Скасувати
+                </button>
+                <button type="submit" className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-xl transition-colors">
+                  Підтвердити
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DRAWER СЕЙФУ */}
+      {isSafeOpen && (
+        <div className="fixed top-0 bottom-0 left-0 z-50 pointer-events-none">
+          {/* bg-black/60 pointer-events-auto removed to allow clicking cards */}
+          <div className="relative w-80 max-w-[85vw] h-full bg-neutral-900 border-r border-neutral-700 shadow-[20px_0_50px_rgba(0,0,0,0.8)] flex flex-col pt-[72px] animate-in slide-in-from-left duration-300 pointer-events-auto">
+            <div className="px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50 backdrop-blur sticky top-0 z-20">
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 to-yellow-600 flex items-center gap-2">
+                <Lock className="text-yellow-500" strokeWidth={2.5} /> Сейф
+              </h2>
+              <button onClick={() => setIsSafeOpen(false)} className="text-neutral-500 hover:text-white p-2">✕</button>
+            </div>
+
+            <div className="p-4 flex-1 overflow-y-auto">
+              <p className="text-xs text-neutral-400 mb-4 px-1 leading-relaxed">
+                Захищені картки неможливо випадково продати чи виставити на ринок. Натисніть на картку в інвентарі, щоб додати її сюди.
+              </p>
+
+              {safeCards.length === 0 ? (
+                <div className="text-center py-10 opacity-50">
+                  <Lock size={40} className="mx-auto mb-3 text-neutral-600" />
+                  <p className="text-sm">Сейф порожній</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {safeCards.map((pSafe, idx) => {
+                    const style = getCardStyle(pSafe.card.rarity, rarities);
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          if (!pSafe.isGameCard) {
+                            if (pSafe.count > 1) {
+                              setSafeTransferModal({ item: { card: pSafe.card }, isEnteringSafe: false, maxAmount: pSafe.count });
+                            } else {
+                              toggleSafe(pSafe.card.id, null, 1, false);
+                            }
+                          } else {
+                            toggleSafe(pSafe.card.id, pSafe.statsIndex, 1, false);
+                          }
+                        }}
+                        className="relative cursor-pointer group hover:scale-105 transition-transform"
+                      >
+                        <div className={`relative w-full aspect-[2/3] rounded-lg border-2 bg-neutral-950 overflow-hidden ${style.border}`}>
+                          {pSafe.count > 1 && (
+                            <div className="absolute top-1 right-1 bg-black/80 text-white font-black text-[9px] px-1 py-0.5 rounded-sm z-10 border border-neutral-700">
+                              x{pSafe.count}
+                            </div>
+                          )}
+                          <CardFrame frame={pSafe.card.frame}>
+                            <img src={pSafe.card.image} alt="card" className="w-full h-full object-cover" />
+                          </CardFrame>
+                        </div>
+                        {pSafe.isGameCard && (
+                          <div className="mt-1 flex justify-center gap-2 text-[10px] bg-neutral-900 rounded p-1">
+                            <span className="text-yellow-500 font-bold flex items-center gap-0.5"><Zap size={8} />{pSafe.power}</span>
+                            <span className="text-red-500 font-bold">❤️{pSafe.hp}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

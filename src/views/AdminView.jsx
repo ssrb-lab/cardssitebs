@@ -137,6 +137,10 @@ export default function AdminView({
     soundVolume: 0.5,
     frame: 'normal',
     isGame: false,
+    minPower: '',
+    maxPower: '',
+    minHp: '',
+    maxHp: '',
   });
   const [editingPack, setEditingPack] = useState(null);
   const [packForm, setPackForm] = useState({
@@ -746,6 +750,10 @@ export default function AdminView({
         soundVolume: 0.5,
         frame: 'normal',
         isGame: false,
+        minPower: '',
+        maxPower: '',
+        minHp: '',
+        maxHp: '',
       });
       showToast('Картку збережено в MySQL!', 'success');
     } catch {
@@ -3026,6 +3034,61 @@ export default function AdminView({
                   Ігрова картка (Отримує силу при випадінні)
                 </label>
               </div>
+
+              <div className="md:col-span-4 mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-neutral-900/50 p-4 border border-neutral-800 rounded-xl">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
+                    Min Сила (Опц.)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Паку"
+                    value={cardForm.minPower ?? ''}
+                    onChange={(e) => setCardForm({ ...cardForm, minPower: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
+                    Max Сила (Опц.)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Паку"
+                    value={cardForm.maxPower ?? ''}
+                    onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
+                    Min HP (Опц.)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Паку"
+                    value={cardForm.minHp ?? ''}
+                    onChange={(e) => setCardForm({ ...cardForm, minHp: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-red-500 focus:outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
+                    Max HP (Опц.)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Паку"
+                    value={cardForm.maxHp ?? ''}
+                    onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-red-500 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">
@@ -3057,6 +3120,10 @@ export default function AdminView({
                       soundVolume: 0.5,
                       frame: 'normal',
                       isGame: false,
+                      minPower: '',
+                      maxPower: '',
+                      minHp: '',
+                      maxHp: '',
                     });
                   }}
                   className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl"
@@ -3140,6 +3207,10 @@ export default function AdminView({
                             soundUrl: card.soundUrl || '',
                             soundVolume: card.soundVolume !== undefined ? card.soundVolume : 0.5,
                             frame: card.frame || 'normal',
+                            minPower: card.minPower !== null ? card.minPower : '',
+                            maxPower: card.maxPower !== null ? card.maxPower : '',
+                            minHp: card.minHp !== null ? card.minHp : '',
+                            maxHp: card.maxHp !== null ? card.maxHp : '',
                           });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}

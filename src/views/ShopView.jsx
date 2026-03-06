@@ -242,9 +242,18 @@ export default function ShopView({
                   >
                     <Sparkles size={12} /> {card.rarity}
                   </div>
-                  {card.generatedPower && (
-                    <div className="text-xs sm:text-sm font-bold text-green-400 uppercase flex items-center justify-center gap-1 mt-1 mb-1 shadow-sm">
-                      <Zap size={14} /> Сила: {card.generatedPower}
+                  {(card.generatedPower || card.generatedHp) && (
+                    <div className="flex flex-col items-center justify-center gap-1 mt-1 mb-1">
+                      {card.generatedPower && (
+                        <div className="text-xs sm:text-sm font-bold text-yellow-500 flex items-center justify-center gap-1 shadow-sm">
+                          <Zap size={14} strokeWidth={2.5} /> {card.generatedPower}
+                        </div>
+                      )}
+                      {card.generatedHp && (
+                        <div className="text-xs sm:text-sm font-bold text-red-500 flex items-center justify-center gap-1 shadow-sm">
+                          ❤️ {card.generatedHp}
+                        </div>
+                      )}
                     </div>
                   )}
                   <h3 className="font-bold text-white text-xs sm:text-sm truncate w-full group-hover:text-yellow-100 transition-colors">
@@ -590,11 +599,10 @@ function OpenButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${
-        disabled
+      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${disabled
           ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70'
           : `${color} transform hover:-translate-y-1`
-      }`}
+        }`}
     >
       {label ? label : `Відкрити ${amount}x`}
       <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">

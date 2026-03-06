@@ -741,7 +741,15 @@ app.post(
       }
 
       // Переконуємося, що frame передається правильно (fallback на "normal")
-      const cardData = { ...data, frame: data.frame || 'normal', isGame: Boolean(data.isGame) };
+      const cardData = {
+        ...data,
+        frame: data.frame || 'normal',
+        isGame: Boolean(data.isGame),
+        minPower: data.minPower !== '' && data.minPower !== null && data.minPower !== undefined ? Number(data.minPower) : null,
+        maxPower: data.maxPower !== '' && data.maxPower !== null && data.maxPower !== undefined ? Number(data.maxPower) : null,
+        minHp: data.minHp !== '' && data.minHp !== null && data.minHp !== undefined ? Number(data.minHp) : null,
+        maxHp: data.maxHp !== '' && data.maxHp !== null && data.maxHp !== undefined ? Number(data.maxHp) : null,
+      };
 
       const existing = await prisma.cardCatalog.findUnique({ where: { id: cardData.id } });
       let card;
@@ -862,103 +870,117 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     let localPulledCounts = {};
     availableCards.forEach((c) => (localPulledCounts[c.id] = c.pulledCount || 0));
 
-    const generatePower = (rarity) => {
+    const generatePower = (rarity, cardObj) => {
       let min = 0,
         max = 0;
-      let ranges;
-      if (typeof pack.statsRanges === 'string') {
-        try {
-          ranges = JSON.parse(pack.statsRanges);
-        } catch (e) { }
-      } else {
-        ranges = pack.statsRanges;
-      }
 
-      if (
-        ranges &&
-        ranges[rarity] &&
-        ranges[rarity].minPower !== undefined &&
-        ranges[rarity].maxPower !== undefined &&
-        ranges[rarity].minPower !== '' &&
-        ranges[rarity].maxPower !== ''
-      ) {
-        min = Number(ranges[rarity].minPower);
-        max = Number(ranges[rarity].maxPower);
+      // Card logic overriding
+      if (cardObj && cardObj.minPower !== null && cardObj.maxPower !== null) {
+        min = cardObj.minPower;
+        max = cardObj.maxPower;
       } else {
-        switch (rarity) {
-          case 'Унікальна':
-            min = 100;
-            max = 150;
-            break;
-          case 'Легендарна':
-            min = 50;
-            max = 125;
-            break;
-          case 'Епічна':
-            min = 25;
-            max = 100;
-            break;
-          case 'Рідкісна':
-            min = 10;
-            max = 80;
-            break;
-          case 'Звичайна':
-            min = 5;
-            max = 50;
-            break;
-          default:
-            return null;
+        let ranges;
+        if (typeof pack.statsRanges === 'string') {
+          try {
+            ranges = JSON.parse(pack.statsRanges);
+          } catch (e) { }
+        } else {
+          ranges = pack.statsRanges;
+        }
+
+        if (
+          ranges &&
+          ranges[rarity] &&
+          ranges[rarity].minPower !== undefined &&
+          ranges[rarity].maxPower !== undefined &&
+          ranges[rarity].minPower !== '' &&
+          ranges[rarity].maxPower !== ''
+        ) {
+          min = Number(ranges[rarity].minPower);
+          max = Number(ranges[rarity].maxPower);
+        } else {
+          switch (rarity) {
+            case 'Унікальна':
+              min = 100;
+              max = 150;
+              break;
+            case 'Легендарна':
+              min = 50;
+              max = 125;
+              break;
+            case 'Епічна':
+              min = 25;
+              max = 100;
+              break;
+            case 'Рідкісна':
+              min = 10;
+              max = 80;
+              break;
+            case 'Звичайна':
+              min = 5;
+              max = 50;
+              break;
+            default:
+              return null;
+          }
         }
       }
       return Math.floor(Math.random() * (max - min + 1)) + min;
     };
 
-    const generateHp = (rarity) => {
+    const generateHp = (rarity, cardObj) => {
       let min = 0,
         max = 0;
-      let ranges;
-      if (typeof pack.statsRanges === 'string') {
-        try {
-          ranges = JSON.parse(pack.statsRanges);
-        } catch (e) { }
-      } else {
-        ranges = pack.statsRanges;
-      }
 
-      if (
-        ranges &&
-        ranges[rarity] &&
-        ranges[rarity].minHp !== undefined &&
-        ranges[rarity].maxHp !== undefined &&
-        ranges[rarity].minHp !== '' &&
-        ranges[rarity].maxHp !== ''
-      ) {
-        min = Number(ranges[rarity].minHp);
-        max = Number(ranges[rarity].maxHp);
+      // Card logic overriding
+      if (cardObj && cardObj.minHp !== null && cardObj.maxHp !== null) {
+        min = cardObj.minHp;
+        max = cardObj.maxHp;
       } else {
-        switch (rarity) {
-          case 'Унікальна':
-            min = 300;
-            max = 500;
-            break;
-          case 'Легендарна':
-            min = 200;
-            max = 400;
-            break;
-          case 'Епічна':
-            min = 150;
-            max = 300;
-            break;
-          case 'Рідкісна':
-            min = 100;
-            max = 200;
-            break;
-          case 'Звичайна':
-            min = 50;
-            max = 100;
-            break;
-          default:
-            return null;
+        let ranges;
+        if (typeof pack.statsRanges === 'string') {
+          try {
+            ranges = JSON.parse(pack.statsRanges);
+          } catch (e) { }
+        } else {
+          ranges = pack.statsRanges;
+        }
+
+        if (
+          ranges &&
+          ranges[rarity] &&
+          ranges[rarity].minHp !== undefined &&
+          ranges[rarity].maxHp !== undefined &&
+          ranges[rarity].minHp !== '' &&
+          ranges[rarity].maxHp !== ''
+        ) {
+          min = Number(ranges[rarity].minHp);
+          max = Number(ranges[rarity].maxHp);
+        } else {
+          switch (rarity) {
+            case 'Унікальна':
+              min = 300;
+              max = 500;
+              break;
+            case 'Легендарна':
+              min = 200;
+              max = 400;
+              break;
+            case 'Епічна':
+              min = 150;
+              max = 300;
+              break;
+            case 'Рідкісна':
+              min = 100;
+              max = 200;
+              break;
+            case 'Звичайна':
+              min = 50;
+              max = 100;
+              break;
+            default:
+              return null;
+          }
         }
       }
       return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -1011,8 +1033,8 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
 
       let generatedStats = null;
       if (pack.isGame || newCard.isGame) {
-        const power = generatePower(newCard.rarity);
-        const hp = generateHp(newCard.rarity);
+        const power = generatePower(newCard.rarity, newCard);
+        const hp = generateHp(newCard.rarity, newCard);
         generatedStats = { power, hp };
       }
 
@@ -1160,6 +1182,9 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
         });
 
         if (powerIndex > -1) {
+          if (statsArray[powerIndex] && statsArray[powerIndex].inSafe) {
+            throw new Error('Ця картка знаходиться у Сейфі і не може бути виставлена на ринок.');
+          }
           const defInstances = await getDefendingInstances(user.uid);
           const isDefending = defInstances.some(inst => inst.cardId === cardId && inst.statsIndex === powerIndex);
           if (isDefending) {
@@ -1192,12 +1217,16 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           removedHp = parsedHp;
         }
       } else if (statsArray.length > 0) {
-        let weakestIndex = 0;
+        let weakestIndex = -1;
         let minSum = Infinity;
         for (let i = 0; i < statsArray.length; i++) {
           const s = statsArray[i];
+          if (s && s.inSafe) continue; // Пропускаємо сейвлені картки
           const sum = typeof s === 'object' ? (s.power || 0) + (s.hp || 0) : Number(s);
           if (sum < minSum) { minSum = sum; weakestIndex = i; }
+        }
+        if (weakestIndex === -1) {
+          throw new Error('Усі ваші картки цього типу знаходяться у Сейфі.');
         }
         const map = createSpliceMap(statsArray.length, weakestIndex, 1);
         const removed = statsArray.splice(weakestIndex, 1)[0]; // забираємо найслабшу
@@ -1389,6 +1418,78 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
     res.json({ success: true, profile: updatedUser });
   } catch (error) {
     res.status(500).json({ error: 'Помилка скасування лоту.' });
+  }
+});
+
+// ----------------------------------------
+// СЕЙФ КАРТОК (SAFE)
+// ----------------------------------------
+app.post('/api/game/inventory/safe', authenticate, async (req, res) => {
+  const { cardId, statsIndex, amount, isSafe } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено' });
+
+    await prisma.$transaction(async (tx) => {
+      const invItem = await tx.inventoryItem.findUnique({
+        where: { userId_cardId: { userId: user.uid, cardId } },
+      });
+      if (!invItem) throw new Error('Картка не знайдена в інвентарі');
+
+      let statsArray = [];
+      if (invItem.gameStats) {
+        statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+      }
+
+      // Якщо передано конкретний індекс (для ігрових карток)
+      if (statsIndex !== undefined && statsIndex !== null) {
+        if (statsIndex < 0 || statsIndex >= statsArray.length) throw new Error('Невірний індекс картки');
+
+        // Перевіряємо чи не на арені
+        const defInstances = await getDefendingInstances(user.uid);
+        const isDefending = defInstances.some(inst => inst.cardId === cardId && inst.statsIndex === statsIndex);
+        if (isDefending && isSafe) {
+          throw new Error('Не можна покласти в сейф картку, яка зараз на Арені!');
+        }
+
+        if (typeof statsArray[statsIndex] !== 'object' || statsArray[statsIndex] === null) {
+          statsArray[statsIndex] = { power: Number(statsArray[statsIndex]) || 0, hp: 0, inSafe: isSafe };
+        } else {
+          statsArray[statsIndex].inSafe = isSafe;
+        }
+      } else {
+        // Масове перенесення (для неігрових карток, де всі екземпляри однакові)
+        if (amount === undefined || amount === null) throw new Error('Не вказана кількість карток');
+        const transferAmount = Number(amount);
+        if (transferAmount <= 0) throw new Error('Невірна кількість');
+
+        // Рахуємо скільки зараз в сейфі
+        const currentlySafeCount = statsArray.filter(s => s && s.inSafe).length;
+        const targetSafeCount = isSafe ? Math.min(invItem.amount, currentlySafeCount + transferAmount) : Math.max(0, currentlySafeCount - transferAmount);
+
+        statsArray = statsArray.filter(s => typeof s !== 'object' || !s.inSafe);
+        const safeArr = Array(targetSafeCount).fill({ inSafe: true });
+
+        // Зберігаємо оригінальні стати
+        const oldStats = statsArray.filter(s => typeof s === 'object' && !s.inSafe);
+        const oldNumbers = statsArray.filter(s => typeof s !== 'object');
+
+        statsArray = [...oldNumbers, ...oldStats, ...safeArr];
+      }
+
+      await tx.inventoryItem.update({
+        where: { id: invItem.id },
+        data: { gameStats: statsArray },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Помилка сейфу' });
   }
 });
 
@@ -3438,6 +3539,19 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
       case 'giveCard':
         {
           const cardObj = await prisma.cardCatalog.findUnique({ where: { id: payload.cardId } });
+
+          let generatedPower = 50;
+          let generatedHp = 100;
+
+          if (cardObj) {
+            if (cardObj.minPower !== null && cardObj.maxPower !== null) {
+              generatedPower = Math.floor(Math.random() * (cardObj.maxPower - cardObj.minPower + 1)) + cardObj.minPower;
+            }
+            if (cardObj.minHp !== null && cardObj.maxHp !== null) {
+              generatedHp = Math.floor(Math.random() * (cardObj.maxHp - cardObj.minHp + 1)) + cardObj.minHp;
+            }
+          }
+
           let newStats = [];
           if (cardObj?.isGame || payload.power !== undefined || payload.hp !== undefined) {
             for (let i = 0; i < payload.amount; i++) {
@@ -3446,13 +3560,13 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
                   payload.power !== undefined && payload.power !== null
                     ? Number(payload.power)
                     : cardObj?.isGame
-                      ? 50
+                      ? generatedPower
                       : 0,
                 hp:
                   payload.hp !== undefined && payload.hp !== null
                     ? Number(payload.hp)
                     : cardObj?.isGame
-                      ? 100
+                      ? generatedHp
                       : 0,
               });
             }
@@ -4174,6 +4288,9 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
             });
 
             if (powerIndex > -1) {
+              if (statsArray[powerIndex] && statsArray[powerIndex].inSafe) {
+                throw new Error('Ця картка знаходиться у Сейфі!');
+              }
               const defInstances = await getDefendingInstances(user.uid);
               const isDefending = defInstances.some(inst => inst.cardId === item.cardId && inst.statsIndex === powerIndex);
               if (isDefending) {
@@ -4185,25 +4302,36 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
               await syncArenaIndices(tx, user.uid, item.cardId, map);
             } else if (statsArray.length > 0) {
               // Fallback: remove closest match
-              let closestIndex = 0;
+              let closestIndex = -1;
               let minDiff = Infinity;
               for (let i = 0; i < statsArray.length; i++) {
-                const pVal = typeof statsArray[i] === 'object' ? Number(statsArray[i].power) : Number(statsArray[i]);
+                const s = statsArray[i];
+                if (s && s.inSafe) continue; // SKIP SAFE
+                const pVal = typeof s === 'object' ? Number(s.power) : Number(s);
                 const diff = Math.abs(pVal - parsedPower);
                 if (diff < minDiff) { minDiff = diff; closestIndex = i; }
               }
+              if (closestIndex === -1) throw new Error('Всі ваші картки цього типу знаходяться у Сейфі!');
               const map = createSpliceMap(statsArray.length, closestIndex, 1);
               statsArray.splice(closestIndex, 1);
               await syncArenaIndices(tx, user.uid, item.cardId, map);
             }
             // else: no gameStats tracked, skip
           } else {
-            // Продати без конкретної сили: залишити найсильнішу (якщо після продажу залишається >= 1 картка)
+            // Продати без конкретної сили: залишити найсильнішу
             const defInstances = await getDefendingInstances(user.uid);
-            const defendingCountForCard = defInstances.filter(inst => inst.cardId === item.cardId).length;
 
-            if (invItem.amount - item.amount < defendingCountForCard) {
-              throw new Error('Ви не можете продати стільки карток, оскільки деякі з них захищають точку на Арені.');
+            // Рахуємо скільки карток заблоковано (Арена + Сейф)
+            const lockedIndices = new Set();
+            defInstances.filter(inst => inst.cardId === item.cardId).forEach(inst => {
+              if (inst.statsIndex != null) lockedIndices.add(inst.statsIndex);
+            });
+            statsArray.forEach((s, idx) => {
+              if (s && s.inSafe) lockedIndices.add(idx);
+            });
+
+            if (invItem.amount - item.amount < lockedIndices.size) {
+              throw new Error('Ви не можете продати стільки карток, оскільки деякі з них у Сейфі або на Арені.');
             }
 
             if (statsArray.length > 0) {
@@ -4228,13 +4356,16 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 
                 let keptIndices = new Set();
 
-                // 1. Force keep defending
+                // 1. Force keep defending and safe
                 const reqDefendingIndices = defInstances
                   .filter(inst => inst.cardId === item.cardId)
                   .map(inst => inst.statsIndex)
                   .filter(idx => idx !== undefined && idx !== null);
                 reqDefendingIndices.forEach(idx => {
                   if (idx >= 0 && idx < statsArray.length) keptIndices.add(idx);
+                });
+                statsArray.forEach((s, idx) => {
+                  if (s && s.inSafe) keptIndices.add(idx);
                 });
 
                 // 2. Add best specific stats
