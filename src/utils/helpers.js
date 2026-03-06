@@ -1,3 +1,4 @@
+import { safeFetch } from '../config/api';
 import { COLOR_PRESETS } from '../config/constants';
 
 export const isToday = (dateString) => {
@@ -69,7 +70,7 @@ export const getGlobalTime = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    const timeRes = await fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', {
+    const timeRes = await safeFetch('https://worldtimeapi.org/api/timezone/Etc/UTC', {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

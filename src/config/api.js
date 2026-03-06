@@ -1,7 +1,26 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+
+export const safeFetch = async (url, options) => {
+  try {
+    const res = await window.fetch(url, options);
+    res.json = async () => {
+      const text = await res.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch (e) {
+        throw new Error(`Мережева помилка (Код: ${res.status}). Сервер повернув некоректну відповідь.`);
+      }
+    };
+    return res;
+  } catch (error) {
+    throw new Error(`Помилка з'єднання з сервером. Перевірте інтернет.`);
+  }
+};
+
+
 export const loginUser = async (email, password) => {
-  const res = await fetch(`${API_URL}/auth/login`, {
+  const res = await safeFetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -12,7 +31,7 @@ export const loginUser = async (email, password) => {
 };
 
 export const registerUser = async (nickname, email, password) => {
-  const res = await fetch(`${API_URL}/auth/register`, {
+  const res = await safeFetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nickname, email, password }),
@@ -23,7 +42,7 @@ export const registerUser = async (nickname, email, password) => {
 };
 
 export const googleLoginRequest = async (credential) => {
-  const res = await fetch(`${API_URL}/auth/google`, {
+  const res = await safeFetch(`${API_URL}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ credential }),
@@ -40,7 +59,7 @@ export const removeToken = () => localStorage.removeItem('token');
 
 // --- СПОВІЩЕННЯ ---
 export const fetchNotifications = async (token) => {
-  const res = await fetch(`${API_URL}/notifications`, {
+  const res = await safeFetch(`${API_URL}/notifications`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -49,7 +68,7 @@ export const fetchNotifications = async (token) => {
 };
 
 export const markNotificationRead = async (token, notifId) => {
-  const res = await fetch(`${API_URL}/notifications/${notifId}/read`, {
+  const res = await safeFetch(`${API_URL}/notifications/${notifId}/read`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -57,7 +76,7 @@ export const markNotificationRead = async (token, notifId) => {
 };
 
 export const claimNotificationGift = async (token, notifId) => {
-  const res = await fetch(`${API_URL}/notifications/${notifId}/claim`, {
+  const res = await safeFetch(`${API_URL}/notifications/${notifId}/claim`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -67,7 +86,7 @@ export const claimNotificationGift = async (token, notifId) => {
 };
 
 export const sendAdminNotification = async (token, notificationData) => {
-  const res = await fetch(`${API_URL}/admin/notifications`, {
+  const res = await safeFetch(`${API_URL}/admin/notifications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(notificationData),
@@ -79,7 +98,7 @@ export const sendAdminNotification = async (token, notificationData) => {
 
 // --- КАТАЛОГ ТА АДМІНКА ---
 export const fetchCatalog = async () => {
-  const res = await fetch(`${API_URL}/catalog`);
+  const res = await safeFetch(`${API_URL}/catalog`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
@@ -101,7 +120,7 @@ export const saveCardToDb = async (token, cardData) => {
     body = JSON.stringify(cardData);
   }
 
-  const res = await fetch(`${API_URL}/admin/cards`, {
+  const res = await safeFetch(`${API_URL}/admin/cards`, {
     method: 'POST',
     headers,
     body,
@@ -110,7 +129,7 @@ export const saveCardToDb = async (token, cardData) => {
 };
 
 export const deleteCardFromDb = async (token, cardId) => {
-  const res = await fetch(`${API_URL}/admin/cards/${cardId}`, {
+  const res = await safeFetch(`${API_URL}/admin/cards/${cardId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -132,7 +151,7 @@ export const savePackToDb = async (token, packData) => {
     body = JSON.stringify(packData);
   }
 
-  const res = await fetch(`${API_URL}/admin/packs`, {
+  const res = await safeFetch(`${API_URL}/admin/packs`, {
     method: 'POST',
     headers,
     body,
@@ -141,7 +160,7 @@ export const savePackToDb = async (token, packData) => {
 };
 
 export const deletePackFromDb = async (token, packId) => {
-  const res = await fetch(`${API_URL}/admin/packs/${packId}`, {
+  const res = await safeFetch(`${API_URL}/admin/packs/${packId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -149,7 +168,7 @@ export const deletePackFromDb = async (token, packId) => {
 };
 
 export const openPackRequest = async (token, packId, amount) => {
-  const res = await fetch(`${API_URL}/game/open-pack`, {
+  const res = await safeFetch(`${API_URL}/game/open-pack`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ packId, amount }),
@@ -160,7 +179,7 @@ export const openPackRequest = async (token, packId, amount) => {
 };
 
 export const sellCardsRequest = async (token, items) => {
-  const res = await fetch(`${API_URL}/game/sell-cards`, {
+  const res = await safeFetch(`${API_URL}/game/sell-cards`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ items }),
@@ -171,7 +190,7 @@ export const sellCardsRequest = async (token, items) => {
 };
 
 export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSafe) => {
-  const res = await fetch(`${API_URL}/game/inventory/safe`, {
+  const res = await safeFetch(`${API_URL}/game/inventory/safe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ cardId, statsIndex, amount, isSafe }),
@@ -182,7 +201,7 @@ export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSaf
 };
 
 export const rerollPowerRequest = async (token, cardId, currentPower, currentHp) => {
-  const response = await fetch(`${API_URL}/game/forge/reroll`, {
+  const response = await safeFetch(`${API_URL}/game/forge/reroll`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -199,7 +218,7 @@ export const rerollPowerRequest = async (token, cardId, currentPower, currentHp)
 
 // --- CRASH ---
 export const fetchCrashState = async (token) => {
-  const res = await fetch(`${API_URL}/game/crash/state`, {
+  const res = await safeFetch(`${API_URL}/game/crash/state`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -208,7 +227,7 @@ export const fetchCrashState = async (token) => {
 };
 
 export const placeCrashBet = async (token, betAmount) => {
-  const res = await fetch(`${API_URL}/game/crash/bet`, {
+  const res = await safeFetch(`${API_URL}/game/crash/bet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ betAmount }),
@@ -219,7 +238,7 @@ export const placeCrashBet = async (token, betAmount) => {
 };
 
 export const cashOutCrash = async (token) => {
-  const res = await fetch(`${API_URL}/game/crash/cashout`, {
+  const res = await safeFetch(`${API_URL}/game/crash/cashout`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -230,14 +249,14 @@ export const cashOutCrash = async (token) => {
 
 // --- РИНОК ---
 export const fetchMarket = async () => {
-  const res = await fetch(`${API_URL}/game/market`);
+  const res = await safeFetch(`${API_URL}/game/market`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
 };
 
 export const listCardRequest = async (token, cardId, price, power = null, hp = null) => {
-  const res = await fetch(`${API_URL}/game/market/list`, {
+  const res = await safeFetch(`${API_URL}/game/market/list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ cardId, price, power, hp }),
@@ -248,7 +267,7 @@ export const listCardRequest = async (token, cardId, price, power = null, hp = n
 };
 
 export const buyCardRequest = async (token, listingId) => {
-  const res = await fetch(`${API_URL}/game/market/buy`, {
+  const res = await safeFetch(`${API_URL}/game/market/buy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ listingId }),
@@ -259,7 +278,7 @@ export const buyCardRequest = async (token, listingId) => {
 };
 
 export const cancelListingRequest = async (token, listingId) => {
-  const res = await fetch(`${API_URL}/game/market/cancel`, {
+  const res = await safeFetch(`${API_URL}/game/market/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ listingId }),
@@ -271,14 +290,14 @@ export const cancelListingRequest = async (token, listingId) => {
 
 // --- ФАРМ (БОСИ) ---
 export const fetchFarmState = async (token) => {
-  const res = await fetch(`${API_URL}/game/farm/state`, {
+  const res = await safeFetch(`${API_URL}/game/farm/state`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.json();
 };
 
 export const syncFarmHitRequest = async (token, bossId, damageDone, maxHp) => {
-  const res = await fetch(`${API_URL}/game/farm/sync`, {
+  const res = await safeFetch(`${API_URL}/game/farm/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ bossId, damageDone, maxHp }),
@@ -289,7 +308,7 @@ export const syncFarmHitRequest = async (token, bossId, damageDone, maxHp) => {
 };
 
 export const claimFarmRewardRequest = async (token, bossId) => {
-  const res = await fetch(`${API_URL}/game/farm/claim`, {
+  const res = await safeFetch(`${API_URL}/game/farm/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ bossId }),
@@ -300,7 +319,7 @@ export const claimFarmRewardRequest = async (token, bossId) => {
 };
 
 export const adminResetCdRequest = async (token, targetUid, maxHp) => {
-  const res = await fetch(`${API_URL}/admin/farm/reset-cd`, {
+  const res = await safeFetch(`${API_URL}/admin/farm/reset-cd`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ targetUid, maxHp }),
@@ -310,12 +329,12 @@ export const adminResetCdRequest = async (token, targetUid, maxHp) => {
 
 // --- НАЛАШТУВАННЯ ТА ПРОМОКОДИ ---
 export const fetchSettings = async () => {
-  const res = await fetch(`${API_URL}/game/settings`);
+  const res = await safeFetch(`${API_URL}/game/settings`);
   return res.json();
 };
 
 export const saveSettingsRequest = async (token, settingsData) => {
-  const res = await fetch(`${API_URL}/admin/settings`, {
+  const res = await safeFetch(`${API_URL}/admin/settings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(settingsData),
@@ -324,7 +343,7 @@ export const saveSettingsRequest = async (token, settingsData) => {
 };
 
 export const fetchPromosRequest = async (token) => {
-  const res = await fetch(`${API_URL}/admin/promos`, {
+  const res = await safeFetch(`${API_URL}/admin/promos`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -333,7 +352,7 @@ export const fetchPromosRequest = async (token) => {
 };
 
 export const savePromoRequest = async (token, promoData) => {
-  const res = await fetch(`${API_URL}/admin/promos`, {
+  const res = await safeFetch(`${API_URL}/admin/promos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(promoData),
@@ -342,7 +361,7 @@ export const savePromoRequest = async (token, promoData) => {
 };
 
 export const deletePromoRequest = async (token, code) => {
-  const res = await fetch(`${API_URL}/admin/promos/${code}`, {
+  const res = await safeFetch(`${API_URL}/admin/promos/${code}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -350,7 +369,7 @@ export const deletePromoRequest = async (token, code) => {
 };
 
 export const usePromoRequest = async (token, code) => {
-  const res = await fetch(`${API_URL}/game/promos/use`, {
+  const res = await safeFetch(`${API_URL}/game/promos/use`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ code }),
@@ -361,7 +380,7 @@ export const usePromoRequest = async (token, code) => {
 };
 
 export const claimDailyRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/daily-claim`, {
+  const res = await safeFetch(`${API_URL}/game/daily-claim`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -371,7 +390,7 @@ export const claimDailyRequest = async (token) => {
 };
 
 export const updateAvatarRequest = async (token, url) => {
-  const res = await fetch(`${API_URL}/profile/update-avatar`, {
+  const res = await safeFetch(`${API_URL}/profile/update-avatar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ avatarUrl: url }),
@@ -383,7 +402,7 @@ export const uploadAvatarRequest = async (token, file) => {
   const formData = new FormData();
   formData.append('avatar', file);
 
-  const res = await fetch(`${API_URL}/profile/upload-avatar`, {
+  const res = await safeFetch(`${API_URL}/profile/upload-avatar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -394,14 +413,14 @@ export const uploadAvatarRequest = async (token, file) => {
 };
 
 export const fetchLeaderboard = async () => {
-  const res = await fetch(`${API_URL}/game/leaderboard`);
+  const res = await safeFetch(`${API_URL}/game/leaderboard`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
 };
 
 export const buyPremiumRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/buy-premium`, {
+  const res = await safeFetch(`${API_URL}/game/buy-premium`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -411,7 +430,7 @@ export const buyPremiumRequest = async (token) => {
 };
 
 export const setMainShowcaseRequest = async (token, showcaseId) => {
-  const res = await fetch(`${API_URL}/profile/main-showcase`, {
+  const res = await safeFetch(`${API_URL}/profile/main-showcase`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ showcaseId }),
@@ -423,7 +442,7 @@ export const setMainShowcaseRequest = async (token, showcaseId) => {
 
 // --- АДМІНКА: ГРАВЦІ ---
 export const fetchAdminUsers = async (token) => {
-  const res = await fetch(`${API_URL}/admin/users`, {
+  const res = await safeFetch(`${API_URL}/admin/users`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -432,7 +451,7 @@ export const fetchAdminUsers = async (token) => {
 };
 
 export const fetchAdminUserInventory = async (token, targetUid) => {
-  const res = await fetch(`${API_URL}/admin/users/${targetUid}/inventory`, {
+  const res = await safeFetch(`${API_URL}/admin/users/${targetUid}/inventory`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -441,7 +460,7 @@ export const fetchAdminUserInventory = async (token, targetUid) => {
 };
 
 export const adminUserActionRequest = async (token, action, targetUid, payload = {}) => {
-  const res = await fetch(`${API_URL}/admin/users/action`, {
+  const res = await safeFetch(`${API_URL}/admin/users/action`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ action, targetUid, payload }),
@@ -452,14 +471,14 @@ export const adminUserActionRequest = async (token, action, targetUid, payload =
 };
 
 export const fetchPublicProfileRequest = async (uid) => {
-  const res = await fetch(`${API_URL}/profile/public/${uid}`);
+  const res = await safeFetch(`${API_URL}/profile/public/${uid}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
 };
 
 export const changePasswordRequest = async (token, oldPassword, newPassword) => {
-  const res = await fetch(`${API_URL}/profile/change-password`, {
+  const res = await safeFetch(`${API_URL}/profile/change-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -473,7 +492,7 @@ export const changePasswordRequest = async (token, oldPassword, newPassword) => 
 };
 
 export const createShowcaseRequest = async (token, name) => {
-  const res = await fetch(`${API_URL}/profile/showcases`, {
+  const res = await safeFetch(`${API_URL}/profile/showcases`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ name }),
@@ -484,7 +503,7 @@ export const createShowcaseRequest = async (token, name) => {
 };
 
 export const deleteShowcaseRequest = async (token, showcaseId) => {
-  const res = await fetch(`${API_URL}/profile/showcases/${showcaseId}`, {
+  const res = await safeFetch(`${API_URL}/profile/showcases/${showcaseId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -494,7 +513,7 @@ export const deleteShowcaseRequest = async (token, showcaseId) => {
 };
 
 export const saveShowcaseCardsRequest = async (token, showcaseId, cardIds) => {
-  const res = await fetch(`${API_URL}/profile/showcases/${showcaseId}/cards`, {
+  const res = await safeFetch(`${API_URL}/profile/showcases/${showcaseId}/cards`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ cardIds }),
@@ -505,7 +524,7 @@ export const saveShowcaseCardsRequest = async (token, showcaseId, cardIds) => {
 };
 
 export const changeNicknameRequest = async (token, newNickname) => {
-  const res = await fetch(`${API_URL}/profile/change-nickname`, {
+  const res = await safeFetch(`${API_URL}/profile/change-nickname`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ newNickname }),
@@ -516,7 +535,7 @@ export const changeNicknameRequest = async (token, newNickname) => {
 };
 
 export const buyPremiumItemRequest = async (token, item) => {
-  const res = await fetch(`${API_URL}/game/premium-shop/buy`, {
+  const res = await safeFetch(`${API_URL}/game/premium-shop/buy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ item }),
@@ -527,7 +546,7 @@ export const buyPremiumItemRequest = async (token, item) => {
 };
 
 export const createAdminLogRequest = async (token, type, details) => {
-  await fetch(`${API_URL}/admin/logs`, {
+  await safeFetch(`${API_URL}/admin/logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ type, details }),
@@ -535,7 +554,7 @@ export const createAdminLogRequest = async (token, type, details) => {
 };
 
 export const fetchAdminLogsRequest = async (token) => {
-  const res = await fetch(`${API_URL}/admin/logs`, {
+  const res = await safeFetch(`${API_URL}/admin/logs`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -544,14 +563,14 @@ export const fetchAdminLogsRequest = async (token) => {
 };
 
 export const clearAdminLogsRequest = async (token) => {
-  await fetch(`${API_URL}/admin/logs`, {
+  await safeFetch(`${API_URL}/admin/logs`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
 };
 
 export const claim2048RewardRequest = async (token, score) => {
-  const res = await fetch(`${API_URL}/game/2048/claim`, {
+  const res = await safeFetch(`${API_URL}/game/2048/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ score }),
@@ -562,7 +581,7 @@ export const claim2048RewardRequest = async (token, score) => {
 };
 
 export const start2048GameRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/2048/start`, {
+  const res = await safeFetch(`${API_URL}/game/2048/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
@@ -572,7 +591,7 @@ export const start2048GameRequest = async (token) => {
 };
 
 export const claimTetrisRewardRequest = async (token, score) => {
-  const res = await fetch(`${API_URL}/game/tetris/claim`, {
+  const res = await safeFetch(`${API_URL}/game/tetris/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ score }),
@@ -583,7 +602,7 @@ export const claimTetrisRewardRequest = async (token, score) => {
 };
 
 export const startTetrisGameRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/tetris/start`, {
+  const res = await safeFetch(`${API_URL}/game/tetris/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
@@ -593,7 +612,7 @@ export const startTetrisGameRequest = async (token) => {
 };
 
 export const claimFuseRewardRequest = async (token, score) => {
-  const res = await fetch(`${API_URL}/game/fuse/claim`, {
+  const res = await safeFetch(`${API_URL}/game/fuse/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ score }),
@@ -604,7 +623,7 @@ export const claimFuseRewardRequest = async (token, score) => {
 };
 
 export const startFuseGameRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/fuse/start`, {
+  const res = await safeFetch(`${API_URL}/game/fuse/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
@@ -614,7 +633,7 @@ export const startFuseGameRequest = async (token) => {
 };
 
 export const startBlackjackGameRequest = async (token, betAmount) => {
-  const res = await fetch(`${API_URL}/game/blackjack/start`, {
+  const res = await safeFetch(`${API_URL}/game/blackjack/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ betAmount }),
@@ -625,7 +644,7 @@ export const startBlackjackGameRequest = async (token, betAmount) => {
 };
 
 export const hitBlackjackRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/blackjack/hit`, {
+  const res = await safeFetch(`${API_URL}/game/blackjack/hit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
@@ -635,7 +654,7 @@ export const hitBlackjackRequest = async (token) => {
 };
 
 export const standBlackjackRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/blackjack/stand`, {
+  const res = await safeFetch(`${API_URL}/game/blackjack/stand`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });
@@ -645,7 +664,7 @@ export const standBlackjackRequest = async (token) => {
 };
 
 export const getBlackjackStateRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/blackjack/state`, {
+  const res = await safeFetch(`${API_URL}/game/blackjack/state`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -655,7 +674,7 @@ export const getBlackjackStateRequest = async (token) => {
 
 // --- CRASH ---
 export const startCrashGameRequest = async (token, betAmount) => {
-  const res = await fetch(`${API_URL}/game/crash/start`, {
+  const res = await safeFetch(`${API_URL}/game/crash/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ betAmount }),
@@ -666,7 +685,7 @@ export const startCrashGameRequest = async (token, betAmount) => {
 };
 
 export const claimCrashRewardRequest = async (token, gameId, multiplier) => {
-  const res = await fetch(`${API_URL}/game/crash/cashout`, {
+  const res = await safeFetch(`${API_URL}/game/crash/cashout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ gameId, multiplier }),
@@ -677,7 +696,7 @@ export const claimCrashRewardRequest = async (token, gameId, multiplier) => {
 };
 
 export const pollCrashStatusRequest = async (token, gameId) => {
-  const res = await fetch(`${API_URL}/game/crash/${gameId}/status`, {
+  const res = await safeFetch(`${API_URL}/game/crash/${gameId}/status`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -686,14 +705,14 @@ export const pollCrashStatusRequest = async (token, gameId) => {
 };
 
 export const fetchMarketHistoryRequest = async (token) => {
-  const res = await fetch(`${API_URL}/profile/market-history`, {
+  const res = await safeFetch(`${API_URL}/profile/market-history`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.json();
 };
 
 export const clearMyMarketHistoryRequest = async (token) => {
-  const res = await fetch(`${API_URL}/profile/market-history`, {
+  const res = await safeFetch(`${API_URL}/profile/market-history`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -701,7 +720,7 @@ export const clearMyMarketHistoryRequest = async (token) => {
 };
 
 export const adminClearUserMarketHistoryRequest = async (token, targetUid) => {
-  const res = await fetch(`${API_URL}/admin/users/${targetUid}/market-history`, {
+  const res = await safeFetch(`${API_URL}/admin/users/${targetUid}/market-history`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -709,7 +728,7 @@ export const adminClearUserMarketHistoryRequest = async (token, targetUid) => {
 };
 
 export const adminClearAllMarketHistoryRequest = async (token) => {
-  const res = await fetch(`${API_URL}/admin/market-history`, {
+  const res = await safeFetch(`${API_URL}/admin/market-history`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -718,14 +737,14 @@ export const adminClearAllMarketHistoryRequest = async (token) => {
 
 // --- GAME STATUS (ADMIN & PUBLIC) ---
 export const fetchGameStatuses = async () => {
-  const res = await fetch(`${API_URL}/games/status`);
+  const res = await safeFetch(`${API_URL}/games/status`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
 };
 
 export const adminToggleGameStatus = async (token, gameName) => {
-  const res = await fetch(`${API_URL}/admin/games/toggle`, {
+  const res = await safeFetch(`${API_URL}/admin/games/toggle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -740,14 +759,14 @@ export const adminToggleGameStatus = async (token, gameName) => {
 
 // --- ACHIEVEMENTS ---
 export const fetchAdminAchievements = async (token) => {
-  const res = await fetch(`${API_URL}/admin/achievements`, {
+  const res = await safeFetch(`${API_URL}/admin/achievements`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return res.json();
 };
 
 export const saveAchievementSettingsRequest = async (token, achievementData) => {
-  const res = await fetch(`${API_URL}/admin/achievements`, {
+  const res = await safeFetch(`${API_URL}/admin/achievements`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -759,7 +778,7 @@ export const saveAchievementSettingsRequest = async (token, achievementData) => 
 };
 
 export const deleteAchievementSettingsRequest = async (token, id) => {
-  const res = await fetch(`${API_URL}/admin/achievements/${id}`, {
+  const res = await safeFetch(`${API_URL}/admin/achievements/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -768,7 +787,7 @@ export const deleteAchievementSettingsRequest = async (token, id) => {
 
 // --- ARENA MAP POINTS ---
 export const fetchArenaPointsRequest = async (token) => {
-  const res = await fetch(`${API_URL}/game/arena/points`, {
+  const res = await safeFetch(`${API_URL}/game/arena/points`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -777,7 +796,7 @@ export const fetchArenaPointsRequest = async (token) => {
 };
 
 export const createArenaPointRequest = async (token, pointData) => {
-  const res = await fetch(`${API_URL}/admin/arena/points`, {
+  const res = await safeFetch(`${API_URL}/admin/arena/points`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(pointData),
@@ -788,7 +807,7 @@ export const createArenaPointRequest = async (token, pointData) => {
 };
 
 export const deleteArenaPointRequest = async (token, pointId) => {
-  const res = await fetch(`${API_URL}/admin/arena/points/${pointId}`, {
+  const res = await safeFetch(`${API_URL}/admin/arena/points/${pointId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -798,7 +817,7 @@ export const deleteArenaPointRequest = async (token, pointId) => {
 };
 
 export const captureArenaPointRequest = async (token, pointId, cards = []) => {
-  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/capture`, {
+  const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/capture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ cards }),
@@ -809,7 +828,7 @@ export const captureArenaPointRequest = async (token, pointId, cards = []) => {
 };
 
 export const battleArenaPointRequest = async (token, pointId, cards = []) => {
-  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/battle`, {
+  const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/battle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ cards }),
@@ -820,7 +839,7 @@ export const battleArenaPointRequest = async (token, pointId, cards = []) => {
 };
 
 export const claimArenaCrystalsRequest = async (token, pointId) => {
-  const res = await fetch(`${API_URL}/game/arena/points/${pointId}/claim`, {
+  const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
   });

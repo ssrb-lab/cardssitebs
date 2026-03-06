@@ -180,7 +180,7 @@ export default function App() {
       }
 
       try {
-        const res = await fetch(`${API_BASE_URL}/profile`, {
+        const res = await safeFetch(`${API_BASE_URL}/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -276,7 +276,7 @@ export default function App() {
 
     const checkMarketNotifications = async () => {
       try {
-        const res = await fetch(
+        const res = await safeFetch(
           `${API_BASE_URL}/game/market/notifications?lastCheck=${lastCheckRef.current}`,
           {
             headers: { Authorization: `Bearer ${getToken()}` },
@@ -342,7 +342,7 @@ export default function App() {
 
     try {
       if (authMode === 'forgotPassword') {
-        const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        const res = await safeFetch(`${API_BASE_URL}/auth/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email }),
@@ -356,7 +356,7 @@ export default function App() {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token') || '';
 
-        const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        const res = await safeFetch(`${API_BASE_URL}/auth/reset-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, newPassword: password }),
@@ -435,7 +435,7 @@ export default function App() {
 
   const reloadProfile = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/profile`, {
+      const res = await safeFetch(`${API_BASE_URL}/profile`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Keyboard, Loader2, Play } from 'lucide-react';
-import { getToken } from '../config/api';
+import { getToken, safeFetch } from '../config/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -26,7 +26,7 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
   const loadState = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/wordle/state`, {
+      const res = await safeFetch(`${API_BASE_URL}/wordle/state`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) {
@@ -46,7 +46,7 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/wordle/start`, {
+      const res = await safeFetch(`${API_BASE_URL}/wordle/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -69,7 +69,7 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
 
     setIsProcessing(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/wordle/guess`, {
+      const res = await safeFetch(`${API_BASE_URL}/wordle/guess`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
