@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 const { OAuth2Client } = require('google-auth-library');
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const multer = require('multer');
@@ -2067,12 +2067,12 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
     const startResult = await prisma.user.updateMany({
       where: {
         uid: user.uid,
-        blackjackState: null, // Only start if no active game
+        blackjackState: { equals: Prisma.AnyNull }, // Only start if no active game
         coins: { gte: parsedBet }, // Only start if they have enough coins at this exact moment
       },
       data: {
         coins: { decrement: pScore === 21 ? parsedBet - playerState.earnedCoins : parsedBet },
-        blackjackState: pScore === 21 ? null : playerState,
+        blackjackState: pScore === 21 ? Prisma.DbNull : playerState,
       },
     });
 
@@ -2126,9 +2126,9 @@ app.post('/api/game/blackjack/hit', authenticate, async (req, res) => {
       const hitResult = await prisma.user.updateMany({
         where: {
           uid: user.uid,
-          blackjackState: { not: null },
+          blackjackState: { not: Prisma.AnyNull },
         },
-        data: { blackjackState: null },
+        data: { blackjackState: Prisma.DbNull },
       });
 
       if (hitResult.count === 0) {
@@ -2138,7 +2138,7 @@ app.post('/api/game/blackjack/hit', authenticate, async (req, res) => {
       const hitResult = await prisma.user.updateMany({
         where: {
           uid: user.uid,
-          blackjackState: { not: null },
+          blackjackState: { not: Prisma.AnyNull },
         },
         data: { blackjackState: state },
       });
@@ -2209,11 +2209,11 @@ app.post('/api/game/blackjack/stand', authenticate, async (req, res) => {
     const standResult = await prisma.user.updateMany({
       where: {
         uid: user.uid,
-        blackjackState: { not: null },
+        blackjackState: { not: Prisma.AnyNull },
       },
       data: {
         coins: state.earnedCoins > 0 ? { increment: state.earnedCoins } : undefined,
-        blackjackState: null,
+        blackjackState: Prisma.DbNull,
       },
     });
 

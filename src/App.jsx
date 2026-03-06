@@ -43,6 +43,7 @@ import {
   saveShowcaseCardsRequest,
   fetchNotifications,
   toggleSafeRequest,
+  safeFetch,
 } from './config/api';
 import NotificationsModal from './components/NotificationsModal';
 import { GoogleLogin } from '@react-oauth/google';
