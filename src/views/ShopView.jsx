@@ -169,7 +169,7 @@ export default function ShopView({
           Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : '!'}
         </h2>
 
-        <div className="flex flex-wrap justify-center gap-6 mb-10 w-full max-h-[60vh] overflow-y-auto hide-scrollbar p-4">
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-6 mb-6 sm:mb-10 w-full max-h-[60vh] overflow-y-auto hide-scrollbar p-2 sm:p-4">
           {pulledCards.map((card, index) => {
             const style = getCardStyle(card.rarity, rarities);
             const effectClass = card.effect ? `effect-${card.effect}` : '';
@@ -197,7 +197,7 @@ export default function ShopView({
                 }}
               >
                 <div
-                  className={`w-32 sm:w-40 md:w-56 aspect-[2/3] rounded-2xl border-4 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-4 ${effectClass} transform-gpu will-change-transform`}
+                  className={`w-28 sm:w-40 md:w-56 aspect-[2/3] rounded-xl sm:rounded-2xl border-2 sm:border-4 overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.6)] sm:shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-2 sm:mb-4 ${effectClass} transform-gpu will-change-transform`}
                 >
                   <CardFrame frame={card.frame}>
                     <img
@@ -265,19 +265,19 @@ export default function ShopView({
           })}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto px-4 sm:px-0">
           <button
             onClick={() => setPulledCards([])}
-            className="px-8 py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg border border-neutral-700"
+            className="px-6 sm:px-8 py-3 sm:py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg border border-neutral-700 w-full sm:w-auto text-sm sm:text-base"
           >
             Забрати картки
           </button>
           <button
             onClick={sellPulledCards}
             disabled={isProcessing || !hasDuplicates}
-            className="px-8 py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2"
+            className="px-6 sm:px-8 py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2 w-full sm:w-auto text-sm sm:text-base"
           >
-            Продати дублікати (+{duplicateSellPrice} <Coins size={16} />)
+            Продати дублікати (+{duplicateSellPrice} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />)
           </button>
         </div>
       </div>
@@ -303,7 +303,7 @@ export default function ShopView({
           <ArrowLeft size={20} /> Назад
         </button>
 
-        <div className="flex flex-col items-center mb-12 bg-neutral-900/50 p-6 rounded-3xl border border-neutral-800 max-w-3xl mx-auto">
+        <div className="flex flex-col items-center mb-8 sm:mb-12 bg-neutral-900/50 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-neutral-800 max-w-3xl mx-4 sm:mx-auto">
           {selectedPack.isPremiumOnly && (
             <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
               <Gem size={14} /> Преміум Пак
@@ -314,9 +314,9 @@ export default function ShopView({
               Ігровий Пак (Дає сили)
             </div>
           )}
-          <h2 className="text-3xl font-black mb-6 text-white text-center">{selectedPack.name}</h2>
+          <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 text-white text-center">{selectedPack.name}</h2>
 
-          <div className="relative w-48 h-48 mb-8 flex justify-center items-center perspective-1000">
+          <div className="relative w-32 h-32 sm:w-48 sm:h-48 mb-6 sm:mb-8 flex justify-center items-center perspective-1000">
             {openingPackId === selectedPack.id ? (
               <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl border-4 border-indigo-500 shadow-[0_0_40px_rgba(99,102,241,0.6)] animate-pulse flex items-center justify-center">
                 <Loader2 className="animate-spin text-indigo-300 w-12 h-12" />
@@ -335,7 +335,7 @@ export default function ShopView({
             )}
           </div>
 
-          <div className="flex flex-wrap justify-center gap-3 w-full">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-2 sm:gap-3 w-full">
             <OpenButton
               amount={1}
               cost={selectedPack.cost}
@@ -394,7 +394,7 @@ export default function ShopView({
           <h3 className="text-xl font-black mb-6 text-white text-center uppercase tracking-wider">
             Можливі картки в цьому паку (від найрідкісніших)
           </h3>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4 px-2 sm:px-0">
             {packCards.map((card) => {
               const style = getCardStyle(card.rarity, rarities);
               const effectClass = card.effect ? `effect-${card.effect}` : '';
@@ -505,7 +505,7 @@ export default function ShopView({
       </div>
 
       {categoriesList.length > 2 && (
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 hide-scrollbar justify-center max-w-4xl mx-auto">
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 hide-scrollbar justify-start sm:justify-center max-w-4xl mx-auto px-4 sm:px-0">
           {categoriesList.map((c) => (
             <button
               key={c}
@@ -518,47 +518,47 @@ export default function ShopView({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 max-w-4xl mx-auto px-3 sm:px-0">
         {displayedPacks.map((pack) => (
           <button
             key={pack.id}
             onClick={() => setSelectedPackId(pack.id)}
-            className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-3xl p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}
+            className={`bg-neutral-900 border ${pack.isPremiumOnly ? 'border-fuchsia-900/50 hover:border-fuchsia-500' : 'border-neutral-800 hover:border-neutral-600'} rounded-2xl sm:rounded-3xl p-3 sm:p-6 flex flex-col items-center justify-between group transition-colors shadow-lg text-left w-full cursor-pointer hover:-translate-y-1 transform duration-300 relative overflow-hidden`}
           >
             {pack.isHidden && (
-              <div className="absolute top-3 left-3 bg-red-900 text-red-100 text-[10px] px-2 py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
+              <div className="absolute top-2 sm:top-3 left-2 sm:left-3 bg-red-900 text-red-100 text-[8px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-red-500 font-bold uppercase z-10 shadow-lg">
                 Приховано
               </div>
             )}
             {pack.isPremiumOnly && (
-              <div className="absolute top-3 right-3 bg-fuchsia-900 text-fuchsia-100 text-[10px] px-2 py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
-                <Gem size={10} /> Преміум
+              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 bg-fuchsia-900 text-fuchsia-100 text-[8px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-fuchsia-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1">
+                <Gem size={8} className="sm:w-2.5 sm:h-2.5 w-2 h-2" /> <span className="hidden sm:inline">Преміум</span>
               </div>
             )}
             {pack.isGame && (
               <div
-                className={`absolute ${pack.isHidden ? 'top-10' : 'top-3'} left-3 bg-green-900 text-green-100 text-[10px] px-2 py-1 rounded border border-green-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1`}
+                className={`absolute ${pack.isHidden ? 'top-8 sm:top-10' : 'top-2 sm:top-3'} left-2 sm:left-3 bg-green-900 text-green-100 text-[8px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-green-500 font-bold uppercase z-10 shadow-lg flex items-center gap-1`}
               >
-                ⚔ Ігровий
+                ⚔ <span className="hidden sm:inline">Ігровий</span>
               </div>
             )}
 
             <div
-              className={`text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}
+              className={`text-[8px] sm:text-[10px] ${pack.isPremiumOnly ? 'text-fuchsia-400' : 'text-purple-400'} font-bold uppercase tracking-widest text-center mb-1 relative z-10`}
             >
               {pack.category || 'Базові'}
             </div>
-            <h3 className="text-xl font-bold text-white mb-2 text-center w-full relative z-10">
+            <h3 className="text-sm sm:text-xl font-bold text-white mb-2 text-center w-full relative z-10 line-clamp-2 sm:line-clamp-none leading-tight sm:leading-normal min-h-[2.5rem] sm:min-h-0 flex items-center justify-center">
               {pack.name}
             </h3>
 
-            <div className="flex items-center justify-center gap-1.5 text-yellow-500 font-bold mb-4 bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10">
-              {pack.cost} <Coins size={16} />
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-yellow-500 font-bold mb-3 sm:mb-4 bg-yellow-500/10 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10 text-xs sm:text-base">
+              {pack.cost} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />
             </div>
 
-            <div className="relative w-40 h-40 mb-6 flex justify-center items-center perspective-1000">
+            <div className="relative w-20 h-20 sm:w-40 sm:h-40 mb-3 sm:mb-6 flex justify-center items-center perspective-1000">
               <div
-                className={`w-full h-full bg-neutral-800 rounded-2xl border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}
+                className={`w-full h-full bg-neutral-800 rounded-xl sm:rounded-2xl border-2 sm:border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}
               >
                 <img
                   src={pack.image}
@@ -569,7 +569,7 @@ export default function ShopView({
               </div>
             </div>
             <div
-              className={`w-full py-3 rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-2 transition-all relative z-10`}
+              className={`w-full py-2 sm:py-3 text-[10px] sm:text-base rounded-lg sm:rounded-xl font-bold text-neutral-400 group-hover:text-white bg-neutral-950 border ${pack.isPremiumOnly ? 'border-fuchsia-900/30' : 'border-neutral-800'} group-hover:border-neutral-700 flex items-center justify-center gap-1 sm:gap-2 transition-all relative z-10`}
             >
               Детальніше
             </div>
@@ -599,14 +599,14 @@ function OpenButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg ${disabled
+      className={`px-2 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all shadow-lg text-xs sm:text-base ${disabled
           ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70'
           : `${color} transform hover:-translate-y-1`
-        }`}
+        } flex-1 sm:flex-none`}
     >
-      {label ? label : `Відкрити ${amount}x`}
-      <span className="flex items-center text-sm bg-black/20 px-2 py-1 rounded ml-1">
-        {cost * amount} <Coins size={14} className="ml-1" />
+      <span className="text-center">{label ? label : `Відкрити ${amount}x`}</span>
+      <span className="flex items-center text-[10px] sm:text-sm bg-black/20 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded sm:ml-1 mt-0.5 sm:mt-0">
+        {cost * amount} <Coins size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" />
       </span>
     </button>
   );
