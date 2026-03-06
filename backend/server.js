@@ -8,6 +8,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const authenticate = require('./middleware/auth');
@@ -476,6 +477,51 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Помилка логіну:', error);
     res.status(500).json({ error: 'Помилка сервера.' });
+  }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'Користувача з такою електронною поштою не знайдено.' });
+    }
+
+    // Generate random 8 character password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    // Update user password in DB
+    await prisma.user.update({
+      where: { email },
+      data: { passwordHash },
+    });
+
+    // Setup nodemailer
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'supportbscard@gmail.com',
+        pass: 'wfxs olow emyd qglp' // App Password instead of regular password
+      }
+    });
+
+    const mailOptions = {
+      from: 'supportbscard@gmail.com',
+      to: email,
+      subject: 'Відновлення паролю',
+      text: `Ваш новий тимчасовий пароль: ${tempPassword}\n\nБудь ласка, увійдіть використовуючи цей пароль та змініть його в налаштуваннях профілю.`
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+
+    res.json({ success: true, message: 'Тимчасовий пароль відправлено на вашу пошту.' });
+  } catch (error) {
+    console.error('Помилка відновлення паролю:', error);
+    res.status(500).json({ error: 'Помилка сервера при відновленні паролю.' });
   }
 });
 

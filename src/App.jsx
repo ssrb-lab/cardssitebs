@@ -81,7 +81,7 @@ export default function App() {
   const lastCheckRef = useRef(null);
 
   const [needsRegistration, setNeedsRegistration] = useState(false);
-  const [authMode, setAuthMode] = useState('login');
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgotPassword'
   const [dbError, setDbError] = useState('');
 
   const [bosses, setBosses] = useState([]);
@@ -325,12 +325,22 @@ export default function App() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const email = e.target.email.value.trim();
-    const password = e.target.password.value;
     setLoading(true);
     setDbError('');
 
     try {
-      if (authMode === 'register') {
+      if (authMode === 'forgotPassword') {
+        const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Помилка відновлення паролю');
+        showToast(data.message, 'success');
+        setAuthMode('login'); // Redirect to login after success
+      } else if (authMode === 'register') {
+        const password = e.target.password.value;
         const nickname = e.target.nickname.value.trim();
         if (!nickname) throw new Error('Введіть нікнейм!');
         const data = await registerUser(nickname, email, password);
@@ -339,15 +349,17 @@ export default function App() {
         if (autoSound !== null) data.user.autoSoundEnabled = autoSound === 'true';
         setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
+        setNeedsRegistration(false);
       } else {
+        const password = e.target.password.value;
         const data = await loginUser(email, password);
         setToken(data.token);
         const autoSound = localStorage.getItem('autoSoundEnabled');
         if (autoSound !== null) data.user.autoSoundEnabled = autoSound === 'true';
         setUser({ uid: data.user.uid, email: data.user.email });
         setProfile(data.user);
+        setNeedsRegistration(false);
       }
-      setNeedsRegistration(false);
     } catch (err) {
       setDbError(err.message);
     }
@@ -983,9 +995,17 @@ export default function App() {
   if (!user || needsRegistration) {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 font-sans text-neutral-100 relative overflow-hidden">
+        {toastMsg.text && (
+          <div
+            className={`fixed top-20 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full flex items-center gap-2 shadow-lg z-[100] text-white font-medium ${toastMsg.type === 'success' ? 'bg-green-600' : 'bg-red-900'}`}
+          >
+            {toastMsg.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}{' '}
+            {toastMsg.text}
+          </div>
+        )}
         <div className="bg-neutral-900 p-8 rounded-3xl max-w-md w-full relative z-10">
           <h1 className="text-3xl font-black mb-6 text-center text-white">
-            {authMode === 'login' ? 'Вхід' : 'Реєстрація'}
+            {authMode === 'login' ? 'Вхід' : authMode === 'register' ? 'Реєстрація' : 'Відновлення паролю'}
           </h1>
           <form id="auth-form" onSubmit={handleAuthSubmit} className="space-y-4">
             {authMode === 'register' && (
@@ -1004,23 +1024,25 @@ export default function App() {
               placeholder="Електронна пошта"
               className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
             />
-            <input
-              type="password"
-              name="password"
-              required
-              placeholder="Пароль"
-              className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
-              minLength="6"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
-              }}
-            />
+            {authMode !== 'forgotPassword' && (
+              <input
+                type="password"
+                name="password"
+                required
+                placeholder="Пароль"
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
+                minLength="6"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
+                }}
+              />
+            )}
             <button
               id="auth-submit-btn"
               type="submit"
               className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-4 rounded-xl mt-4"
             >
-              {authMode === 'login' ? 'Увійти в гру' : 'Створити акаунт'}
+              {authMode === 'login' ? 'Увійти в гру' : authMode === 'register' ? 'Створити акаунт' : 'Відновити пароль'}
             </button>
           </form>
           <div className="mt-4 flex justify-center w-full">
@@ -1037,7 +1059,7 @@ export default function App() {
                   setProfile(data.user);
                   setNeedsRegistration(false);
                 } catch (err) {
-                  setDbError(err.message);
+                  showToast(err.message || 'Помилка входу через Google.');
                 }
                 setLoading(false);
               }}
@@ -1051,15 +1073,39 @@ export default function App() {
               width="100%"
             />
           </div>
-          <button
-            onClick={() => {
-              setAuthMode(authMode === 'login' ? 'register' : 'login');
-              setDbError('');
-            }}
-            className="w-full text-neutral-400 mt-6 font-bold"
-          >
-            {authMode === 'login' ? 'Немає акаунту? Зареєструватися' : 'Вже є акаунт? Увійти'}
-          </button>
+          <div className="w-full flex flex-col gap-2 mt-6">
+            <button
+              onClick={() => {
+                setAuthMode(authMode === 'login' ? 'register' : 'login');
+                setDbError('');
+              }}
+              className="text-neutral-400 font-bold"
+            >
+              {authMode === 'login' ? 'Немає акаунту? Зареєструватися' : 'Вже є акаунт? Увійти'}
+            </button>
+            {authMode !== 'forgotPassword' && (
+              <button
+                onClick={() => {
+                  setAuthMode('forgotPassword');
+                  setDbError('');
+                }}
+                className="text-neutral-500 hover:text-white transition-colors text-sm"
+              >
+                Забули пароль?
+              </button>
+            )}
+            {authMode === 'forgotPassword' && (
+              <button
+                onClick={() => {
+                  setAuthMode('login');
+                  setDbError('');
+                }}
+                className="text-neutral-500 hover:text-white transition-colors text-sm"
+              >
+                Повернутись до входу
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
