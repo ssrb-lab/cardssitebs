@@ -81,7 +81,7 @@ export default function App() {
   const lastCheckRef = useRef(null);
 
   const [needsRegistration, setNeedsRegistration] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgotPassword'
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgotPassword', 'resetPassword'
   const [dbError, setDbError] = useState('');
 
   const [bosses, setBosses] = useState([]);
@@ -158,6 +158,18 @@ export default function App() {
 
   useEffect(() => {
     const initAuth = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const resetToken = params.get('token');
+      const isResetPath = window.location.pathname === '/reset-password';
+
+      if (isResetPath && resetToken) {
+        setAuthMode('resetPassword');
+        setUser(null);
+        setNeedsRegistration(true);
+        setLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem('token');
 
       if (!token) {
@@ -310,7 +322,7 @@ export default function App() {
         try {
           const notifs = await fetchNotifications(getToken());
           setNotifications(notifs);
-        } catch (err) { }
+        } catch (err) {}
       } catch (e) {
         console.error('Помилка фонового опитування:', e);
       }
@@ -333,12 +345,28 @@ export default function App() {
         const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Помилка відновлення паролю');
         showToast(data.message, 'success');
         setAuthMode('login'); // Redirect to login after success
+      } else if (authMode === 'resetPassword') {
+        const password = e.target.password.value;
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token') || '';
+
+        const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, newPassword: password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Помилка скидання паролю');
+
+        showToast(data.message, 'success');
+        window.history.replaceState({}, document.title, '/');
+        setAuthMode('login');
       } else if (authMode === 'register') {
         const password = e.target.password.value;
         const nickname = e.target.nickname.value.trim();
@@ -545,10 +573,10 @@ export default function App() {
 
           setTimeout(() => {
             setIsRouletteSpinning(false);
-            const mappedResults = results.map(c => ({
+            const mappedResults = results.map((c) => ({
               ...c,
               generatedPower: c.generatedStats?.power,
-              generatedHp: c.generatedStats?.hp
+              generatedHp: c.generatedStats?.hp,
             }));
             const sortedResults = [...mappedResults].sort(
               (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
@@ -572,10 +600,10 @@ export default function App() {
           }, 5000);
         } else {
           setOpeningPackId(null);
-          const mappedResults = results.map(c => ({
+          const mappedResults = results.map((c) => ({
             ...c,
             generatedPower: c.generatedStats?.power,
-            generatedHp: c.generatedStats?.hp
+            generatedHp: c.generatedStats?.hp,
           }));
           const sortedResults = [...mappedResults].sort(
             (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
@@ -626,7 +654,7 @@ export default function App() {
       const invItem = dbInventory.find((i) => i.id === id || i.cardId === id);
       const invAmount = invItem ? invItem.amount : 0;
 
-      const isGameCard = pulledCards.find(c => c.id === id)?.isGame;
+      const isGameCard = pulledCards.find((c) => c.id === id)?.isGame;
       const keepAmount = isGameCard ? 3 : 1;
       const duplicateCount = Math.max(0, invAmount - keepAmount);
       const sellAmount = Math.min(pulledAmount, duplicateCount);
@@ -790,7 +818,10 @@ export default function App() {
       const keepAmount = isGameCard ? 3 : 1;
 
       if (!existing || existing.amount <= keepAmount) {
-        showToast(`Для масового продажу потрібно більше ніж ${keepAmount} шт. цієї картки.`, 'error');
+        showToast(
+          `Для масового продажу потрібно більше ніж ${keepAmount} шт. цієї картки.`,
+          'error'
+        );
         actionLock.current = false;
         setIsProcessing(false);
         return;
@@ -1005,7 +1036,13 @@ export default function App() {
         )}
         <div className="bg-neutral-900 p-8 rounded-3xl max-w-md w-full relative z-10">
           <h1 className="text-3xl font-black mb-6 text-center text-white">
-            {authMode === 'login' ? 'Вхід' : authMode === 'register' ? 'Реєстрація' : 'Відновлення паролю'}
+            {authMode === 'login'
+              ? 'Вхід'
+              : authMode === 'register'
+                ? 'Реєстрація'
+                : authMode === 'resetPassword'
+                  ? 'Встановлення паролю'
+                  : 'Відновлення паролю'}
           </h1>
           <form id="auth-form" onSubmit={handleAuthSubmit} className="space-y-4">
             {authMode === 'register' && (
@@ -1017,13 +1054,15 @@ export default function App() {
                 className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
               />
             )}
-            <input
-              type="email"
-              name="email"
-              required
-              placeholder="Електронна пошта"
-              className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
-            />
+            {authMode !== 'resetPassword' && (
+              <input
+                type="email"
+                name="email"
+                required
+                placeholder="Електронна пошта"
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-4 text-white focus:border-yellow-500 outline-none"
+              />
+            )}
             {authMode !== 'forgotPassword' && (
               <input
                 type="password"
@@ -1042,7 +1081,13 @@ export default function App() {
               type="submit"
               className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-4 rounded-xl mt-4"
             >
-              {authMode === 'login' ? 'Увійти в гру' : authMode === 'register' ? 'Створити акаунт' : 'Відновити пароль'}
+              {authMode === 'login'
+                ? 'Увійти в гру'
+                : authMode === 'register'
+                  ? 'Створити акаунт'
+                  : authMode === 'resetPassword'
+                    ? 'Зберегти новий пароль'
+                    : 'Відновити пароль'}
             </button>
           </form>
           <div className="mt-4 flex justify-center w-full">
@@ -1076,6 +1121,7 @@ export default function App() {
           <div className="w-full flex flex-col gap-2 mt-6">
             <button
               onClick={() => {
+                window.history.replaceState({}, document.title, '/');
                 setAuthMode(authMode === 'login' ? 'register' : 'login');
                 setDbError('');
               }}
@@ -1083,7 +1129,7 @@ export default function App() {
             >
               {authMode === 'login' ? 'Немає акаунту? Зареєструватися' : 'Вже є акаунт? Увійти'}
             </button>
-            {authMode !== 'forgotPassword' && (
+            {(authMode === 'login' || authMode === 'register') && (
               <button
                 onClick={() => {
                   setAuthMode('forgotPassword');
@@ -1094,9 +1140,10 @@ export default function App() {
                 Забули пароль?
               </button>
             )}
-            {authMode === 'forgotPassword' && (
+            {(authMode === 'forgotPassword' || authMode === 'resetPassword') && (
               <button
                 onClick={() => {
+                  window.history.replaceState({}, document.title, '/');
                   setAuthMode('login');
                   setDbError('');
                 }}

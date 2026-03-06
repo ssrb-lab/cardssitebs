@@ -9,6 +9,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const authenticate = require('./middleware/auth');
@@ -25,7 +27,10 @@ const avatarStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `avatar-${req.user?.uid || Date.now()}-${Date.now()}${ext}`);
+    cb(
+      null,
+      `avatar-${req.user?.uid || Date.now()}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`
+    );
   },
 });
 
@@ -47,7 +52,7 @@ const cardsStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.png';
-    cb(null, `item-${Date.now()}-${Math.round(Math.random() * 1000)}${ext}`);
+    cb(null, `item-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
   },
 });
 
@@ -69,9 +74,48 @@ const activeCrashGames = new Map();
 app.use(cors());
 app.use(express.json());
 
+// Загальний ліміт для API
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 хвилин
+  max: 500, // Ліміт кожного IP до 500 запитів на `window`
+  message: { error: 'Забагато запитів з цього IP, будь ласка, спробуйте знову через 15 хвилин' },
+});
+app.use('/api', apiLimiter);
+
+// Ліміт для авторизації
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15, // Ліміт кожного IP до 15 запитів
+  message: { error: 'Забагато спроб авторизації. Спробуйте пізніше.' },
+});
+
 // Роздача статичних файлів (аватарки та картки)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Мідлвар для перевірки реального типу файлу за "magic bytes"
+const validateImageSignature = async (req, res, next) => {
+  if (!req.file) return next();
+
+  try {
+    const { fileTypeFromFile } = await import('file-type');
+    const type = await fileTypeFromFile(req.file.path);
+
+    if (!type || !type.mime.startsWith('image/')) {
+      // Файл не є зображенням, видаляємо його
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Завантажений файл не є валідним зображенням' });
+    }
+
+    next();
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error('Помилка валідації файлу:', err);
+    return res.status(500).json({ error: 'Помилка валідації безпеки файлу' });
+  }
+};
 
 // Мідлвар для перевірки прав адміністратора
 const checkAdmin = async (req, res, next) => {
@@ -317,7 +361,7 @@ const checkAndUnbanUser = async (user) => {
   return user;
 };
 
-app.post('/api/auth/google', async (req, res) => {
+app.post('/api/auth/google', authLimiter, async (req, res) => {
   const { credential } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -336,9 +380,9 @@ app.post('/api/auth/google', async (req, res) => {
 
     if (!user) {
       const existingNick = await prisma.user.findFirst({ where: { nickname } });
-      if (existingNick) nickname = `${nickname}_${Math.floor(Math.random() * 10000)}`;
+      if (existingNick) nickname = `${nickname}_${crypto.randomBytes(4).toString('hex')}`;
 
-      const randomPassword = Math.random().toString(36).slice(-10);
+      const randomPassword = crypto.randomBytes(16).toString('hex');
       const passwordHash = await bcrypt.hash(randomPassword, 10);
 
       user = await prisma.user.create({
@@ -383,7 +427,7 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { nickname, email, password } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -430,7 +474,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -480,7 +524,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   const { email } = req.body;
 
   try {
@@ -489,14 +533,19 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(404).json({ error: 'Користувача з такою електронною поштою не знайдено.' });
     }
 
-    // Generate random 8 character password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    // Generate secure token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = await bcrypt.hash(rawToken, 10);
+    // Token valid for 1 hour
+    const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
-    // Update user password in DB
+    // Update user token in DB
     await prisma.user.update({
       where: { email },
-      data: { passwordHash },
+      data: {
+        resetToken: hashedToken,
+        resetTokenExpiry: tokenExpiry,
+      },
     });
 
     // Setup nodemailer
@@ -508,20 +557,68 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       },
     });
 
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
+
     const mailOptions = {
       from: 'supportbscard@gmail.com',
       to: email,
       subject: 'Відновлення паролю',
-      text: `Ваш новий тимчасовий пароль: ${tempPassword}\n\nБудь ласка, увійдіть використовуючи цей пароль та змініть його в налаштуваннях профілю.`,
+      text: `Ви запросили відновлення паролю.\n\nПерейдіть за посиланням нижче, щоб встановити новий пароль. Це посилання дійсне протягом 1 години:\n\n${resetLink}\n\nЯкщо ви не робили цього запиту, просто проігноруйте цей лист.`,
     };
 
     // Send email
     await transporter.sendMail(mailOptions);
 
-    res.json({ success: true, message: 'Тимчасовий пароль відправлено на вашу пошту.' });
+    res.json({
+      success: true,
+      message: 'Посилання для відновлення паролю відправлено на вашу пошту.',
+    });
   } catch (error) {
     console.error('Помилка відновлення паролю:', error);
     res.status(500).json({ error: 'Помилка сервера при відновленні паролю.' });
+  }
+});
+
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  const { email, token, newPassword } = req.body;
+
+  if (!email || !token || !newPassword) {
+    return res.status(400).json({ error: "Всі поля обов'язкові." });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user || !user.resetToken || !user.resetTokenExpiry) {
+      return res.status(400).json({ error: 'Недійсний запит на відновлення паролю.' });
+    }
+
+    if (new Date() > new Date(user.resetTokenExpiry)) {
+      return res
+        .status(400)
+        .json({ error: 'Токен відновлення паролю закінчився. Запросіть нове посилання.' });
+    }
+
+    const isTokenValid = await bcrypt.compare(token, user.resetToken);
+    if (!isTokenValid) {
+      return res.status(400).json({ error: 'Недійсний токен відновлення паролю.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    res.json({ success: true, message: 'Пароль успішно змінено.' });
+  } catch (error) {
+    console.error('Помилка скидання пароля:', error);
+    res.status(500).json({ error: 'Помилка сервера при зміні пароля.' });
   }
 });
 
@@ -773,6 +870,7 @@ app.post(
   authenticate,
   checkAdmin,
   uploadCard.single('imageFile'),
+  validateImageSignature,
   async (req, res) => {
     try {
       let data;
@@ -840,6 +938,7 @@ app.post(
   authenticate,
   checkAdmin,
   uploadCard.single('imageFile'),
+  validateImageSignature,
   async (req, res) => {
     try {
       let data;
@@ -1969,12 +2068,9 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
     });
 
     if (startResult.count === 0) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Не вдалося розпочати гру. Можливо, у вас вже є активна гра або недостатньо монет.',
-        });
+      return res.status(400).json({
+        error: 'Не вдалося розпочати гру. Можливо, у вас вже є активна гра або недостатньо монет.',
+      });
     }
 
     updatedUser = await prisma.user.findUnique({ where: { uid: user.uid } });
@@ -2128,7 +2224,6 @@ app.post('/api/game/blackjack/stand', authenticate, async (req, res) => {
 // ----------------------------------------
 // CRASH
 // ----------------------------------------
-const crypto = require('crypto');
 
 function getCrashMultiplier(hash) {
   // 1. Беремо перші 52 біти з SHA-256 хешу раунду (13 hex-символів)
@@ -3875,6 +3970,7 @@ app.post(
   '/api/profile/upload-avatar',
   authenticate,
   uploadAvatar.single('avatar'),
+  validateImageSignature,
   async (req, res) => {
     try {
       if (!req.file) {

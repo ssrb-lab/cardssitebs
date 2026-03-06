@@ -51,6 +51,8 @@ model User {
   dailyWordleAttempts  Int      @default(0)
   lastWordlePlayDate   DateTime?
   blackjackState       Json?
+  resetToken           String?
+  resetTokenExpiry     DateTime?
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
