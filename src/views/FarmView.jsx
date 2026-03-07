@@ -62,6 +62,9 @@ export default function FarmView({
   const [activeGame, setActiveGame] = useState(null);
   const [blockedGames, setBlockedGames] = useState([]);
 
+  // Хелпер: адміністратори можуть заходити в заблоковані ігри
+  const isBlocked = (game) => profile?.isAdmin ? false : blockedGames.includes(game);
+
   const actionLock = useRef(false);
   const accumulatedDamage = useRef(0);
 
@@ -116,7 +119,7 @@ export default function FarmView({
 
   // Примусовий вихід з гри, якщо її заблокували в реальному часі
   useEffect(() => {
-    if (activeGame && blockedGames.includes(activeGame)) {
+    if (activeGame && isBlocked(activeGame)) {
       setActiveGame(null);
       showToast('Гра тимчасово недоступна (Заблоковано адміністратором)', 'error');
     }
@@ -366,35 +369,35 @@ export default function FarmView({
         {/* Арена (Виділена окремо) */}
         <div className="mb-8 px-2 w-full">
           <div
-            className={`bg-gradient-to-r ${blockedGames.includes('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
+            className={`bg-gradient-to-r ${isBlocked('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
           >
             <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
               <Trophy
                 size={200}
-                className={blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'}
+                className={isBlocked('arena') ? 'text-neutral-500' : 'text-indigo-400'}
               />
             </div>
 
             <div className="relative z-10 flex-1">
               <div className="flex items-center gap-3 mb-3">
                 <div
-                  className={`p-3 rounded-2xl border flex-shrink-0 ${blockedGames.includes('arena') ? 'bg-neutral-800 border-neutral-700' : 'bg-indigo-500/20 border-indigo-500/30'}`}
+                  className={`p-3 rounded-2xl border flex-shrink-0 ${isBlocked('arena') ? 'bg-neutral-800 border-neutral-700' : 'bg-indigo-500/20 border-indigo-500/30'}`}
                 >
                   <Swords
                     size={32}
                     className={
-                      blockedGames.includes('arena') ? 'text-neutral-500' : 'text-indigo-400'
+                      isBlocked('arena') ? 'text-neutral-500' : 'text-indigo-400'
                     }
                   />
                 </div>
                 <h3
-                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${blockedGames.includes('arena') ? 'text-neutral-500' : 'text-white'}`}
+                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('arena') ? 'text-neutral-500' : 'text-white'}`}
                 >
                   Арена
                 </h3>
               </div>
               <p
-                className={`${blockedGames.includes('arena') ? 'text-neutral-600' : 'text-indigo-200'} text-sm sm:text-base max-w-xl leading-relaxed`}
+                className={`${isBlocked('arena') ? 'text-neutral-600' : 'text-indigo-200'} text-sm sm:text-base max-w-xl leading-relaxed`}
               >
                 Доведіть свою перевагу в епічних PvP битвах проти інших гравців! Здобувайте славу,
                 унікальні нагороди та піднімайтеся на вершину рейтингу.
@@ -403,7 +406,7 @@ export default function FarmView({
 
             <div className="relative z-10 w-full md:w-auto">
               <div className="bg-neutral-950/80 backdrop-blur-md border border-neutral-800 rounded-2xl p-4 text-center">
-                {blockedGames.includes('arena') ? (
+                {isBlocked('arena') ? (
                   <div className="w-full text-red-400 font-bold py-3 px-8 rounded-xl bg-red-900/20 text-center flex items-center justify-center gap-2">
                     <Lock size={20} /> Тимчасово недоступна
                   </div>
@@ -422,27 +425,27 @@ export default function FarmView({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 px-2">
           <div
-            onClick={() => (blockedGames.includes('2048') ? null : setActiveGame('2048'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('2048') ? null : setActiveGame('2048'))}
+            className={`bg-neutral-900 border ${isBlocked('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Gamepad2
                 size={120}
-                className={blockedGames.includes('2048') ? 'text-neutral-500' : 'text-purple-500'}
+                className={isBlocked('2048') ? 'text-neutral-500' : 'text-purple-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('2048') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('2048') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Gamepad2
-                className={blockedGames.includes('2048') ? 'text-neutral-500' : 'text-purple-500'}
+                className={isBlocked('2048') ? 'text-neutral-500' : 'text-purple-500'}
               />{' '}
               Гра 2048
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!
             </p>
-            {blockedGames.includes('2048') ? (
+            {isBlocked('2048') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -454,27 +457,27 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('tetris') ? null : setActiveGame('tetris'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('tetris') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-cyan-900/50 hover:border-cyan-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('tetris') ? null : setActiveGame('tetris'))}
+            className={`bg-neutral-900 border ${isBlocked('tetris') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-cyan-900/50 hover:border-cyan-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Blocks
                 size={120}
-                className={blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-cyan-500'}
+                className={isBlocked('tetris') ? 'text-neutral-500' : 'text-cyan-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('tetris') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Blocks
-                className={blockedGames.includes('tetris') ? 'text-neutral-500' : 'text-cyan-500'}
+                className={isBlocked('tetris') ? 'text-neutral-500' : 'text-cyan-500'}
               />{' '}
               Тетріс
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Класична неонова гра! Збирайте лінії, набирайте рахунок та отримуйте монети.
             </p>
-            {blockedGames.includes('tetris') ? (
+            {isBlocked('tetris') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -486,27 +489,27 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('fuse') ? null : setActiveGame('fuse'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('fuse') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-orange-900/50 hover:border-orange-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('fuse') ? null : setActiveGame('fuse'))}
+            className={`bg-neutral-900 border ${isBlocked('fuse') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-orange-900/50 hover:border-orange-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Zap
                 size={120}
-                className={blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-orange-500'}
+                className={isBlocked('fuse') ? 'text-neutral-500' : 'text-orange-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('fuse') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Zap
-                className={blockedGames.includes('fuse') ? 'text-neutral-500' : 'text-orange-500'}
+                className={isBlocked('fuse') ? 'text-neutral-500' : 'text-orange-500'}
               />{' '}
               Запобіжники
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Шукайте пошкоджені запобіжники на платах та заробляйте монети за кожен рівень!
             </p>
-            {blockedGames.includes('fuse') ? (
+            {isBlocked('fuse') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -518,23 +521,23 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('blackjack') ? null : setActiveGame('blackjack'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('blackjack') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-emerald-900/50 hover:border-emerald-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('blackjack') ? null : setActiveGame('blackjack'))}
+            className={`bg-neutral-900 border ${isBlocked('blackjack') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-emerald-900/50 hover:border-emerald-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Dices
                 size={120}
                 className={
-                  blockedGames.includes('blackjack') ? 'text-neutral-500' : 'text-emerald-500'
+                  isBlocked('blackjack') ? 'text-neutral-500' : 'text-emerald-500'
                 }
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('blackjack') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('blackjack') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Dices
                 className={
-                  blockedGames.includes('blackjack') ? 'text-neutral-500' : 'text-emerald-500'
+                  isBlocked('blackjack') ? 'text-neutral-500' : 'text-emerald-500'
                 }
               />{' '}
               Блекджек
@@ -542,7 +545,7 @@ export default function FarmView({
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Роби ставку, збирай 21 та перемагай дилера у класичній грі Блекджек!
             </p>
-            {blockedGames.includes('blackjack') ? (
+            {isBlocked('blackjack') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -554,27 +557,27 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('wordle') ? null : setActiveGame('wordle'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('wordle') ? null : setActiveGame('wordle'))}
+            className={`bg-neutral-900 border ${isBlocked('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Keyboard
                 size={120}
-                className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
+                className={isBlocked('wordle') ? 'text-neutral-500' : 'text-blue-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('wordle') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Keyboard
-                className={blockedGames.includes('wordle') ? 'text-neutral-500' : 'text-blue-500'}
+                className={isBlocked('wordle') ? 'text-neutral-500' : 'text-blue-500'}
               />{' '}
               Слівце
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Вгадайте українське слово з 5 літер! Тренуйте розум і заробляйте великі призи.
             </p>
-            {blockedGames.includes('wordle') ? (
+            {isBlocked('wordle') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -586,27 +589,27 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('crash') ? null : setActiveGame('crash'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('crash') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-rose-900/50 hover:border-rose-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('crash') ? null : setActiveGame('crash'))}
+            className={`bg-neutral-900 border ${isBlocked('crash') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-rose-900/50 hover:border-rose-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Rocket
                 size={120}
-                className={blockedGames.includes('crash') ? 'text-neutral-500' : 'text-rose-500'}
+                className={isBlocked('crash') ? 'text-neutral-500' : 'text-rose-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('crash') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('crash') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Rocket
-                className={blockedGames.includes('crash') ? 'text-neutral-500' : 'text-rose-500'}
+                className={isBlocked('crash') ? 'text-neutral-500' : 'text-rose-500'}
               />{' '}
               Краш
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Слідкуй за графіком та встигни забрати виграш до того, як ракета впаде!
             </p>
-            {blockedGames.includes('crash') ? (
+            {isBlocked('crash') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>
@@ -618,27 +621,27 @@ export default function FarmView({
           </div>
 
           <div
-            onClick={() => (blockedGames.includes('boss') ? null : setActiveGame('boss'))}
-            className={`bg-neutral-900 border ${blockedGames.includes('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            onClick={() => (isBlocked('boss') ? null : setActiveGame('boss'))}
+            className={`bg-neutral-900 border ${isBlocked('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Swords
                 size={120}
-                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
+                className={isBlocked('boss') ? 'text-neutral-500' : 'text-red-500'}
               />
             </div>
             <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${blockedGames.includes('boss') ? 'text-neutral-500' : 'text-white'}`}
+              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('boss') ? 'text-neutral-500' : 'text-white'}`}
             >
               <Swords
-                className={blockedGames.includes('boss') ? 'text-neutral-500' : 'text-red-500'}
+                className={isBlocked('boss') ? 'text-neutral-500' : 'text-red-500'}
               />{' '}
               Битва з Босом
             </h3>
             <p className="text-neutral-400 text-sm mb-6 relative z-10">
               Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.
             </p>
-            {blockedGames.includes('boss') ? (
+            {isBlocked('boss') ? (
               <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
                 <Lock size={16} /> Тимчасово недоступна
               </div>

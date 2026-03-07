@@ -806,6 +806,17 @@ export const createArenaPointRequest = async (token, pointData) => {
   return data;
 };
 
+export const updateArenaPointRequest = async (token, pointId, pointData) => {
+  const res = await safeFetch(`${API_URL}/admin/arena/points/${pointId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(pointData),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 export const deleteArenaPointRequest = async (token, pointId) => {
   const res = await safeFetch(`${API_URL}/admin/arena/points/${pointId}`, {
     method: 'DELETE',

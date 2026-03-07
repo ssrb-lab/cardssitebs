@@ -2402,7 +2402,7 @@ app.get('/api/game/arena/points', authenticate, async (req, res) => {
 });
 
 app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) => {
-  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour } = req.body;
+  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds } = req.body;
   try {
     const newPoint = await prisma.arenaPoint.create({
       data: {
@@ -2414,11 +2414,38 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
         entryFee: entryFee ? Number(entryFee) : 0,
         cooldownMinutes: cooldownMinutes ? Number(cooldownMinutes) : 15,
         crystalRatePerHour: crystalRatePerHour ? Number(crystalRatePerHour) : 0,
+        areaPolygon: areaPolygon || [],
+        isLandingZone: !!isLandingZone,
+        neighborIds: Array.isArray(neighborIds) ? neighborIds : [],
       },
     });
     res.json({ success: true, point: newPoint });
   } catch (error) {
     res.status(500).json({ error: 'Помилка створення точки.' });
+  }
+});
+
+app.put('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds } = req.body;
+  try {
+    const updatedPoint = await prisma.arenaPoint.update({
+      where: { id },
+      data: {
+        name: name || 'Точка Арени',
+        icon: icon || 'castle',
+        color: color || '#4f46e5',
+        entryFee: entryFee !== undefined ? Number(entryFee) : 0,
+        cooldownMinutes: cooldownMinutes !== undefined ? Number(cooldownMinutes) : 15,
+        crystalRatePerHour: crystalRatePerHour !== undefined ? Number(crystalRatePerHour) : 0,
+        areaPolygon: areaPolygon,
+        isLandingZone: isLandingZone !== undefined ? !!isLandingZone : undefined,
+        neighborIds: Array.isArray(neighborIds) ? neighborIds : undefined,
+      },
+    });
+    res.json({ success: true, point: updatedPoint });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка оновлення точки.' });
   }
 });
 
@@ -2536,6 +2563,20 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
     const point = await prisma.arenaPoint.findUnique({ where: { id } });
 
     if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
+
+    // Перевірка доступу: якщо точка НЕ landing zone — гравець повинен володіти хоча б одним сусідом
+    if (!point.isLandingZone) {
+      const neighborIds = Array.isArray(point.neighborIds) ? point.neighborIds : [];
+      if (neighborIds.length === 0) {
+        return res.status(400).json({ error: 'Ця точка недоступна для захоплення (немає з\'єднаних зон висадки).' });
+      }
+      const ownedNeighbors = await prisma.arenaPoint.findMany({
+        where: { id: { in: neighborIds }, ownerId: user.uid },
+      });
+      if (ownedNeighbors.length === 0) {
+        return res.status(400).json({ error: 'Щоб атакувати цю точку, спершу захопіть сусідню зону!' });
+      }
+    }
 
     if (!point.ownerId) {
       // Точка пуста, перший гравець може її захопити
@@ -2705,6 +2746,20 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     if (point.ownerId === user.uid)
       return res.status(400).json({ error: 'Ви не можете атакувати власну точку.' });
 
+    // Перевірка доступу: якщо точка НЕ landing zone — гравець повинен володіти хоча б одним сусідом
+    if (!point.isLandingZone) {
+      const neighborIds = Array.isArray(point.neighborIds) ? point.neighborIds : [];
+      if (neighborIds.length === 0) {
+        return res.status(400).json({ error: 'Ця точка недоступна для атаки (немає з\'єднаних зон висадки).' });
+      }
+      const ownedNeighbors = await prisma.arenaPoint.findMany({
+        where: { id: { in: neighborIds }, ownerId: user.uid },
+      });
+      if (ownedNeighbors.length === 0) {
+        return res.status(400).json({ error: 'Щоб атакувати цю точку, спершу захопіть сусідню зону!' });
+      }
+    }
+
     if (!cards || !Array.isArray(cards) || cards.length !== 5) {
       return res.status(400).json({ error: 'Для бою необхідно рівно 5 карт.' });
     }
@@ -2723,22 +2778,28 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
     // Симуляція бою
     const attackerCards = validatedCards;
-    const defenderCards = (point.defendingCards || []).map((c) => ({
-      ...c,
-      currentHp: c.hp !== undefined && c.hp !== null ? c.hp : c.power || 1,
-      maxHp:
-        c.maxHp !== undefined && c.maxHp !== null
-          ? c.maxHp
-          : c.hp !== undefined && c.hp !== null
-            ? c.hp
-            : c.power || 1,
-    }));
+    const defenderCards = (point.defendingCards || []).map((c) => {
+      const maxHp = (c.maxHp !== undefined && c.maxHp !== null && c.maxHp > 0)
+        ? c.maxHp
+        : (c.hp !== undefined && c.hp !== null && c.hp > 0)
+          ? c.hp
+          : c.power || 1;
+      const currentHp = (c.hp !== undefined && c.hp !== null && c.hp > 0)
+        ? c.hp
+        : maxHp; // Якщо hp = 0 або відсутнє — відновлюємо до maxHp
+      return { ...c, currentHp, maxHp };
+    });
 
     const battleLog = [];
     const isTeamDead = (team) => team.every((c) => c.currentHp <= 0);
 
     if (isTeamDead(attackerCards)) {
       return res.status(400).json({ error: "Ваші картки не мають здоров'я (0 ХП) для бою!" });
+    }
+
+    // Захист від корумпованих даних: якщо всі захисники мертві — атакуючий перемагає без бою
+    if (isTeamDead(defenderCards)) {
+      battleLog.push({ note: 'Захисники не мали HP — автоматична перемога атакуючого.' });
     }
 
     // Функція пошуку цілі (спочатку навпроти, потім найближча)
@@ -2775,7 +2836,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             anyAttackMade = true;
             const baseDmg = attackerCards[i].power;
             const range = baseDmg * 0.25;
-            const damage = Math.floor(baseDmg - range + Math.random() * (range * 2));
+            const damage = Math.max(1, Math.floor(baseDmg - range + Math.random() * (range * 2)));
 
             defenderCards[targetIdx].currentHp -= damage;
 
@@ -2796,7 +2857,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             anyAttackMade = true;
             const baseDmg = defenderCards[i].power;
             const range = baseDmg * 0.25;
-            const damage = Math.floor(baseDmg - range + Math.random() * (range * 2));
+            const damage = Math.max(1, Math.floor(baseDmg - range + Math.random() * (range * 2)));
 
             attackerCards[targetIdx].currentHp -= damage;
 
@@ -2814,7 +2875,26 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       if (!anyAttackMade) break; // Захист від нескінченного циклу, якщо ніхто не може атакувати
     }
 
-    const attackerWon = isTeamDead(defenderCards);
+    // Визначення переможця
+    let attackerWon;
+    if (isTeamDead(defenderCards)) {
+      attackerWon = true;
+    } else if (isTeamDead(attackerCards)) {
+      attackerWon = false;
+    } else {
+      // Тайм-аут (MAX_TURNS досягнуто) — перемагає той, хто зберіг більше % HP
+      const calcHpPercent = (team) => {
+        const alive = team.filter((c) => c.currentHp > 0);
+        if (alive.length === 0) return 0;
+        return alive.reduce((sum, c) => sum + (c.currentHp / (c.maxHp || 1)), 0) / team.length;
+      };
+      const attackerHpPct = calcHpPercent(attackerCards);
+      const defenderHpPct = calcHpPercent(defenderCards);
+      attackerWon = attackerHpPct >= defenderHpPct; // Нічия = перемога атакуючого
+      battleLog.push({
+        note: `Тайм-аут (${turnCount} ходів). Атакуючий HP: ${(attackerHpPct * 100).toFixed(1)}%, Захисник HP: ${(defenderHpPct * 100).toFixed(1)}%`,
+      });
+    }
     let updatedPoint = point;
 
     await prisma.$transaction(async (tx) => {
@@ -4540,7 +4620,7 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
         }
 
         const price = card.sellPrice || 15;
-        const earn = price * item.amount;
+        let earn = price * item.amount; // Буде перераховано після можливого обрізання
 
         // Перевіряємо, чи є в інвентарі достатньо карток
         const invItem = await tx.inventoryItem.findUnique({
@@ -4625,11 +4705,17 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
               if (s && s.inSafe) lockedIndices.add(idx);
             });
 
-            if (invItem.amount - item.amount < lockedIndices.size) {
+            // Замість блокування — зменшуємо sell amount, щоб не зачепити заблоковані картки
+            const maxSellable = Math.max(0, invItem.amount - lockedIndices.size);
+            if (maxSellable === 0) {
               throw new Error(
-                'Ви не можете продати стільки карток, оскільки деякі з них у Сейфі або на Арені.'
+                'Всі картки цього типу заблоковані (Сейф або Арена).'
               );
             }
+            if (item.amount > maxSellable) {
+              item.amount = maxSellable;
+            }
+            earn = price * item.amount; // Перераховуємо після можливого обрізання
 
             if (statsArray.length > 0) {
               const remainingAmount = invItem.amount - item.amount; // скільки карток лишається
@@ -4746,7 +4832,7 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
       include: { inventory: true },
     });
 
-    res.json({ success: true, earned: totalEarned, profile: updatedUser });
+    res.json({ success: true, earned: totalEarned, totalRemoved: totalCardsRemoved, profile: updatedUser });
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message || 'Помилка продажу карток.' });

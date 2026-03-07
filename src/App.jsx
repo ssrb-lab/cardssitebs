@@ -849,7 +849,14 @@ export default function App() {
           gameStats: i.gameStats,
         }))
       );
-      showToast(`Продано ${sellCount} шт. за ${data.earned} монет!`, 'success');
+
+      // Перевіряємо чи сервер продав менше ніж ми просили (заблоковані картки)
+      const actualSold = data.totalRemoved || sellCount;
+      if (actualSold < sellCount) {
+        showToast(`Продано ${actualSold} шт. за ${data.earned} монет! (${sellCount - actualSold} пропущено — Сейф/Арена)`, 'success');
+      } else {
+        showToast(`Продано ${actualSold} шт. за ${data.earned} монет!`, 'success');
+      }
     } catch (e) {
       showToast(e.message || 'Помилка під час масового продажу.');
     } finally {
@@ -894,6 +901,8 @@ export default function App() {
         };
       });
 
+      const totalRequested = itemsToSell.reduce((s, i) => s + i.amount, 0);
+
       const data = await sellCardsRequest(getToken(), itemsToSell);
       setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
@@ -903,7 +912,13 @@ export default function App() {
           gameStats: i.gameStats,
         }))
       );
-      showToast(`Продано всі дублікати! Отримано ${data.earned} монет.`, 'success');
+
+      const actualSold = data.totalRemoved || totalRequested;
+      if (actualSold < totalRequested) {
+        showToast(`Продано дублікати! Отримано ${data.earned} монет. (${totalRequested - actualSold} карт пропущено — Сейф/Арена)`, 'success');
+      } else {
+        showToast(`Продано всі дублікати! Отримано ${data.earned} монет.`, 'success');
+      }
     } catch (e) {
       showToast(e.message || 'Помилка під час масового продажу інвентарю.');
     } finally {

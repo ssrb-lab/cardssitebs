@@ -232,5 +232,8 @@ model ArenaPoint {
   capturedAt         DateTime?
   crystalsLastClaimedAt DateTime?
   defendingCards     Json      @default("[]")
+  areaPolygon        Json?     @default("[]")
+  isLandingZone      Boolean   @default(false)
+  neighborIds        Json?     @default("[]")
   createdAt          DateTime  @default(now())
 }
