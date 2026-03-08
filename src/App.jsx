@@ -331,10 +331,34 @@ export default function App() {
       }
     };
 
-    const interval = setInterval(checkMarketNotifications, 10000);
+    // Initial check on load
     checkMarketNotifications();
 
-    return () => clearInterval(interval);
+    // Підключення до SSE для персональних сповіщень (наприклад, продажі на ринку)
+    const token = getToken();
+    if (!token) return;
+
+    const eventSource = new EventSource(`${API_BASE_URL}/notifications/stream?token=${token}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'MARKET_SALE' || data.type === 'BANNED') {
+          checkMarketNotifications();
+        }
+      } catch (e) {
+        console.error('Помилка обробки SSE:', e);
+      }
+    };
+
+    eventSource.onerror = (e) => {
+      console.warn('Помилка підключення SSE до персональних сповіщень', e);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, [user, profile, needsRegistration]);
 
   const handleAuthSubmit = async (e) => {

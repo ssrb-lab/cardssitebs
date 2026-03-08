@@ -69,6 +69,23 @@ const uploadCard = multer({
 // SSE Clients for real-time game status updates
 let gameClients = [];
 
+// SSE Clients for user-specific real-time notifications
+let userSSEClients = {};
+
+// Helper to send real-time notification to a specific user
+const sendUserNotification = (uid, data) => {
+  if (userSSEClients[uid]) {
+    const message = `data: ${JSON.stringify(data)}\n\n`;
+    userSSEClients[uid].forEach((client) => {
+      // Use setImmediate to avoid blocking or write errors in transactions
+      setImmediate(() => {
+        client.write(message);
+        if (client.flush) client.flush(); // If compression middleware is used
+      });
+    });
+  }
+};
+
 // Активні ігри Crash
 const activeCrashGames = new Map();
 
@@ -1542,6 +1559,9 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
       where: { uid: req.user.uid },
       include: { inventory: true },
     });
+
+    // Notify the seller via SSE
+    sendUserNotification(listing.sellerId, { type: 'MARKET_SALE' });
 
     // Перевірка ачівки для паку купленої картки
     const boughtCard = await prisma.cardCatalog.findUnique({ where: { id: listing.cardId } });
@@ -3231,10 +3251,52 @@ const sseGarbageCollector = setInterval(() => {
     }
     return true;
   });
+
+  // User notifications clients
+  for (const uid in userSSEClients) {
+    if (userSSEClients.hasOwnProperty(uid)) {
+      userSSEClients[uid].forEach(client => {
+        if (now - client.lastActivity > HEARTBEAT_TIMEOUT) {
+          if (!client.writableEnded) {
+            client.end();
+          }
+          userSSEClients[uid].delete(client);
+        }
+      });
+      if (userSSEClients[uid].size === 0) {
+        delete userSSEClients[uid];
+      }
+    }
+  }
 }, GARBAGE_COLLECTOR_INTERVAL);
 
-process.on('SIGTERM', () => clearInterval(sseGarbageCollector));
-process.on('SIGINT', () => clearInterval(sseGarbageCollector));
+// Keep-Alive Ping для обходу буферизації проксі (напр. Vite)
+const sseKeepAlive = setInterval(() => {
+  const pingMessage = `:\n\n`; // SSE comment for keep-alive
+
+  gameClients.forEach(client => {
+    client.write(pingMessage);
+    if (client.flush) client.flush();
+  });
+
+  for (const uid in userSSEClients) {
+    if (userSSEClients.hasOwnProperty(uid)) {
+      userSSEClients[uid].forEach(client => {
+        client.write(pingMessage);
+        if (client.flush) client.flush();
+      });
+    }
+  }
+}, 15000);
+
+process.on('SIGTERM', () => {
+  clearInterval(sseGarbageCollector);
+  clearInterval(sseKeepAlive);
+});
+process.on('SIGINT', () => {
+  clearInterval(sseGarbageCollector);
+  clearInterval(sseKeepAlive);
+});
 
 // Ендпоінт для отримання heartbeat від клієнтів
 app.post('/api/games/heartbeat', (req, res) => {
@@ -3251,13 +3313,25 @@ app.post('/api/games/heartbeat', (req, res) => {
     client.lastActivity = Date.now();
   }
   
+  // Also check userSSEClients for heartbeat
+  for (const uid in userSSEClients) {
+    if (userSSEClients.hasOwnProperty(uid)) {
+      userSSEClients[uid].forEach(c => {
+        if (c.id === clientId) {
+          c.lastActivity = Date.now();
+        }
+      });
+    }
+  }
+
   res.status(200).send('OK');
 });
 
 app.get('/api/games/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
   res.write(`data: {"type": "CONNECTED"}\n\n`);
 
@@ -3271,6 +3345,36 @@ app.get('/api/games/stream', (req, res) => {
   req.on('close', () => {
     gameClients = gameClients.filter((client) => client !== res);
   });
+});
+
+// SSE для персональних сповіщень (напр., ринок, бани)
+app.get('/api/notifications/stream', authenticate, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const uid = req.user.uid;
+  if (!userSSEClients[uid]) {
+    userSSEClients[uid] = new Set();
+  }
+  
+  res.id = req.query.clientId || Date.now().toString();
+  res.lastActivity = Date.now();
+  userSSEClients[uid].add(res);
+
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED' })}\n\n`);
+
+  req.on('close', () => {
+    if (userSSEClients[uid]) {
+      userSSEClients[uid].delete(res);
+      if (userSSEClients[uid].size === 0) {
+        delete userSSEClients[uid];
+      }
+    }
+  });
+
+  // Heartbeat endpoint updates lastActivity for this client too
 });
 
 app.get('/api/games/status', async (req, res) => {
