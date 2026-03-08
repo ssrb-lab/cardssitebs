@@ -1951,7 +1951,8 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
               ? 431
               : 402;
 
-    let coinsToGive = Math.floor(score * payoutPerScore * (1 + Math.floor(score / 5) * 0.1));
+    let coinsToGive = Math.floor(Number(score) * payoutPerScore * (1 + Math.floor(Number(score) / 5) * 0.1));
+    if (isNaN(coinsToGive) || coinsToGive < 0) coinsToGive = 0;
 
     if (currentDailyFarm + coinsToGive > 500000) {
       coinsToGive = 500000 - currentDailyFarm;
