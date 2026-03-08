@@ -959,34 +959,53 @@ export default function AdminView({
     const cardsInThisPack = cardsCatalog.filter((c) => c.packId === packInfo.id);
     if (cardsInThisPack.length === 0) return '0%';
 
-    let totalWeight = 0;
-    let targetWeight = 0;
+    let exactPercentageSum = 0;
+    let fallbackWeightsSum = 0;
 
-    // Розраховуємо загальну вагу паку за тими ж правилами, що й при відкритті
+    // Перший прохід: збираємо точні відсотки та ваги для інших
     for (const c of cardsInThisPack) {
-      let w = 1;
-      const globalRObj = rarities.find((r) => r.name === c.rarity);
-
       if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
-        w = Number(c.weight);
-      } else if (
-        packInfo.customWeights?.[c.rarity] !== undefined &&
-        packInfo.customWeights?.[c.rarity] !== ''
-      ) {
-        w = Number(packInfo.customWeights[c.rarity]);
-      } else if (globalRObj) {
-        w = Number(globalRObj.weight);
+        exactPercentageSum += Number(c.weight);
+      } else {
+        let w = 1;
+        if (
+          packInfo.customWeights?.[c.rarity] !== undefined &&
+          packInfo.customWeights?.[c.rarity] !== ''
+        ) {
+          w = Number(packInfo.customWeights[c.rarity]);
+        }
+        fallbackWeightsSum += w;
       }
-
-      totalWeight += w;
-      if (c.id === targetCard.id) targetWeight = w;
     }
 
-    if (totalWeight === 0) return '0%';
+    // Розраховуємо шанс цільової картки
+    let chance = 0;
+    if (
+      targetCard.weight !== null &&
+      targetCard.weight !== undefined &&
+      targetCard.weight !== '' &&
+      Number(targetCard.weight) > 0
+    ) {
+      chance = Number(targetCard.weight); // Використовуємо точний відсоток
+    } else {
+      // Для карток без точного відсотка розраховуємо шанс з залишку
+      let remainingPercentage = 100 - exactPercentageSum;
+      if (remainingPercentage < 0) remainingPercentage = 0; // Захист від суми > 100%
 
-    // Розраховуємо відсоток
-    const chance = (targetWeight / totalWeight) * 100;
-    return chance < 0.01 ? '<0.01%' : chance.toFixed(2) + '%';
+      let targetW = 1;
+      if (
+        packInfo.customWeights?.[targetCard.rarity] !== undefined &&
+        packInfo.customWeights?.[targetCard.rarity] !== ''
+      ) {
+        targetW = Number(packInfo.customWeights[targetCard.rarity]);
+      }
+
+      if (fallbackWeightsSum > 0) {
+        chance = (targetW / fallbackWeightsSum) * remainingPercentage;
+      }
+    }
+
+    return chance < 0.01 && chance > 0 ? '<0.01%' : chance.toFixed(2) + '%';
   };
 
   const filteredAdminUsers = allUsers.filter((u) =>
@@ -2896,11 +2915,11 @@ export default function AdminView({
               <input
                 type="number"
                 step="0.01"
-                placeholder="Індивід. Шанс (Вага)"
+                placeholder="Шанс випадіння картки (в %)"
                 value={cardForm.weight}
                 onChange={(e) => setCardForm({ ...cardForm, weight: e.target.value })}
                 className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                title="Якщо заповнено - ігнорує глобальний шанс рідкості"
+                title="Вкажіть точний відсоток або вагу випадіння цієї картки з паку. Ігнорує зашиті в код ймовірності рідкості."
               />
               <input
                 type="number"
@@ -3062,52 +3081,52 @@ export default function AdminView({
               </div>
             </div>
 
-              {/* Perk (Здібність) */}
-                <div className="md:col-span-4 mt-2 grid grid-cols-2 gap-3 bg-purple-950/20 p-4 border border-purple-900/30 rounded-xl">
-                  <div>
-                    <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
-                      Перк (Здібність)
-                    </label>
-                    <select
-                      value={cardForm.perk || ''}
-                      onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
-                      className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors"
-                    >
-                      <option value="">Без перку</option>
-                      <optgroup label="⚔️ Атакувальні">
-                        <option value="crit">Крит (2× шкоди)</option>
-                        <option value="cleave">Сплеск (по сусідах)</option>
-                        <option value="poison">Отрута (3 ходи)</option>
-                        <option value="lifesteal">Вампіризм (ліфстіл)</option>
-                      </optgroup>
-                      <optgroup label="🛡️ Захисні">
-                        <option value="dodge">Ухилення</option>
-                        <option value="thorns">Шипи (повернення шкоди)</option>
-                        <option value="armor">Броня (зниження шкоди)</option>
-                        <option value="laststand">Виживання (1 HP)</option>
-                      </optgroup>
-                      <optgroup label="🎯 Тактичні">
-                        <option value="taunt">Провокація (таунт)</option>
-                        <option value="healer">Цілитель</option>
-                      </optgroup>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
-                      Значення перку (%)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      placeholder={cardForm.perk === 'taunt' || cardForm.perk === 'laststand' ? 'Не потрібно' : 'Напр. 25'}
-                      disabled={!cardForm.perk || cardForm.perk === 'taunt' || cardForm.perk === 'laststand'}
-                      value={cardForm.perkValue ?? ''}
-                      onChange={(e) => setCardForm({ ...cardForm, perkValue: e.target.value })}
-                      className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-40"
-                    />
-                  </div>
-                </div>
+            {/* Perk (Здібність) */}
+            <div className="md:col-span-4 mt-2 grid grid-cols-2 gap-3 bg-purple-950/20 p-4 border border-purple-900/30 rounded-xl">
+              <div>
+                <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
+                  Перк (Здібність)
+                </label>
+                <select
+                  value={cardForm.perk || ''}
+                  onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors"
+                >
+                  <option value="">Без перку</option>
+                  <optgroup label="⚔️ Атакувальні">
+                    <option value="crit">Крит (2× шкоди)</option>
+                    <option value="cleave">Сплеск (по сусідах)</option>
+                    <option value="poison">Отрута (3 ходи)</option>
+                    <option value="lifesteal">Вампіризм (ліфстіл)</option>
+                  </optgroup>
+                  <optgroup label="🛡️ Захисні">
+                    <option value="dodge">Ухилення</option>
+                    <option value="thorns">Шипи (повернення шкоди)</option>
+                    <option value="armor">Броня (зниження шкоди)</option>
+                    <option value="laststand">Виживання (1 HP)</option>
+                  </optgroup>
+                  <optgroup label="🎯 Тактичні">
+                    <option value="taunt">Провокація (таунт)</option>
+                    <option value="healer">Цілитель</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
+                  Значення перку (%)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  placeholder={cardForm.perk === 'taunt' || cardForm.perk === 'laststand' ? 'Не потрібно' : 'Напр. 25'}
+                  disabled={!cardForm.perk || cardForm.perk === 'taunt' || cardForm.perk === 'laststand'}
+                  value={cardForm.perkValue ?? ''}
+                  onChange={(e) => setCardForm({ ...cardForm, perkValue: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-40"
+                />
+              </div>
+            </div>
 
             <div className="flex gap-3">
               <button

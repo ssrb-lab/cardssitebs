@@ -1019,13 +1019,7 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     if (availableCards.length === 0)
       return res.status(400).json({ error: 'У цьому паку закінчились картки.' });
 
-    const DEFAULT_RARITIES = [
-      { name: 'Звичайна', weight: 70 },
-      { name: 'Рідкісна', weight: 25 },
-      { name: 'Епічна', weight: 4 },
-      { name: 'Легендарна', weight: 1 },
-      { name: 'Унікальна', weight: 0.1 },
-    ];
+
 
     let results = [];
     let countsMap = {};
@@ -1156,40 +1150,66 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     for (let i = 0; i < amount; i++) {
       if (availableCards.length === 0) break; // Якщо всі картки закінчились під час відкриття
 
-      let totalWeight = 0;
-      const activeWeights = [];
+      let exactPercentageSum = 0;
+      let fallbackWeightsSum = 0;
 
+      // Перший прохід: збираємо точні відсотки та ваги для інших
       for (const c of availableCards) {
-        let w = 1;
-        const globalRObj = DEFAULT_RARITIES.find((r) => r.name === c.rarity);
-
-        // Жорстка перевірка: використовуємо шанс картки, тільки якщо він більший за 0
         if (
           c.weight !== null &&
           c.weight !== undefined &&
           c.weight !== '' &&
           Number(c.weight) > 0
         ) {
-          w = Number(c.weight);
-        } else if (
-          pack.customWeights &&
-          pack.customWeights[c.rarity] !== undefined &&
-          pack.customWeights[c.rarity] !== ''
-        ) {
-          w = Number(pack.customWeights[c.rarity]);
-        } else if (globalRObj) {
-          w = Number(globalRObj.weight);
+          exactPercentageSum += Number(c.weight);
+        } else {
+          let w = 1;
+          if (
+            pack.customWeights &&
+            pack.customWeights[c.rarity] !== undefined &&
+            pack.customWeights[c.rarity] !== ''
+          ) {
+            w = Number(pack.customWeights[c.rarity]);
+          }
+          fallbackWeightsSum += w;
         }
-
-        totalWeight += w;
-        activeWeights.push({ card: c, weight: w });
       }
 
-      const rand = Math.random() * totalWeight;
+      const activeWeights = [];
+      let remainingPercentage = 100 - exactPercentageSum;
+      if (remainingPercentage < 0) remainingPercentage = 0; // Захист від суми > 100%
+
+      for (const c of availableCards) {
+        let chance = 0;
+        if (
+          c.weight !== null &&
+          c.weight !== undefined &&
+          c.weight !== '' &&
+          Number(c.weight) > 0
+        ) {
+          chance = Number(c.weight); // Точний відсоток
+        } else {
+          let w = 1;
+          if (
+            pack.customWeights &&
+            pack.customWeights[c.rarity] !== undefined &&
+            pack.customWeights[c.rarity] !== ''
+          ) {
+            w = Number(pack.customWeights[c.rarity]);
+          }
+          if (fallbackWeightsSum > 0) {
+            chance = (w / fallbackWeightsSum) * remainingPercentage;
+          }
+        }
+        
+        activeWeights.push({ card: c, chance: chance });
+      }
+
+      const rand = Math.random() * 100;
       let sum = 0;
       let newCard = activeWeights[0].card;
       for (const item of activeWeights) {
-        sum += item.weight;
+        sum += item.chance;
         if (rand <= sum) {
           newCard = item.card;
           break;
