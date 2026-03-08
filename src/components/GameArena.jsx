@@ -23,9 +23,20 @@ import {
   Anchor,
   Lock,
   Info,
+  Flame,
+  Droplets,
+  Heart,
+  Eye,
+  ShieldCheck,
+  Target,
+  Skull,
+  Crosshair,
+  Stethoscope,
+  Wind,
 } from 'lucide-react';
 import { getCardStyle, parseGameStat } from '../utils/helpers';
 import PlayerAvatar from './PlayerAvatar';
+import { PERK_META, PerkBadge } from './PerkBadge';
 import {
   fetchArenaPointsRequest,
   createArenaPointRequest,
@@ -94,6 +105,44 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     }
   }, [deck]);
 
+  // Re-validate deck whenever inventory or catalog changes
+  useEffect(() => {
+    if (deck.length === 0 || !profile?.inventory || !cardsCatalog) return;
+
+    const currentOwned = ownedGameCards;
+    let deckChanged = false;
+    const claimedUniqueIds = new Set();
+
+    const validatedDeck = deck.map(deckCard => {
+      // Find a matching card in current inventory that hasn't been claimed yet
+      const match = currentOwned.find(oc => 
+        oc.id === deckCard.id && 
+        oc.power === deckCard.power && 
+        oc.hp === deckCard.hp &&
+        !claimedUniqueIds.has(oc.uniqueInstanceId)
+      );
+
+      if (match) {
+        claimedUniqueIds.add(match.uniqueInstanceId);
+        // If the uniqueInstanceId (which includes statsIndex) changed, mark as deck changed
+        if (match.uniqueInstanceId !== deckCard.uniqueInstanceId || match.statsIndex !== deckCard.statsIndex) {
+          deckChanged = true;
+          return { ...match };
+        }
+        return deckCard;
+      } else {
+        // Card no longer exists with these stats
+        deckChanged = true;
+        return null;
+      }
+    }).filter(c => c !== null);
+
+    if (deckChanged) {
+      console.log('Arena Deck Validated & Updated due to inventory changes');
+      setDeck(validatedDeck);
+    }
+  }, [profile?.inventory, cardsCatalog]);
+
   const [points, setPoints] = useState([]);
   const [isLoadingPoints, setIsLoadingPoints] = useState(true);
 
@@ -115,6 +164,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const [isBattleAnimating, setIsBattleAnimating] = useState(false);
   const [animationStepData, setAnimationStepData] = useState(null);
   const [battleResult, setBattleResult] = useState(null);
+  const [showPerkInfo, setShowPerkInfo] = useState(false); // Perk info modal
   const mapRef = useRef(null);
 
   // Timer state for cooldowns
@@ -355,53 +405,51 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     setSelectedPoint(null); // Close sidebar
   };
 
-  const ownedGameCards = [];
-  if (profile?.inventory && cardsCatalog) {
-    profile.inventory.forEach((invItem) => {
-      const cardDetails = cardsCatalog.find((c) => c.id === invItem.cardId);
+  const ownedGameCards = React.useMemo(() => {
+    const cards = [];
+    if (profile?.inventory && cardsCatalog) {
+      profile.inventory.forEach((invItem) => {
+        const cardDetails = cardsCatalog.find((c) => c.id === invItem.cardId);
 
-      let stats = invItem.gameStats;
-      if (typeof stats === 'string') {
-        try {
-          stats = JSON.parse(stats);
-        } catch (e) {
+        let stats = invItem.gameStats;
+        if (typeof stats === 'string') {
+          try {
+            stats = JSON.parse(stats);
+          } catch (e) {
+            stats = [];
+          }
+        }
+        if (!Array.isArray(stats)) {
           stats = [];
         }
-      }
-      if (!Array.isArray(stats)) {
-        stats = [];
-      }
 
-      // Якщо це ігрова карта, але вона не має записаної сили (старі карти або щойно випали), присвоюємо базову
-      if (cardDetails && (cardDetails.isGame || stats.length > 0)) {
-        const minPower = RARITY_MIN_POWER[cardDetails.rarity] || 5;
-        const defaultStat = parseGameStat(minPower, cardDetails.rarity);
-        const effectiveStats = stats.map((s) => parseGameStat(s, cardDetails.rarity)); // Recorded powers
+        if (cardDetails && (cardDetails.isGame || stats.length > 0)) {
+          const minPower = RARITY_MIN_POWER[cardDetails.rarity] || 5;
+          const defaultStat = parseGameStat(minPower, cardDetails.rarity);
+          const effectiveStats = stats.map((s) => parseGameStat(s, cardDetails.rarity));
 
-        // Add default power for any amount that doesn't have a recorded stat yet
-        while (effectiveStats.length < invItem.amount) {
-          effectiveStats.push(defaultStat);
-        }
-
-        // Truncate to actual amount (gameStats may have stale extra entries from sold/traded copies)
-        const limitedStats = effectiveStats.slice(0, invItem.amount);
-
-        limitedStats.forEach((statObj, idx) => {
-          if (statObj.power > 0) {
-            ownedGameCards.push({
-              ...cardDetails,
-              uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`, // Stable ID
-              power: statObj.power,
-              hp: statObj.hp,
-              statsIndex: idx,
-            });
+          while (effectiveStats.length < invItem.amount) {
+            effectiveStats.push(defaultStat);
           }
-        });
-      }
-    });
-  }
 
-  ownedGameCards.sort((a, b) => b.power - a.power);
+          const limitedStats = effectiveStats.slice(0, invItem.amount);
+
+          limitedStats.forEach((statObj, idx) => {
+            if (statObj.power > 0) {
+              cards.push({
+                ...cardDetails,
+                uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`,
+                power: statObj.power,
+                hp: statObj.hp,
+                statsIndex: idx,
+              });
+            }
+          });
+        }
+      });
+    }
+    return cards.sort((a, b) => b.power - a.power);
+  }, [profile?.inventory, cardsCatalog]);
 
   const handleToggleCard = (card) => {
     if (deck.find((c) => c.uniqueInstanceId === card.uniqueInstanceId)) {
@@ -427,28 +475,60 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
     for (let i = 0; i < log.length; i++) {
       const step = log[i];
+      if (step.note) continue; // Skip notes
+
+      const events = step.events || [];
+      const targetSide = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
 
       setAnimationStepData({
         attackerSide: step.attackerSide,
         attackerIndex: step.attackerIndex,
-        targetSide: step.attackerSide === 'attacker' ? 'defender' : 'attacker',
+        targetSide: events.includes('healer') ? step.attackerSide : targetSide,
         targetIndex: step.targetIndex,
         damage: step.damage,
         isDead: step.isTargetDead,
+        events,
+        healAmount: step.healAmount,
+        thornsDamage: step.thornsDamage,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, events.includes('dodge') ? 600 : 800));
 
-      if (step.attackerSide === 'attacker') {
-        currentDefenders[step.targetIndex] = { ...currentDefenders[step.targetIndex] };
-        currentDefenders[step.targetIndex].currentHp -= step.damage;
-        if (currentDefenders[step.targetIndex].currentHp < 0)
-          currentDefenders[step.targetIndex].currentHp = 0;
-      } else {
-        currentAttackers[step.targetIndex] = { ...currentAttackers[step.targetIndex] };
-        currentAttackers[step.targetIndex].currentHp -= step.damage;
-        if (currentAttackers[step.targetIndex].currentHp < 0)
-          currentAttackers[step.targetIndex].currentHp = 0;
+      // Update HP based on events
+      if (events.includes('healer')) {
+        // Healer heals own team
+        const team = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+        team[step.targetIndex] = { ...team[step.targetIndex] };
+        team[step.targetIndex].currentHp = Math.min(
+          team[step.targetIndex].maxHp || team[step.targetIndex].hp || 1,
+          team[step.targetIndex].currentHp + (step.healAmount || 0)
+        );
+      } else if (!events.includes('dodge')) {
+        // Apply damage to target
+        const defTeam = step.attackerSide === 'attacker' ? currentDefenders : currentAttackers;
+        defTeam[step.targetIndex] = { ...defTeam[step.targetIndex] };
+        defTeam[step.targetIndex].currentHp -= step.damage;
+        if (events.includes('laststand') && defTeam[step.targetIndex].currentHp <= 0) {
+          defTeam[step.targetIndex].currentHp = 1;
+        }
+        if (defTeam[step.targetIndex].currentHp < 0) defTeam[step.targetIndex].currentHp = 0;
+
+        // Lifesteal heal
+        if (step.healAmount && events.includes('lifesteal')) {
+          const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+          atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
+          atkTeam[step.attackerIndex].currentHp = Math.min(
+            atkTeam[step.attackerIndex].maxHp || atkTeam[step.attackerIndex].hp || 1,
+            atkTeam[step.attackerIndex].currentHp + step.healAmount
+          );
+        }
+        // Thorns damage
+        if (step.thornsDamage) {
+          const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+          atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
+          atkTeam[step.attackerIndex].currentHp -= step.thornsDamage;
+          if (atkTeam[step.attackerIndex].currentHp < 0) atkTeam[step.attackerIndex].currentHp = 0;
+        }
       }
 
       setBattleState((prev) => ({
@@ -458,8 +538,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       }));
 
       setAnimationStepData(null);
-
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
     setTimeout(() => {
@@ -524,6 +603,13 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           <h2 className="text-3xl font-black text-white uppercase tracking-widest drop-shadow-md">
             Арена
           </h2>
+          <button
+            onClick={() => setShowPerkInfo(true)}
+            className="ml-2 bg-indigo-950/50 border border-indigo-700/50 hover:border-indigo-500 text-indigo-400 hover:text-indigo-300 p-1.5 rounded-lg transition-colors"
+            title="Інфо про перки"
+          >
+            <Info size={18} />
+          </button>
         </div>
 
         <div className="flex flex-col items-end sm:flex-row sm:items-center gap-3 sm:gap-6 bg-indigo-950/20 px-4 py-2 rounded-2xl border border-indigo-900/30">
@@ -554,11 +640,11 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         {/* Left Panel - Deck Selection */}
         <div
           className={`flex flex-col gap-4 relative transition-all duration-500 ease-in-out shrink-0 h-full
-            ${isSidebarOpen ? 'w-full lg:w-[400px] xl:w-[450px] 2xl:w-[500px] opacity-100 lg:translate-x-0' : 'w-0 opacity-0 lg:-ml-6 lg:-translate-x-full absolute lg:relative z-40'}
+            ${isSidebarOpen ? 'w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] opacity-100 lg:translate-x-0' : 'w-0 opacity-0 lg:-ml-6 lg:-translate-x-full absolute lg:relative z-40'}
           `}
         >
           {/* Inner wrapper to maintain exact width while collapsing */}
-          <div className="w-full lg:w-[400px] xl:w-[450px] 2xl:w-[500px] flex flex-col gap-4 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2 pb-4">
+          <div className="w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] flex flex-col gap-4 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2 pb-4">
             {/* Block 1: Selected Cards */}
             <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] shrink-0 h-min">
               <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2 flex items-center gap-2">
@@ -587,13 +673,15 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         <img src={card.image} className="w-full h-full object-cover" />
                       </div>
 
+                      <PerkBadge perk={card.perk} position="right" />
+
                       {/* Scale stats to prevent overflowing width */}
                       <div className="absolute -bottom-2 inset-x-0 w-[110%] -ml-[5%] mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[8px] sm:text-[10px] xl:text-xs px-1 py-0.5 rounded-full z-10 flex items-center justify-center gap-0.5 shadow-md whitespace-nowrap">
                         <Zap size={10} className="text-yellow-500 shrink-0" /> {card.power}{' '}
                         <span className="text-red-500 shrink-0">❤️</span> {card.hp || card.power || 50}
                       </div>
 
-                      <div className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      <div className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-30">
                         <X size={12} />
                       </div>
                     </div>
@@ -620,7 +708,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     силою для Арени.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {ownedGameCards.map((card) => {
                       const isSelected = deck.find((c) => c.id === card.id);
                       if (isSelected) return null; // Hide from inventory if already in deck
@@ -641,10 +729,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                               Захищає
                             </div>
                           )}
-                          <div className="absolute top-1 right-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1 border border-neutral-700 shadow-md">
-                            <Zap size={8} className="text-yellow-400" /> {card.power}{' '}
-                            <span className="text-red-500 ml-0.5">❤️</span>{' '}
-                            {card.hp || card.power || 50}
+                          <PerkBadge perk={card.perk} position="right" />
+                          <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
+                            <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{card.power}</span></div>
+                            <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{card.hp || card.power || 50}</span></div>
                           </div>
                           <div className="w-full h-full relative group">
                             <img
@@ -679,7 +767,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           {/* Admin Map Toolbar */}
           {profile?.isAdmin && (
-            <div className="absolute top-4 right-4 z-50 bg-neutral-900/90 backdrop-blur-md p-2 rounded-xl flex items-center gap-2 border border-neutral-800 shadow-xl">
+            <div className="absolute top-4 left-4 z-50 bg-neutral-900/90 backdrop-blur-md p-2 rounded-xl flex items-center gap-2 border border-neutral-800 shadow-xl">
               <span className="text-xs uppercase font-bold text-neutral-400 mr-2 border-r border-neutral-700 pr-2">
                 Адмін панель
               </span>
@@ -837,6 +925,42 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   </p>
                 </div>
 
+                {/* Battle Mode Select */}
+                <div className="mt-3 border-t border-neutral-800 pt-3">
+                  <label className="text-xs uppercase font-bold text-neutral-400 mb-1.5 block">
+                    Режим Бою
+                  </label>
+                  <select
+                    value={adminPointData.battleMode || 'FULL'}
+                    onChange={(e) => setAdminPointData({ ...adminPointData, battleMode: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                  >
+                    <option value="FULL">🟢 Повне Відновлення (Default)</option>
+                    <option value="CHIP_DAMAGE">🟡 Втрата Статів (Chip Damage)</option>
+                    <option value="HARDCORE">🔴 Хардкор (Перманентна Смерть)</option>
+                  </select>
+
+                  {adminPointData.battleMode === 'CHIP_DAMAGE' && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-neutral-400 w-1/2">Шанс втрати 5% ХП/Сили:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={adminPointData.chipDamageChance || 0}
+                        onChange={(e) => setAdminPointData({ ...adminPointData, chipDamageChance: e.target.value })}
+                        className="w-1/2 bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-yellow-500 transition-colors"
+                      />
+                      <span className="text-xs text-neutral-500">%</span>
+                    </div>
+                  )}
+                  {adminPointData.battleMode === 'HARDCORE' && (
+                    <p className="text-[10px] text-red-500 mt-1.5 font-bold">
+                      ⚠️ УВАГА: Картки, які закінчують бій з 0 ХП, будуть назавжди ВИДАЛЕНІ з інвентаря!
+                    </p>
+                  )}
+                </div>
+
                 {/* Neighbor Points Selector (only when NOT landing zone) */}
                 {!adminPointData.isLandingZone && (
                   <div className="mt-2">
@@ -875,6 +999,37 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     </div>
                   </div>
                 )}
+
+                {/* Ownership Management */}
+                <div className="mt-3 border-t border-neutral-800 pt-3">
+                  <label className="text-xs uppercase font-bold text-neutral-400 mb-2 block">
+                    Управління власником
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      placeholder="UID Власника"
+                      value={adminPointData.ownerId || ''}
+                      onChange={(e) => setAdminPointData({ ...adminPointData, ownerId: e.target.value })}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Нікнейм Власника"
+                        value={adminPointData.ownerNickname || ''}
+                        onChange={(e) => setAdminPointData({ ...adminPointData, ownerNickname: e.target.value })}
+                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                      />
+                      <button
+                        onClick={() => setAdminPointData({ ...adminPointData, ownerId: null, ownerNickname: null, defendingCards: [], capturedAt: null, crystalsLastClaimedAt: null })}
+                        className="px-3 py-2 bg-red-900/50 hover:bg-red-800/80 text-red-300 rounded-xl font-bold text-xs border border-red-700/50 transition-colors whitespace-nowrap"
+                      >
+                        Звільнити
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-3 mt-4">
                   {isDrawingPolygon ? (
@@ -1170,10 +1325,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         key={idx}
                         className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-950 ${getCardStyle(defCard.rarity).border}`}
                       >
-                        <div className="absolute top-1 right-1 bg-black/80 font-black text-[10px] px-1 py-0.5 rounded z-10 text-white flex items-center gap-1 border border-neutral-700 shadow-md">
-                          <Zap size={8} className="text-yellow-400" /> {defCard.power}{' '}
-                          <span className="text-red-500 ml-0.5">❤️</span>{' '}
-                          {defCard.hp || defCard.power || 50}
+                        <PerkBadge perk={defCard.perk} position="right" />
+                        <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
+                          <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{defCard.power}</span></div>
+                          <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{defCard.hp || defCard.power || 50}</span></div>
                         </div>
                         <img
                           src={defCard.image}
@@ -1294,7 +1449,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const hp =
                       card.currentHp !== undefined ? card.currentHp : card.hp || card.power || 1;
                     const isDead = hp <= 0;
-                    const maxHp = card.hp || card.power || 1;
+                    const maxHp = card.maxHp || card.hp || card.power || 1;
                     const hpPercent = Math.max(0, Math.min(100, (hp / maxHp) * 100));
 
                     const isAttacking =
@@ -1303,23 +1458,54 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const isHit =
                       animationStepData?.targetSide === 'defender' &&
                       animationStepData?.targetIndex === idx;
+                    const ev = animationStepData?.events || [];
+                    const isDodge = isHit && ev.includes('dodge');
+                    const isCrit = isHit && ev.includes('crit');
+                    const isHeal = animationStepData?.targetSide === 'defender' && animationStepData?.targetIndex === idx && ev.includes('healer');
+                    const hasTaunt = card.perk === 'taunt' && !isDead;
 
                     return (
                       <div
                         key={idx}
-                        className={`relative w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit ? '-translate-y-2 rotate-[-5deg] border-red-500 brightness-150' : ''}`}
+                        className={`relative w-28 sm:w-36 md:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit && !isDodge ? '-translate-y-2 rotate-[-5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-red-500/60 animate-pulse' : ''}`}
                         style={!isAttacking && !isHit ? { animationDelay: `${idx * 100}ms` } : {}}
                       >
-                        <div className="absolute -bottom-2.5 inset-x-1 bg-black/90 font-black text-xs sm:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-red-500 shadow-lg">
-                          <Zap size={10} className="text-yellow-500" /> {card.power}{' '}
-                          <span className="text-red-500 ml-0.5">❤️</span> {Math.ceil(hp)}
+                        <PerkBadge perk={card.perk} position="right" />
+                        <div className="absolute -bottom-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-red-500 shadow-lg">
+                          <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
+                          <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
                         </div>
 
-                        {isHit && (
-                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-500">
-                            <span className="text-red-500 font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                              -{animationStepData.damage}
+                        {/* Floating combat text */}
+                        {isHit && !isDodge && !isHeal && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-500">
+                            <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>
+                              {isCrit ? '💥' : ''}-{animationStepData.damage}
                             </span>
+                            {ev.includes('laststand') && <span className="text-yellow-300 font-black text-sm mt-1 animate-bounce">1 HP!</span>}
+                            {ev.includes('poison') && <span className="text-green-400 font-bold text-xs mt-1">☠️ Отруєно</span>}
+                          </div>
+                        )}
+                        {isDodge && (
+                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-blue-300 font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">MISS</span>
+                          </div>
+                        )}
+                        {isHeal && (
+                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-500">
+                            <span className="text-emerald-400 font-black text-3xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">+{animationStepData.healAmount}</span>
+                          </div>
+                        )}
+                        {/* Thorns feedback on attacker */}
+                        {animationStepData?.thornsDamage && animationStepData?.attackerSide === 'defender' && animationStepData?.attackerIndex === idx && (
+                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-amber-400 font-black text-xs">🌵-{animationStepData.thornsDamage}</span>
+                          </div>
+                        )}
+                        {/* Lifesteal feedback on attacker */}
+                        {animationStepData?.healAmount && ev.includes('lifesteal') && animationStepData?.attackerSide === 'defender' && animationStepData?.attackerIndex === idx && (
+                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-pink-400 font-black text-xs">💗+{animationStepData.healAmount}</span>
                           </div>
                         )}
                         <img
@@ -1374,7 +1560,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const hp =
                       card.currentHp !== undefined ? card.currentHp : card.hp || card.power || 1;
                     const isDead = hp <= 0;
-                    const maxHp = card.hp || card.power || 1;
+                    const maxHp = card.maxHp || card.hp || card.power || 1;
                     const hpPercent = Math.max(0, Math.min(100, (hp / maxHp) * 100));
 
                     const isAttacking =
@@ -1383,23 +1569,54 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const isHit =
                       animationStepData?.targetSide === 'attacker' &&
                       animationStepData?.targetIndex === idx;
+                    const ev = animationStepData?.events || [];
+                    const isDodge = isHit && ev.includes('dodge');
+                    const isCrit = isHit && ev.includes('crit');
+                    const isHeal = animationStepData?.targetSide === 'attacker' && animationStepData?.targetIndex === idx && ev.includes('healer');
+                    const hasTaunt = card.perk === 'taunt' && !isDead;
 
                     return (
                       <div
                         key={idx}
-                        className={`relative w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''}`}
+                        className={`relative w-28 sm:w-36 md:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''}`}
                         style={!isAttacking && !isHit ? { animationDelay: `${idx * 100}ms` } : {}}
                       >
-                        <div className="absolute -top-2.5 inset-x-1 bg-black/90 font-black text-xs sm:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-indigo-500 shadow-lg">
-                          <Zap size={10} className="text-yellow-500" /> {card.power}{' '}
-                          <span className="text-red-500 ml-0.5">❤️</span> {Math.ceil(hp)}
+                        <PerkBadge perk={card.perk} position="right" />
+                        <div className="absolute -top-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-indigo-500 shadow-lg">
+                          <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
+                          <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
                         </div>
 
-                        {isHit && (
-                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in slide-in-from-top-5 fade-in duration-500">
-                            <span className="text-red-500 font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                              -{animationStepData.damage}
+                        {/* Floating combat text */}
+                        {isHit && !isDodge && !isHeal && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-top-5 fade-in duration-500">
+                            <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>
+                              {isCrit ? '💥' : ''}-{animationStepData.damage}
                             </span>
+                            {ev.includes('laststand') && <span className="text-yellow-300 font-black text-sm mt-1 animate-bounce">1 HP!</span>}
+                            {ev.includes('poison') && <span className="text-green-400 font-bold text-xs mt-1">☠️ Отруєно</span>}
+                          </div>
+                        )}
+                        {isDodge && (
+                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-blue-300 font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">MISS</span>
+                          </div>
+                        )}
+                        {isHeal && (
+                          <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none animate-in slide-in-from-top-5 fade-in duration-500">
+                            <span className="text-emerald-400 font-black text-3xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">+{animationStepData.healAmount}</span>
+                          </div>
+                        )}
+                        {/* Thorns feedback */}
+                        {animationStepData?.thornsDamage && animationStepData?.attackerSide === 'attacker' && animationStepData?.attackerIndex === idx && (
+                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-amber-400 font-black text-xs">🌵-{animationStepData.thornsDamage}</span>
+                          </div>
+                        )}
+                        {/* Lifesteal feedback */}
+                        {animationStepData?.healAmount && ev.includes('lifesteal') && animationStepData?.attackerSide === 'attacker' && animationStepData?.attackerIndex === idx && (
+                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                            <span className="text-pink-400 font-black text-xs">💗+{animationStepData.healAmount}</span>
                           </div>
                         )}
                         <img
@@ -1462,6 +1679,39 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           )}
         </div>
       </div>
+
+      {/* PERK INFO MODAL */}
+      {showPerkInfo && (
+        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowPerkInfo(false)}>
+          <div className="bg-neutral-900 border border-indigo-500/30 rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl custom-scrollbar animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-xl font-black text-white uppercase tracking-wide flex items-center gap-2">
+                <Zap size={20} className="text-indigo-400" /> Перки Карт
+              </h3>
+              <button onClick={() => setShowPerkInfo(false)} className="p-1 rounded bg-neutral-800 text-neutral-400 hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-neutral-400 text-sm mb-4">Кожна карта може мати спеціальний перк, який впливає на бій. Перк встановлюється адміністратором для карти в каталозі.</p>
+            <div className="flex flex-col gap-3">
+              {Object.entries(PERK_META).map(([key, meta]) => {
+                const Icon = meta.icon;
+                return (
+                  <div key={key} className={`flex items-start gap-3 ${meta.bg} border border-white/5 rounded-xl p-3`}>
+                    <div className={`${meta.color} shrink-0 mt-0.5`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="flex-1">
+                      <div className={`font-black text-sm ${meta.color} uppercase`}>{meta.label}</div>
+                      <div className="text-neutral-300 text-xs mt-0.5 leading-relaxed">{meta.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

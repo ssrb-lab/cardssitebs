@@ -21,6 +21,7 @@ import {
 import { getCardStyle, getCardWeight, playCardSound } from '../utils/helpers';
 import { SELL_PRICE } from '../config/constants';
 import CardFrame from '../components/CardFrame';
+import { PerkBadge } from '../components/PerkBadge';
 
 const RARITY_POWER_RANGES = {
   Звичайна: '5–50',
@@ -132,6 +133,7 @@ export default function ShopView({
                       loading="lazy"
                     />
                   </CardFrame>
+                  <PerkBadge perk={item.perk} position="right" />
                   {item.effect && <div className={`${item.effect} pointer-events-none z-10`} />}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
                     <span
@@ -216,6 +218,7 @@ export default function ShopView({
                       loading="lazy"
                     />
                   </CardFrame>
+                  <PerkBadge perk={card.perk} position="right" />
                   {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   {Number(card.maxSupply) > 0 && (
                     <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
@@ -430,6 +433,7 @@ export default function ShopView({
                         loading="lazy"
                       />
                     </CardFrame>
+                    <PerkBadge perk={card.perk} position="right" />
                     {card.effect && <div className={`${card.effect} z-10 pointer-events-none`} />}
                     {maxSup > 0 && (
                       <div className="absolute top-1 right-1 bg-black/90 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 font-bold z-10">

@@ -37,6 +37,7 @@ import {
 } from '../config/api';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon from '../components/AchievementIcon';
+import { PerkBadge } from '../components/PerkBadge';
 
 export default function ProfileView({
   profile,
@@ -289,6 +290,7 @@ export default function ProfileView({
                               loading="lazy"
                             />
                           </CardFrame>
+                          <PerkBadge perk={item.card.perk} position="right" />
                         </div>
                       )}
                       <div>
@@ -302,6 +304,16 @@ export default function ProfileView({
                           <span className="mx-2">•</span>
                           {formatDate(item.soldAt)}
                         </div>
+                        {item.power !== null && (
+                          <div className="flex gap-2 mt-1">
+                            <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-1.5 py-0.5 items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-widest text-yellow-500">
+                              ⚡ {item.power}
+                            </div>
+                            <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-1.5 py-0.5 items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-widest text-red-500">
+                              ❤️ {item.hp ?? 50}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div

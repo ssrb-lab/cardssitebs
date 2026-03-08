@@ -141,6 +141,8 @@ export default function AdminView({
     maxPower: '',
     minHp: '',
     maxHp: '',
+    perk: '',
+    perkValue: '',
   });
   const [editingPack, setEditingPack] = useState(null);
   const [packForm, setPackForm] = useState({
@@ -718,6 +720,8 @@ export default function AdminView({
       soundVolume: cardForm.soundVolume !== undefined ? Number(cardForm.soundVolume) : 0.5,
       frame: cardForm.frame || 'normal',
       isGame: !!cardForm.isGame,
+      perk: cardForm.perk || '',
+      perkValue: cardForm.perkValue ? Number(cardForm.perkValue) : '',
       pulledCount: editingCard ? editingCard.pulledCount || 0 : 0,
     };
     if (cardImageFile) {
@@ -754,6 +758,8 @@ export default function AdminView({
         maxPower: '',
         minHp: '',
         maxHp: '',
+        perk: '',
+        perkValue: '',
       });
       showToast('Картку збережено в MySQL!', 'success');
     } catch {
@@ -3056,6 +3062,53 @@ export default function AdminView({
               </div>
             </div>
 
+              {/* Perk (Здібність) */}
+                <div className="md:col-span-4 mt-2 grid grid-cols-2 gap-3 bg-purple-950/20 p-4 border border-purple-900/30 rounded-xl">
+                  <div>
+                    <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
+                      Перк (Здібність)
+                    </label>
+                    <select
+                      value={cardForm.perk || ''}
+                      onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
+                      className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors"
+                    >
+                      <option value="">Без перку</option>
+                      <optgroup label="⚔️ Атакувальні">
+                        <option value="crit">Крит (2× шкоди)</option>
+                        <option value="cleave">Сплеск (по сусідах)</option>
+                        <option value="poison">Отрута (3 ходи)</option>
+                        <option value="lifesteal">Вампіризм (ліфстіл)</option>
+                      </optgroup>
+                      <optgroup label="🛡️ Захисні">
+                        <option value="dodge">Ухилення</option>
+                        <option value="thorns">Шипи (повернення шкоди)</option>
+                        <option value="armor">Броня (зниження шкоди)</option>
+                        <option value="laststand">Виживання (1 HP)</option>
+                      </optgroup>
+                      <optgroup label="🎯 Тактичні">
+                        <option value="taunt">Провокація (таунт)</option>
+                        <option value="healer">Цілитель</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
+                      Значення перку (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      placeholder={cardForm.perk === 'taunt' || cardForm.perk === 'laststand' ? 'Не потрібно' : 'Напр. 25'}
+                      disabled={!cardForm.perk || cardForm.perk === 'taunt' || cardForm.perk === 'laststand'}
+                      value={cardForm.perkValue ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, perkValue: e.target.value })}
+                      className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-40"
+                    />
+                  </div>
+                </div>
+
             <div className="flex gap-3">
               <button
                 type="submit"
@@ -3089,6 +3142,8 @@ export default function AdminView({
                       maxPower: '',
                       minHp: '',
                       maxHp: '',
+                      perk: '',
+                      perkValue: '',
                     });
                   }}
                   className="bg-neutral-800 text-white font-bold py-3 px-6 rounded-xl"
@@ -3176,6 +3231,8 @@ export default function AdminView({
                             maxPower: card.maxPower !== null ? card.maxPower : '',
                             minHp: card.minHp !== null ? card.minHp : '',
                             maxHp: card.maxHp !== null ? card.maxHp : '',
+                            perk: card.perk || '',
+                            perkValue: card.perkValue !== null && card.perkValue !== undefined ? card.perkValue : '',
                           });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}

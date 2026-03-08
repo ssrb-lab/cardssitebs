@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { getCardStyle, getCardWeight, playCardSound, parseGameStat } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
+import { PerkBadge } from '../components/PerkBadge';
 
 // Мінімальна сила за рідкістю для старих карток без записаної сили
 const RARITY_MIN_POWER = {
@@ -380,6 +381,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
+                        <PerkBadge perk={item.card.perk} position="right" />
                         {item.card.effect && (
                           <div className={`${item.card.effect} pointer-events-none z-10`} />
                         )}
@@ -586,6 +588,7 @@ export default function InventoryView({
                                   loading="lazy"
                                 />
                               </CardFrame>
+                              <PerkBadge perk={c.perk} position="right" />
                               {c.effect && (
                                 <div className={`${c.effect} pointer-events-none z-10`} />
                               )}
@@ -677,6 +680,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
+                        <PerkBadge perk={cData.perk} position="right" />
                         {cData.effect && (
                           <div className={`${cData.effect} pointer-events-none z-10`} />
                         )}
@@ -733,6 +737,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
+                        <PerkBadge perk={item.card.perk} position="right" />
                         {item.card.effect && (
                           <div className={`${item.card.effect} pointer-events-none z-10`} />
                         )}

@@ -105,6 +105,8 @@ model CardCatalog {
   maxPower    Int?
   minHp       Int?
   maxHp       Int?
+  perk        String?
+  perkValue   Int?
 
   inventoryItems InventoryItem[]
   marketListings MarketListing[]
@@ -235,5 +237,7 @@ model ArenaPoint {
   areaPolygon        Json?     @default("[]")
   isLandingZone      Boolean   @default(false)
   neighborIds        Json?     @default("[]")
+  battleMode         String    @default("FULL") // "FULL", "CHIP_DAMAGE", "HARDCORE"
+  chipDamageChance   Int       @default(0) // % chance to lose stats in CHIP_DAMAGE mode
   createdAt          DateTime  @default(now())
 }

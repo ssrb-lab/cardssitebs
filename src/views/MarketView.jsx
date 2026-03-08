@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Store, Tag, Volume2, User, Coins, Trash2, RefreshCw } from 'lucide-react';
 import { getCardStyle, playCardSound } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
+import { PerkBadge } from '../components/PerkBadge';
 
 export default function MarketView({
   marketListings,
@@ -109,6 +110,7 @@ export default function MarketView({
                         loading="lazy"
                       />
                     </CardFrame>
+                    <PerkBadge perk={card.perk} position="right" />
                     {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   </div>
                   {card.soundUrl && (
@@ -139,7 +141,7 @@ export default function MarketView({
                         ⚡ {listing.power}
                       </div>
                       <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-red-500">
-                        ❤️ {listing.hp !== null ? listing.hp : 50}
+                        ❤️ {listing.hp ?? 50}
                       </div>
                     </div>
                   )}

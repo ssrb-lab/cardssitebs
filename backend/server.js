@@ -78,7 +78,7 @@ app.use(express.json());
 // Загальний ліміт для API
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 хвилин
-  max: 500, // Ліміт кожного IP до 500 запитів на `window`
+  max: 5000, // Збільшено ліміт для комфортного тестування
   message: { error: 'Забагато запитів з цього IP, будь ласка, спробуйте знову через 15 хвилин' },
 });
 app.use('/api', apiLimiter);
@@ -892,6 +892,11 @@ app.post(
         ...data,
         frame: data.frame || 'normal',
         isGame: Boolean(data.isGame),
+        perk: data.perk || null,
+        perkValue:
+          data.perk && data.perkValue !== '' && data.perkValue !== null && data.perkValue !== undefined
+            ? Number(data.perkValue)
+            : null,
         minPower:
           data.minPower !== '' && data.minPower !== null && data.minPower !== undefined
             ? Number(data.minPower)
@@ -1298,6 +1303,7 @@ app.get('/api/game/market', async (req, res) => {
       sellerUid: l.sellerId,
       sellerNickname: l.seller.nickname,
       power: l.power,
+      hp: l.hp,
     }));
     res.json(formatted);
   } catch (error) {
@@ -2402,7 +2408,7 @@ app.get('/api/game/arena/points', authenticate, async (req, res) => {
 });
 
 app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) => {
-  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds } = req.body;
+  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, battleMode, chipDamageChance } = req.body;
   try {
     const newPoint = await prisma.arenaPoint.create({
       data: {
@@ -2417,6 +2423,8 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
         areaPolygon: areaPolygon || [],
         isLandingZone: !!isLandingZone,
         neighborIds: Array.isArray(neighborIds) ? neighborIds : [],
+        battleMode: battleMode || 'FULL',
+        chipDamageChance: chipDamageChance ? Number(chipDamageChance) : 0,
       },
     });
     res.json({ success: true, point: newPoint });
@@ -2427,21 +2435,32 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
 
 app.put('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds } = req.body;
+  const { name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, ownerId, ownerNickname, defendingCards, capturedAt, crystalsLastClaimedAt, battleMode, chipDamageChance } = req.body;
   try {
+    const updateData = {
+      name: name || 'Точка Арени',
+      icon: icon || 'castle',
+      color: color || '#4f46e5',
+      entryFee: entryFee !== undefined ? Number(entryFee) : 0,
+      cooldownMinutes: cooldownMinutes !== undefined ? Number(cooldownMinutes) : 15,
+      crystalRatePerHour: crystalRatePerHour !== undefined ? Number(crystalRatePerHour) : 0,
+      areaPolygon: areaPolygon,
+      isLandingZone: isLandingZone !== undefined ? !!isLandingZone : undefined,
+      neighborIds: Array.isArray(neighborIds) ? neighborIds : undefined,
+    };
+
+    if (battleMode !== undefined) updateData.battleMode = battleMode;
+    if (chipDamageChance !== undefined) updateData.chipDamageChance = Number(chipDamageChance);
+
+    if (ownerId !== undefined) updateData.ownerId = ownerId;
+    if (ownerNickname !== undefined) updateData.ownerNickname = ownerNickname;
+    if (defendingCards !== undefined) updateData.defendingCards = defendingCards;
+    if (capturedAt !== undefined) updateData.capturedAt = capturedAt;
+    if (crystalsLastClaimedAt !== undefined) updateData.crystalsLastClaimedAt = crystalsLastClaimedAt;
+
     const updatedPoint = await prisma.arenaPoint.update({
       where: { id },
-      data: {
-        name: name || 'Точка Арени',
-        icon: icon || 'castle',
-        color: color || '#4f46e5',
-        entryFee: entryFee !== undefined ? Number(entryFee) : 0,
-        cooldownMinutes: cooldownMinutes !== undefined ? Number(cooldownMinutes) : 15,
-        crystalRatePerHour: crystalRatePerHour !== undefined ? Number(crystalRatePerHour) : 0,
-        areaPolygon: areaPolygon,
-        isLandingZone: isLandingZone !== undefined ? !!isLandingZone : undefined,
-        neighborIds: Array.isArray(neighborIds) ? neighborIds : undefined,
-      },
+      data: updateData,
     });
     res.json({ success: true, point: updatedPoint });
   } catch (error) {
@@ -2527,7 +2546,7 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
 
       const idx = c.statsIndex;
       if (idx === undefined || idx === null || idx < 0 || idx >= effectiveStats.length) {
-        return res.status(400).json({ error: 'Недійсні характеристики карти.' });
+        return res.status(400).json({ error: `Недійсні характеристики карти "${catalogCard.name}" (індекс ${idx}, доступно ${effectiveStats.length}).` });
       }
 
       if (!usedIndicesByCard[c.id]) usedIndicesByCard[c.id] = new Set();
@@ -2644,6 +2663,11 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
 app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => {
   const { id } = req.params;
   const { cards } = req.body;
+  console.log('[BATTLE START REQUEST]', { pointId: id, uid: req.user.uid, cardsCount: cards ? cards.length : 'undefined', cardsIsArray: Array.isArray(cards) });
+  if (!cards || !Array.isArray(cards) || cards.length !== 5) {
+    console.log('[BATTLE START ERROR] Forcing 400: Для бою необхідно обрати рівно 5 карт!');
+    return res.status(400).json({ error: 'Для бою необхідно обрати рівно 5 карт!' });
+  }
 
   try {
     const user = await prisma.user.findUnique({
@@ -2760,9 +2784,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       }
     }
 
-    if (!cards || !Array.isArray(cards) || cards.length !== 5) {
-      return res.status(400).json({ error: 'Для бою необхідно рівно 5 карт.' });
-    }
+
 
     if (user.coins < point.entryFee) {
       return res.status(400).json({ error: 'Недостатньо монет для атаки.' });
@@ -2776,7 +2798,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       return res.status(400).json({ error: 'Точка ще під захистом (Кулдаун).' });
     }
 
-    // Симуляція бою
+    // Симуляція бою (Perk-aware)
     const attackerCards = validatedCards;
     const defenderCards = (point.defendingCards || []).map((c) => {
       const maxHp = (c.maxHp !== undefined && c.maxHp !== null && c.maxHp > 0)
@@ -2786,7 +2808,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
           : c.power || 1;
       const currentHp = (c.hp !== undefined && c.hp !== null && c.hp > 0)
         ? c.hp
-        : maxHp; // Якщо hp = 0 або відсутнє — відновлюємо до maxHp
+        : maxHp;
       return { ...c, currentHp, maxHp };
     });
 
@@ -2796,104 +2818,180 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     if (isTeamDead(attackerCards)) {
       return res.status(400).json({ error: "Ваші картки не мають здоров'я (0 ХП) для бою!" });
     }
-
-    // Захист від корумпованих даних: якщо всі захисники мертві — атакуючий перемагає без бою
     if (isTeamDead(defenderCards)) {
       battleLog.push({ note: 'Захисники не мали HP — автоматична перемога атакуючого.' });
     }
 
-    // Функція пошуку цілі (спочатку навпроти, потім найближча)
+    // Perk state tracking
+    const lastStandUsed = { attacker: new Array(attackerCards.length).fill(false), defender: new Array(defenderCards.length).fill(false) };
+    const poisonStacks = { attacker: new Array(attackerCards.length).fill(null), defender: new Array(defenderCards.length).fill(null) };
+
+    // Target selection with Taunt priority
     const getTargetIndex = (attackerIndex, defenders) => {
+      const taunters = [];
+      for (let i = 0; i < defenders.length; i++) {
+        if (defenders[i].currentHp > 0 && defenders[i].perk === 'taunt') taunters.push(i);
+      }
+      if (taunters.length > 0) {
+        let best = taunters[0];
+        let bestDist = Math.abs(attackerIndex - taunters[0]);
+        for (let t = 1; t < taunters.length; t++) {
+          const d = Math.abs(attackerIndex - taunters[t]);
+          if (d < bestDist) { bestDist = d; best = taunters[t]; }
+        }
+        return best;
+      }
       if (defenders[attackerIndex] && defenders[attackerIndex].currentHp > 0) return attackerIndex;
-      let closestIdx = -1;
-      let minDistance = 999;
+      let closestIdx = -1, minDist = 999;
       for (let i = 0; i < defenders.length; i++) {
         if (defenders[i].currentHp > 0) {
-          const dist = Math.abs(attackerIndex - i);
-          if (dist < minDistance) {
-            minDistance = dist;
-            closestIdx = i;
-          }
+          const d = Math.abs(attackerIndex - i);
+          if (d < minDist) { minDist = d; closestIdx = i; }
         }
       }
       return closestIdx;
     };
 
-    let turnCount = 0;
-    const MAX_TURNS = 100; // запобіжник від нескінченних циклів
-
-    while (!isTeamDead(attackerCards) && !isTeamDead(defenderCards) && turnCount < MAX_TURNS) {
-      turnCount++;
-      let anyAttackMade = false;
-
-      const maxCount = Math.max(attackerCards.length, defenderCards.length);
-
-      for (let i = 0; i < maxCount; i++) {
-        // Хід атакуючого i-тою картою
-        if (attackerCards[i]?.currentHp > 0 && !isTeamDead(defenderCards)) {
-          const targetIdx = getTargetIndex(i, defenderCards);
-          if (targetIdx !== -1) {
-            anyAttackMade = true;
-            const baseDmg = attackerCards[i].power;
-            const range = baseDmg * 0.25;
-            const damage = Math.max(1, Math.floor(baseDmg - range + Math.random() * (range * 2)));
-
-            defenderCards[targetIdx].currentHp -= damage;
-
-            battleLog.push({
-              attackerSide: 'attacker',
-              attackerIndex: i,
-              targetIndex: targetIdx,
-              damage: damage,
-              isTargetDead: defenderCards[targetIdx].currentHp <= 0,
-            });
-          }
+    // Find lowest-HP-% ally for Healer
+    const findHealTarget = (team) => {
+      let idx = -1, low = 1.0;
+      for (let i = 0; i < team.length; i++) {
+        if (team[i].currentHp > 0 && team[i].currentHp < (team[i].maxHp || team[i].hp || 1)) {
+          const p = team[i].currentHp / (team[i].maxHp || team[i].hp || 1);
+          if (p < low) { low = p; idx = i; }
         }
+      }
+      return idx;
+    };
 
-        // Хід захисника i-тою картою
-        if (defenderCards[i]?.currentHp > 0 && !isTeamDead(attackerCards)) {
-          const targetIdx = getTargetIndex(i, attackerCards);
-          if (targetIdx !== -1) {
-            anyAttackMade = true;
-            const baseDmg = defenderCards[i].power;
-            const range = baseDmg * 0.25;
-            const damage = Math.max(1, Math.floor(baseDmg - range + Math.random() * (range * 2)));
-
-            attackerCards[targetIdx].currentHp -= damage;
-
-            battleLog.push({
-              attackerSide: 'defender',
-              attackerIndex: i,
-              targetIndex: targetIdx,
-              damage: damage,
-              isTargetDead: attackerCards[targetIdx].currentHp <= 0,
-            });
+    // Poison ticks at start of turn
+    const applyPoisonTicks = (side, team) => {
+      for (let i = 0; i < team.length; i++) {
+        const ps = poisonStacks[side][i];
+        if (ps && ps.turnsLeft > 0 && team[i].currentHp > 0) {
+          team[i].currentHp -= ps.damage;
+          ps.turnsLeft--;
+          if (ps.turnsLeft <= 0) poisonStacks[side][i] = null;
+          if (team[i].currentHp <= 0 && team[i].perk === 'laststand' && !lastStandUsed[side][i]) {
+            team[i].currentHp = 1; lastStandUsed[side][i] = true;
+            battleLog.push({ attackerSide: side === 'attacker' ? 'defender' : 'attacker', attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: false, events: ['poison_tick', 'laststand'] });
+          } else {
+            battleLog.push({ attackerSide: side === 'attacker' ? 'defender' : 'attacker', attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: team[i].currentHp <= 0, events: ['poison_tick'] });
           }
         }
       }
+    };
 
-      if (!anyAttackMade) break; // Захист від нескінченного циклу, якщо ніхто не може атакувати
+    // Single attack with all perks
+    const performAttack = (aSide, aIdx, aTeam, dTeam) => {
+      const atk = aTeam[aIdx];
+      if (!atk || atk.currentHp <= 0) return false;
+      const dSide = aSide === 'attacker' ? 'defender' : 'attacker';
+
+      // Healer perk
+      if (atk.perk === 'healer') {
+        const hIdx = findHealTarget(aTeam);
+        if (hIdx !== -1) {
+          const hAmt = Math.max(1, Math.floor(atk.power * ((atk.perkValue || 30) / 100)));
+          const mxHp = aTeam[hIdx].maxHp || aTeam[hIdx].hp || 1;
+          const old = aTeam[hIdx].currentHp;
+          aTeam[hIdx].currentHp = Math.min(mxHp, aTeam[hIdx].currentHp + hAmt);
+          battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: hIdx, damage: 0, isTargetDead: false, events: ['healer'], healAmount: aTeam[hIdx].currentHp - old, healTargetSide: aSide });
+          return true;
+        }
+      }
+
+      const tIdx = getTargetIndex(aIdx, dTeam);
+      if (tIdx === -1) return false;
+      const tgt = dTeam[tIdx];
+      const ev = [];
+      const base = atk.power;
+      const rng = base * 0.25;
+      let dmg = Math.max(1, Math.floor(base - rng + Math.random() * (rng * 2)));
+
+      // Dodge
+      if (tgt.perk === 'dodge' && Math.random() * 100 < (tgt.perkValue || 20)) {
+        battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: 0, isTargetDead: false, events: ['dodge'] });
+        return true;
+      }
+      // Crit
+      if (atk.perk === 'crit' && Math.random() * 100 < (atk.perkValue || 20)) { dmg *= 2; ev.push('crit'); }
+      // Armor
+      if (tgt.perk === 'armor') { dmg = Math.max(1, dmg - Math.floor(dmg * ((tgt.perkValue || 20) / 100))); ev.push('armor'); }
+
+      tgt.currentHp -= dmg;
+
+      // Last Stand
+      if (tgt.currentHp <= 0 && tgt.perk === 'laststand' && !lastStandUsed[dSide][tIdx]) {
+        tgt.currentHp = 1; lastStandUsed[dSide][tIdx] = true; ev.push('laststand');
+      }
+      const dead = tgt.currentHp <= 0;
+
+      // Lifesteal
+      let heal = 0;
+      if (atk.perk === 'lifesteal') {
+        heal = Math.max(1, Math.floor(dmg * ((atk.perkValue || 25) / 100)));
+        atk.currentHp = Math.min(atk.maxHp || atk.hp || 1, atk.currentHp + heal);
+        ev.push('lifesteal');
+      }
+      // Poison
+      let poisoned = false;
+      if (atk.perk === 'poison' && !dead) {
+        poisonStacks[dSide][tIdx] = { damage: atk.perkValue || 5, turnsLeft: 3 };
+        ev.push('poison'); poisoned = true;
+      }
+      // Thorns
+      let thorns = 0;
+      if (tgt.perk === 'thorns') {
+        thorns = Math.max(1, Math.floor(dmg * ((tgt.perkValue || 25) / 100)));
+        atk.currentHp -= thorns; ev.push('thorns');
+        if (atk.currentHp <= 0 && atk.perk === 'laststand' && !lastStandUsed[aSide][aIdx]) {
+          atk.currentHp = 1; lastStandUsed[aSide][aIdx] = true;
+        }
+      }
+
+      battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: dmg, isTargetDead: dead, events: ev, healAmount: heal || undefined, thornsDamage: thorns || undefined, poisonApplied: poisoned || undefined });
+
+      // Cleave
+      if (atk.perk === 'cleave') {
+        const splash = Math.max(1, Math.floor(dmg * ((atk.perkValue || 30) / 100)));
+        for (const adj of [tIdx - 1, tIdx + 1]) {
+          if (adj >= 0 && adj < dTeam.length && dTeam[adj].currentHp > 0) {
+            dTeam[adj].currentHp -= splash;
+            if (dTeam[adj].currentHp <= 0 && dTeam[adj].perk === 'laststand' && !lastStandUsed[dSide][adj]) { dTeam[adj].currentHp = 1; lastStandUsed[dSide][adj] = true; }
+            battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: adj, damage: splash, isTargetDead: dTeam[adj].currentHp <= 0, events: ['cleave'] });
+          }
+        }
+      }
+      return true;
+    };
+
+    let turnCount = 0;
+    const MAX_TURNS = 100;
+    while (!isTeamDead(attackerCards) && !isTeamDead(defenderCards) && turnCount < MAX_TURNS) {
+      turnCount++;
+      let anyAttack = false;
+      if (turnCount > 1) {
+        applyPoisonTicks('attacker', attackerCards);
+        applyPoisonTicks('defender', defenderCards);
+        if (isTeamDead(attackerCards) || isTeamDead(defenderCards)) break;
+      }
+      const mc = Math.max(attackerCards.length, defenderCards.length);
+      for (let i = 0; i < mc; i++) {
+        if (attackerCards[i]?.currentHp > 0 && !isTeamDead(defenderCards)) { if (performAttack('attacker', i, attackerCards, defenderCards)) anyAttack = true; }
+        if (defenderCards[i]?.currentHp > 0 && !isTeamDead(attackerCards)) { if (performAttack('defender', i, defenderCards, attackerCards)) anyAttack = true; }
+      }
+      if (!anyAttack) break;
     }
 
-    // Визначення переможця
     let attackerWon;
-    if (isTeamDead(defenderCards)) {
-      attackerWon = true;
-    } else if (isTeamDead(attackerCards)) {
-      attackerWon = false;
-    } else {
-      // Тайм-аут (MAX_TURNS досягнуто) — перемагає той, хто зберіг більше % HP
-      const calcHpPercent = (team) => {
-        const alive = team.filter((c) => c.currentHp > 0);
-        if (alive.length === 0) return 0;
-        return alive.reduce((sum, c) => sum + (c.currentHp / (c.maxHp || 1)), 0) / team.length;
-      };
-      const attackerHpPct = calcHpPercent(attackerCards);
-      const defenderHpPct = calcHpPercent(defenderCards);
-      attackerWon = attackerHpPct >= defenderHpPct; // Нічия = перемога атакуючого
-      battleLog.push({
-        note: `Тайм-аут (${turnCount} ходів). Атакуючий HP: ${(attackerHpPct * 100).toFixed(1)}%, Захисник HP: ${(defenderHpPct * 100).toFixed(1)}%`,
-      });
+    if (isTeamDead(defenderCards)) { attackerWon = true; }
+    else if (isTeamDead(attackerCards)) { attackerWon = false; }
+    else {
+      const hpPct = (t) => { const a = t.filter(c => c.currentHp > 0); return a.length === 0 ? 0 : a.reduce((s, c) => s + c.currentHp / (c.maxHp || 1), 0) / t.length; };
+      const aPct = hpPct(attackerCards), dPct = hpPct(defenderCards);
+      attackerWon = aPct >= dPct;
+      battleLog.push({ note: `\u0422\u0430\u0439\u043c-\u0430\u0443\u0442 (${turnCount} \u0445\u043e\u0434\u0456\u0432). \u0410\u0442\u0430\u043a\u0443\u044e\u0447\u0438\u0439 HP: ${(aPct * 100).toFixed(1)}%, \u0417\u0430\u0445\u0438\u0441\u043d\u0438\u043a HP: ${(dPct * 100).toFixed(1)}%` });
     }
     let updatedPoint = point;
 
@@ -2932,11 +3030,47 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
           effectiveStats.push({ power: card.power, hp: card.hp, maxHp: card.maxHp || card.hp }); // Оригінальні арти
         }
 
-        // Записуємо нове пошкоджене ХП. Якщо картка "вмерла" (ХП <= 0), відновлюємо до maxHp
-        const newHp = card.currentHp <= 0 ? card.maxHp || card.hp : card.currentHp;
-        effectiveStats[card.statsIndex].hp = newHp;
-        if (!effectiveStats[card.statsIndex].maxHp) {
-          effectiveStats[card.statsIndex].maxHp = card.maxHp || card.hp;
+        let stat = effectiveStats[card.statsIndex];
+        if (!stat) continue; // Safety check
+        if (!stat.maxHp) stat.maxHp = card.maxHp || card.hp;
+
+        if (point.battleMode === 'HARDCORE') {
+          if (card.currentHp <= 0) {
+            // Delete dead instance
+            effectiveStats.splice(card.statsIndex, 1);
+            card._isDestroyed = true; // Mark as dead for defending snapshot
+            if (effectiveStats.length === 0 && invItem.amount === 1) {
+              await tx.inventoryItem.delete({ where: { id: invItem.id } });
+              continue;
+            } else {
+              await tx.inventoryItem.update({
+                where: { id: invItem.id },
+                data: { gameStats: effectiveStats, amount: { decrement: 1 } },
+              });
+              continue;
+            }
+          } else {
+            stat.hp = card.currentHp;
+            card.hp = stat.hp;
+            card.maxHp = stat.maxHp;
+            card.power = stat.power;
+          }
+        } else if (point.battleMode === 'CHIP_DAMAGE') {
+          stat.hp = stat.maxHp;
+          if (Math.random() * 100 < (point.chipDamageChance || 0)) {
+            stat.maxHp = Math.max(1, Math.floor(stat.maxHp * 0.95));
+            stat.power = Math.max(1, Math.floor(stat.power * 0.95));
+            stat.hp = stat.maxHp;
+          }
+          card.hp = stat.hp;
+          card.maxHp = stat.maxHp;
+          card.power = stat.power;
+        } else {
+          // FULL
+          stat.hp = stat.maxHp;
+          card.hp = stat.hp;
+          card.maxHp = stat.maxHp;
+          card.power = stat.power;
         }
 
         await tx.inventoryItem.update({
@@ -2965,21 +3099,35 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             ownerNickname: user.nickname,
             capturedAt: new Date(),
             crystalsLastClaimedAt: new Date(),
-            defendingCards: attackerCards.map((c) => ({
+            defendingCards: attackerCards.filter(c => !c._isDestroyed).map((c) => ({
               ...c,
-              hp: c.currentHp <= 0 ? c.maxHp : c.currentHp,
-            })), // Зберігаємо як нове базове ХП. Мертві картки відновлюють ХП.
+              hp: c.hp, // Already updated by the loop above based on battleMode
+              currentHp: undefined, // cleanup
+            })),
           },
         });
       } else {
-        // Якщо атакуючий програв, зберігаємо пошкодження захисників для майбутніх атак
+        // Захисник переміг (атаку відбито)
         updatedPoint = await tx.arenaPoint.update({
           where: { id },
           data: {
-            defendingCards: defenderCards.map((c) => ({
-              ...c,
-              hp: c.currentHp <= 0 ? c.maxHp : c.currentHp,
-            })), // Зберігаємо як нове базове ХП. Мертві картки відновлюють ХП.
+            defendingCards: defenderCards.map((c) => {
+              if (point.battleMode === 'HARDCORE') {
+                if (c.currentHp <= 0) return null; // Card dies permanently from defense
+                return { ...c, hp: c.currentHp };
+              } else if (point.battleMode === 'CHIP_DAMAGE') {
+                let newMax = c.maxHp || c.hp;
+                let newPow = c.power;
+                if (Math.random() * 100 < (point.chipDamageChance || 0)) {
+                  newMax = Math.max(1, Math.floor(newMax * 0.95));
+                  newPow = Math.max(1, Math.floor(newPow * 0.95));
+                }
+                return { ...c, maxHp: newMax, power: newPow, hp: newMax };
+              } else {
+                // FULL mode
+                return { ...c, hp: c.maxHp || c.hp };
+              }
+            }).filter(Boolean),
           },
         });
       }
