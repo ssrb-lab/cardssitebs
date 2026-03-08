@@ -1630,7 +1630,7 @@ export default function AdminView({
                           <div
                             className="font-bold text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-2 truncate cursor-pointer transition-colors"
                             onClick={() => {
-                              setViewingPlayerProfile(u.uid);
+                              setViewingPlayerProfile(u.nickname);
                               setCurrentView('publicProfile');
                             }}
                           >

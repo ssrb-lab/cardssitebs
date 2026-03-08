@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import {
   Coins,
   PackageOpen,
@@ -101,15 +102,14 @@ export default function App() {
   const [premiumShopItems, setPremiumShopItems] = useState([]);
   const [wordleEntryCost, setWordleEntryCost] = useState(0);
 
-  const [currentView, setCurrentView] = useState(() => {
-    // Намагаємось отримати збережену вкладку, якщо її немає — за замовчуванням "shop"
-    return localStorage.getItem('lastActiveView') || 'shop';
-  });
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Додаємо useEffect, який буде зберігати вкладку в localStorage щоразу, коли вона змінюється
+  const currentView = location.pathname.split('/')[1] || 'shop'; // Extract base path for NavButton logic
+
   useEffect(() => {
-    localStorage.setItem('lastActiveView', currentView);
-  }, [currentView]);
+    localStorage.setItem('lastActiveView', location.pathname);
+  }, [location.pathname]);
   const [selectedPackId, setSelectedPackId] = useState(null);
   const [openingPackId, setOpeningPackId] = useState(null);
   const [isRouletteSpinning, setIsRouletteSpinning] = useState(false);
@@ -137,6 +137,12 @@ export default function App() {
 
   useEffect(() => {
     document.title = 'Card Game';
+    
+    // Redirect logic on load to maintain previous tab
+    const savedPath = localStorage.getItem('lastActiveView');
+    if (savedPath && savedPath !== '/' && location.pathname === '/') {
+      navigate(savedPath, { replace: true });
+    }
   }, []);
 
   const addSystemLog = async (type, details) => {
@@ -436,7 +442,7 @@ export default function App() {
     setProfile(null);
     setDbInventory([]);
     setShowcases([]);
-    setCurrentView('shop');
+    navigate('/');
     setAuthMode('login');
     setNeedsRegistration(true);
     setLoading(false);
@@ -1234,7 +1240,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div
             className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer"
-            onClick={() => setCurrentView('shop')}
+            onClick={() => navigate('/shop')}
           >
             <img
               src={logo1}
@@ -1247,7 +1253,7 @@ export default function App() {
 
           <div className="flex items-center gap-3 sm:gap-6">
             <button
-              onClick={() => setCurrentView('profile')}
+              onClick={() => navigate('/profile')}
               className="flex items-center gap-3 hover:bg-neutral-800 p-1.5 pr-3 rounded-full text-left"
             >
               <PlayerAvatar profile={profile} className="w-10 h-10 rounded-full" iconSize={20} />
@@ -1271,7 +1277,7 @@ export default function App() {
             <div className="flex items-center gap-2 sm:gap-4">
               {canClaimDaily && (
                 <button
-                  onClick={() => setCurrentView('profile')}
+                  onClick={() => navigate('/profile')}
                   className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl border border-orange-500/30"
                 >
                   <Gift size={20} />
@@ -1316,7 +1322,7 @@ export default function App() {
                 <span className="text-fuchsia-500 font-black">{profile?.crystals || 0}</span>
               </div>
               <button
-                onClick={() => setCurrentView('premium')}
+                onClick={() => navigate('/premium')}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl border bg-neutral-950 border-neutral-800 text-fuchsia-400"
               >
                 <Gem size={18} /> <span className="hidden sm:block font-bold text-sm">Преміум</span>
@@ -1336,175 +1342,221 @@ export default function App() {
       )}
 
       <main className="max-w-5xl w-full mx-auto p-4 mt-4 flex-grow">
-        {currentView === 'farm' && (
-          <FarmView
-            profile={profile}
-            setProfile={setProfile}
-            cardsCatalog={cardsCatalog}
-            showToast={showToast}
-            bosses={bosses}
-            rarities={rarities}
-            wordleEntryCost={wordleEntryCost}
-          />
-        )}
-        {currentView === 'shop' && (
-          <ShopView
-            profile={profile}
-            cardStats={cardStats}
-            packs={packsCatalog}
-            cardsCatalog={cardsCatalog}
-            rarities={rarities}
-            openPack={openPack}
-            openingPackId={openingPackId}
-            isRouletteSpinning={isRouletteSpinning}
-            rouletteItems={rouletteItems}
-            pulledCards={pulledCards}
-            setPulledCards={setPulledCards}
-            sellPulledCards={sellPulledCards}
-            sellSinglePulledCard={sellSinglePulledCard}
-            selectedPackId={selectedPackId}
-            setSelectedPackId={setSelectedPackId}
-            setViewingCard={setViewingCard}
-            isPremiumActive={isPremiumActive}
-            isAdmin={profile?.isAdmin}
-            isProcessing={isProcessing}
-            statsRanges={statsRanges}
-          />
-        )}
-        {currentView === 'premium' && (
-          <PremiumShopView
-            profile={profile}
-            setProfile={setProfile}
-            user={user}
-            premiumPrice={premiumPrice}
-            premiumDurationDays={premiumDurationDays}
-            premiumShopItems={premiumShopItems}
-            showToast={showToast}
-            isProcessing={isProcessing}
-            setIsProcessing={setIsProcessing}
-            addSystemLog={addSystemLog}
-            isPremiumActive={isPremiumActive}
-            cardsCatalog={cardsCatalog}
-            setViewingCard={setViewingCard}
-            rarities={rarities}
-            cardStats={cardStats}
-          />
-        )}
-        {currentView === 'inventory' && (
-          <InventoryView
-            inventory={fullInventory}
-            rarities={rarities}
-            catalogTotal={cardsCatalog.length}
-            setViewingCard={setViewingCard}
-            setListingCard={setListingCard}
-            packsCatalog={packsCatalog}
-            showcases={showcases}
-            profile={profile}
-            cardsCatalog={cardsCatalog}
-            cardStats={cardStats}
-            sellDuplicate={sellDuplicate}
-            sellAllDuplicates={sellAllDuplicates}
-            sellEveryDuplicate={sellEveryDuplicate}
-            toggleSafe={toggleSafe}
-            sellPrice={SELL_PRICE}
-            deleteShowcase={deleteShowcase}
-            setMainShowcase={setMainShowcase}
-            saveShowcaseCards={saveShowcaseCards}
-          />
-        )}
-        {currentView === 'forge' && (
-          <ForgeView
-            inventory={fullInventory}
-            cardsCatalog={cardsCatalog}
-            packsCatalog={packsCatalog}
-            rarities={rarities}
-            profile={profile}
-            showToast={showToast}
-            getToken={getToken}
-            reloadProfile={reloadProfile}
-          />
-        )}
-        {currentView === 'market' && (
-          <MarketView
-            marketListings={marketListings}
-            cardsCatalog={cardsCatalog}
-            rarities={rarities}
-            currentUserUid={user.uid}
-            setViewingCard={setViewingCard}
-            isAdmin={profile?.isAdmin}
-            buyFromMarket={buyFromMarket}
-            cancelMarketListing={cancelMarketListing}
-            reloadMarket={reloadMarket}
-          />
-        )}
-        {currentView === 'profile' && (
-          <ProfileView
-            profile={profile}
-            setProfile={setProfile}
-            user={user}
-            handleLogout={handleLogout}
-            showToast={showToast}
-            inventoryCount={fullInventory.length}
-            canClaimDaily={canClaimDaily}
-            dailyRewards={dailyRewards}
-            premiumDailyRewards={premiumDailyRewards}
-            isPremiumActive={isPremiumActive}
-            showcases={showcases}
-            cardsCatalog={cardsCatalog}
-            rarities={rarities}
-            fullInventory={fullInventory}
-            setViewingCard={setViewingCard}
-            cardStats={cardStats}
-            achievementsCatalog={achievementsCatalog}
-            packsCatalog={packsCatalog}
-          />
-        )}
-        {currentView === 'rating' && (
-          <RatingView
-            currentUid={user.uid}
-            setViewingPlayerProfile={(uid) => {
-              setViewingPlayerProfile(uid);
-              setCurrentView('publicProfile');
-            }}
-          />
-        )}
-        {currentView === 'publicProfile' && viewingPlayerProfile && (
-          <PublicProfileView
-            targetUid={viewingPlayerProfile}
-            goBack={() => setCurrentView('rating')}
-            cardsCatalog={cardsCatalog}
-            rarities={rarities}
-            setViewingCard={setViewingCard}
-            packsCatalog={packsCatalog}
-            cardStats={cardStats}
-            achievementsCatalog={achievementsCatalog}
-          />
-        )}
-        {currentView === 'admin' && (profile?.isAdmin || profile?.isSuperAdmin) && (
-          <AdminView
-            reloadSettings={reloadSettings}
-            currentProfile={profile}
-            setProfile={setProfile}
-            cardsCatalog={cardsCatalog}
-            packsCatalog={packsCatalog}
-            setCardsCatalog={setCardsCatalog}
-            setPacksCatalog={setPacksCatalog}
-            rarities={rarities}
-            showToast={showToast}
-            addSystemLog={addSystemLog}
-            dailyRewards={dailyRewards}
-            premiumDailyRewards={premiumDailyRewards}
-            premiumPrice={premiumPrice}
-            premiumDurationDays={premiumDurationDays}
-            premiumShopItems={premiumShopItems}
-            setViewingPlayerProfile={setViewingPlayerProfile}
-            setCurrentView={setCurrentView}
-            setViewingCard={setViewingCard}
-            bosses={bosses}
-            setBosses={setBosses}
-            wordleEntryCost={wordleEntryCost}
-          />
-        )}
+        <Routes>
+          <Route path="/farm" element={
+            <FarmView
+              profile={profile}
+              setProfile={setProfile}
+              cardsCatalog={cardsCatalog}
+              showToast={showToast}
+              bosses={bosses}
+              rarities={rarities}
+              wordleEntryCost={wordleEntryCost}
+            />
+          } />
+          
+          <Route path="/shop" element={
+            <ShopView
+              profile={profile}
+              cardStats={cardStats}
+              packs={packsCatalog}
+              cardsCatalog={cardsCatalog}
+              rarities={rarities}
+              openPack={openPack}
+              openingPackId={openingPackId}
+              isRouletteSpinning={isRouletteSpinning}
+              rouletteItems={rouletteItems}
+              pulledCards={pulledCards}
+              setPulledCards={setPulledCards}
+              sellPulledCards={sellPulledCards}
+              sellSinglePulledCard={sellSinglePulledCard}
+              selectedPackId={selectedPackId}
+              setSelectedPackId={setSelectedPackId}
+              setViewingCard={setViewingCard}
+              isPremiumActive={isPremiumActive}
+              isAdmin={profile?.isAdmin}
+              isProcessing={isProcessing}
+              statsRanges={statsRanges}
+            />
+          } />
+          <Route path="/" element={
+            <ShopView
+              profile={profile}
+              cardStats={cardStats}
+              packs={packsCatalog}
+              cardsCatalog={cardsCatalog}
+              rarities={rarities}
+              openPack={openPack}
+              openingPackId={openingPackId}
+              isRouletteSpinning={isRouletteSpinning}
+              rouletteItems={rouletteItems}
+              pulledCards={pulledCards}
+              setPulledCards={setPulledCards}
+              sellPulledCards={sellPulledCards}
+              sellSinglePulledCard={sellSinglePulledCard}
+              selectedPackId={selectedPackId}
+              setSelectedPackId={setSelectedPackId}
+              setViewingCard={setViewingCard}
+              isPremiumActive={isPremiumActive}
+              isAdmin={profile?.isAdmin}
+              isProcessing={isProcessing}
+              statsRanges={statsRanges}
+            />
+          } />
+
+          <Route path="/premium" element={
+            <PremiumShopView
+              profile={profile}
+              setProfile={setProfile}
+              user={user}
+              premiumPrice={premiumPrice}
+              premiumDurationDays={premiumDurationDays}
+              premiumShopItems={premiumShopItems}
+              showToast={showToast}
+              isProcessing={isProcessing}
+              setIsProcessing={setIsProcessing}
+              addSystemLog={addSystemLog}
+              isPremiumActive={isPremiumActive}
+              cardsCatalog={cardsCatalog}
+              setViewingCard={setViewingCard}
+              rarities={rarities}
+              cardStats={cardStats}
+            />
+          } />
+
+          <Route path="/inventory" element={
+            <InventoryView
+              inventory={fullInventory}
+              rarities={rarities}
+              catalogTotal={cardsCatalog.length}
+              setViewingCard={setViewingCard}
+              setListingCard={setListingCard}
+              packsCatalog={packsCatalog}
+              showcases={showcases}
+              profile={profile}
+              cardsCatalog={cardsCatalog}
+              cardStats={cardStats}
+              sellDuplicate={sellDuplicate}
+              sellAllDuplicates={sellAllDuplicates}
+              sellEveryDuplicate={sellEveryDuplicate}
+              toggleSafe={toggleSafe}
+              sellPrice={SELL_PRICE}
+              deleteShowcase={deleteShowcase}
+              setMainShowcase={setMainShowcase}
+              saveShowcaseCards={saveShowcaseCards}
+            />
+          } />
+
+          <Route path="/forge" element={
+            <ForgeView
+              inventory={fullInventory}
+              cardsCatalog={cardsCatalog}
+              packsCatalog={packsCatalog}
+              rarities={rarities}
+              profile={profile}
+              showToast={showToast}
+              getToken={getToken}
+              reloadProfile={reloadProfile}
+            />
+          } />
+
+          <Route path="/market" element={
+            <MarketView
+              marketListings={marketListings}
+              cardsCatalog={cardsCatalog}
+              rarities={rarities}
+              currentUserUid={user.uid}
+              setViewingCard={setViewingCard}
+              isAdmin={profile?.isAdmin}
+              buyFromMarket={buyFromMarket}
+              cancelMarketListing={cancelMarketListing}
+              reloadMarket={reloadMarket}
+            />
+          } />
+
+          <Route path="/profile" element={
+            <ProfileView
+              profile={profile}
+              setProfile={setProfile}
+              user={user}
+              handleLogout={handleLogout}
+              showToast={showToast}
+              inventoryCount={fullInventory.length}
+              canClaimDaily={canClaimDaily}
+              dailyRewards={dailyRewards}
+              premiumDailyRewards={premiumDailyRewards}
+              isPremiumActive={isPremiumActive}
+              showcases={showcases}
+              cardsCatalog={cardsCatalog}
+              rarities={rarities}
+              fullInventory={fullInventory}
+              setViewingCard={setViewingCard}
+              cardStats={cardStats}
+              achievementsCatalog={achievementsCatalog}
+              packsCatalog={packsCatalog}
+            />
+          } />
+
+          <Route path="/rating" element={
+            <RatingView
+              currentUid={user.uid}
+              setViewingPlayerProfile={(nickname) => {
+                setViewingPlayerProfile(nickname);
+                navigate(`/dashboard/${nickname}`);
+              }}
+            />
+          } />
+
+          <Route path="/dashboard/:identifier" element={
+            <PublicProfileView
+              goBack={() => navigate('/rating')}
+              cardsCatalog={cardsCatalog}
+              rarities={rarities}
+              setViewingCard={setViewingCard}
+              packsCatalog={packsCatalog}
+              cardStats={cardStats}
+              achievementsCatalog={achievementsCatalog}
+            />
+          } />
+
+          <Route path="/admin" element={
+            (profile?.isAdmin || profile?.isSuperAdmin) ? (
+              <AdminView
+                reloadSettings={reloadSettings}
+                currentProfile={profile}
+                setProfile={setProfile}
+                cardsCatalog={cardsCatalog}
+                packsCatalog={packsCatalog}
+                setCardsCatalog={setCardsCatalog}
+                setPacksCatalog={setPacksCatalog}
+                rarities={rarities}
+                showToast={showToast}
+                addSystemLog={addSystemLog}
+                dailyRewards={dailyRewards}
+                premiumDailyRewards={premiumDailyRewards}
+                premiumPrice={premiumPrice}
+                premiumDurationDays={premiumDurationDays}
+                premiumShopItems={premiumShopItems}
+                setViewingPlayerProfile={(nickname) => {
+                  setViewingPlayerProfile(nickname);
+                }}
+                setCurrentView={(v) => {
+                  if (v === 'publicProfile' && viewingPlayerProfile) {
+                    navigate(`/dashboard/${viewingPlayerProfile}`);
+                  } else {
+                    navigate(`/${v}`);
+                  }
+                }}
+                setViewingCard={setViewingCard}
+                bosses={bosses}
+                setBosses={setBosses}
+                wordleEntryCost={wordleEntryCost}
+              />
+            ) : (
+              <div className="text-center text-red-500 mt-10">Доступ заборонено</div>
+            )
+          } />
+        </Routes>
       </main>
 
       <footer className="w-full text-center text-neutral-600 text-xs py-8 mt-auto px-4 relative z-10">
@@ -1625,14 +1677,14 @@ export default function App() {
             icon={<Swords size={22} />}
             label="Фарм"
             isActive={currentView === 'farm'}
-            onClick={() => setCurrentView('farm')}
+            onClick={() => navigate('/farm')}
           />
           <NavButton
             icon={<PackageOpen size={22} />}
             label="Магазин"
-            isActive={currentView === 'shop'}
+            isActive={currentView === 'shop' || location.pathname === '/'}
             onClick={() => {
-              setCurrentView('shop');
+              navigate('/shop');
               setPulledCards([]);
               setSelectedPackId(null);
             }}
@@ -1642,7 +1694,7 @@ export default function App() {
             label="Інвентар"
             isActive={currentView === 'inventory'}
             onClick={() => {
-              setCurrentView('inventory');
+              navigate('/inventory');
               reloadProfile(); // Примусово оновлюємо дані з сервера
             }}
           />
@@ -1651,7 +1703,7 @@ export default function App() {
             label="Кузня"
             isActive={currentView === 'forge'}
             onClick={() => {
-              setCurrentView('forge');
+              navigate('/forge');
               reloadProfile();
             }}
           />
@@ -1660,26 +1712,26 @@ export default function App() {
             label="Ринок"
             isActive={currentView === 'market'}
             onClick={() => {
-              setCurrentView('market');
+              navigate('/market');
               reloadMarket(); // Викликаємо оновлення даних ринку
             }}
           />
           <NavButton
             icon={<Trophy size={22} />}
             label="Рейтинг"
-            isActive={currentView === 'rating' || currentView === 'publicProfile'}
-            onClick={() => setCurrentView('rating')}
+            isActive={currentView === 'rating' || currentView === 'dashboard'}
+            onClick={() => navigate('/rating')}
           />
           <NavButton
             icon={<User size={22} />}
             label="Профіль"
             isActive={currentView === 'profile'}
-            onClick={() => setCurrentView('profile')}
+            onClick={() => navigate('/profile')}
           />
 
           {(profile?.isAdmin || profile?.isSuperAdmin) && (
             <button
-              onClick={() => setCurrentView('admin')}
+              onClick={() => navigate('/admin')}
               className={`flex flex-col items-center p-2 rounded-lg w-16 sm:w-20 transition-colors ${currentView === 'admin' ? 'text-purple-500' : 'text-neutral-500'}`}
             >
               <Shield size={22} />

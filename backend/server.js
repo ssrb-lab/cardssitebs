@@ -815,10 +815,15 @@ app.get('/api/profile', authenticate, async (req, res) => {
 });
 
 // Публічний профіль гравця (для рейтингу)
-app.get('/api/profile/public/:uid', async (req, res) => {
+app.get('/api/profile/public/:identifier', async (req, res) => {
   try {
+    const identifier = req.params.identifier;
+    
+    // Check if it's a UUID (standard length 36)
+    const isUid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+
     let user = await prisma.user.findUnique({
-      where: { uid: req.params.uid },
+      where: isUid ? { uid: identifier } : { nickname: identifier },
       select: {
         uid: true,
         nickname: true,

@@ -86,10 +86,6 @@ export const useStore = create((set, get) => ({
   setWordleEntryCost: (wordleEntryCost) => set({ wordleEntryCost }),
   setNotifications: (notifications) => set({ notifications }),
 
-  setCurrentView: (view) => {
-    localStorage.setItem('lastActiveView', view);
-    set({ currentView: view });
-  },
   setSelectedPackId: (id) => set({ selectedPackId: id }),
   setOpeningPackId: (id) => set({ openingPackId: id }),
   setIsRouletteSpinning: (val) => set({ isRouletteSpinning: val }),

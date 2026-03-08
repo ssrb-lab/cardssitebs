@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Gem,
@@ -33,7 +34,6 @@ import { fetchPublicProfileRequest } from '../config/api';
 export default function PublicProfileView({
   db,
   appId,
-  targetUid,
   goBack,
   cardsCatalog,
   rarities,
@@ -57,10 +57,12 @@ export default function PublicProfileView({
       ? packsCatalog
       : packsCatalog.filter((p) => (p.category || 'Базові') === filterCategory);
 
+  const { identifier } = useParams();
+
   useEffect(() => {
     const fetchPlayerData = async () => {
       try {
-        const profileData = await fetchPublicProfileRequest(targetUid);
+        const profileData = await fetchPublicProfileRequest(identifier);
         setPlayerInfo(profileData);
 
         const inv = (profileData.inventory || [])
@@ -99,7 +101,7 @@ export default function PublicProfileView({
       setLoading(false);
     };
     fetchPlayerData();
-  }, [targetUid, db, appId, cardsCatalog]);
+  }, [identifier, db, appId, cardsCatalog]);
 
   if (loading)
     return (

@@ -104,7 +104,7 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
           return (
             <div
               key={leader.uid}
-              onClick={() => setViewingPlayerProfile(leader.uid)}
+              onClick={() => setViewingPlayerProfile(leader.nickname)}
               className={`flex items-center justify-between p-2 sm:p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group ${leader.uid === currentUid ? 'bg-yellow-900/10' : 'hover:bg-neutral-800/80'} ${leader.isBanned ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
