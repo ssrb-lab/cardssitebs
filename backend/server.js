@@ -1013,6 +1013,15 @@ app.delete('/api/admin/packs/:id', authenticate, checkAdmin, async (req, res) =>
 // ----------------------------------------
 // ІГРОВА МЕХАНІКА (ВІДКРИТТЯ ПАКІВ)
 // ----------------------------------------
+
+const DEFAULT_RARITY_WEIGHTS = {
+  'Звичайна': 70,
+  'Рідкісна': 25,
+  'Епічна': 4,
+  'Легендарна': 1,
+  'Унікальна': 0.1
+};
+
 app.post('/api/game/open-pack', authenticate, async (req, res) => {
   const { packId, amount } = req.body;
 
@@ -1170,7 +1179,15 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
     let cardStatsToAdd = {}; // { cardId: [{power, hp}, ...] }
 
     for (let i = 0; i < amount; i++) {
-      if (availableCards.length === 0) break; // Якщо всі картки закінчились під час відкриття
+      if (availableCards.length === 0) break;
+
+      // Підраховуємо кількість карток для кожної рідкісності (тільки для тих, хто без фіксованого %)
+      const rarityCounts = {};
+      for (const c of availableCards) {
+        if (!(c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0)) {
+          rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + 1;
+        }
+      }
 
       let exactPercentageSum = 0;
       let fallbackWeightsSum = 0;
@@ -1185,7 +1202,8 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         ) {
           exactPercentageSum += Number(c.weight);
         } else {
-          let w = 1;
+          const globalW = DEFAULT_RARITY_WEIGHTS[c.rarity] || 1;
+          let w = globalW;
           if (
             pack.customWeights &&
             pack.customWeights[c.rarity] !== undefined &&
@@ -1193,13 +1211,15 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           ) {
             w = Number(pack.customWeights[c.rarity]);
           }
-          fallbackWeightsSum += w;
+          // Вага однієї картки = вага всієї рідкісності / кількість карток цієї рідкісності
+          const perCardW = w / (rarityCounts[c.rarity] || 1);
+          fallbackWeightsSum += perCardW;
         }
       }
 
       const activeWeights = [];
       let remainingPercentage = 100 - exactPercentageSum;
-      if (remainingPercentage < 0) remainingPercentage = 0; // Захист від суми > 100%
+      if (remainingPercentage < 0) remainingPercentage = 0;
 
       for (const c of availableCards) {
         let chance = 0;
@@ -1209,9 +1229,10 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           c.weight !== '' &&
           Number(c.weight) > 0
         ) {
-          chance = Number(c.weight); // Точний відсоток
+          chance = Number(c.weight);
         } else {
-          let w = 1;
+          const globalW = DEFAULT_RARITY_WEIGHTS[c.rarity] || 1;
+          let w = globalW;
           if (
             pack.customWeights &&
             pack.customWeights[c.rarity] !== undefined &&
@@ -1219,8 +1240,9 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           ) {
             w = Number(pack.customWeights[c.rarity]);
           }
+          const perCardW = w / (rarityCounts[c.rarity] || 1);
           if (fallbackWeightsSum > 0) {
-            chance = (w / fallbackWeightsSum) * remainingPercentage;
+            chance = (perCardW / fallbackWeightsSum) * remainingPercentage;
           }
         }
         

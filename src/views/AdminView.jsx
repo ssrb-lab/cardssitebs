@@ -959,6 +959,14 @@ export default function AdminView({
     const cardsInThisPack = cardsCatalog.filter((c) => c.packId === packInfo.id);
     if (cardsInThisPack.length === 0) return '0%';
 
+    // Підраховуємо кількість карток для кожної рідкісності (для тих, хто без фіксованого %)
+    const rarityCounts = {};
+    for (const c of cardsInThisPack) {
+      if (!(c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0)) {
+        rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + 1;
+      }
+    }
+
     let exactPercentageSum = 0;
     let fallbackWeightsSum = 0;
 
@@ -967,14 +975,16 @@ export default function AdminView({
       if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
         exactPercentageSum += Number(c.weight);
       } else {
-        let w = 1;
+        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
+        let w = globalW;
         if (
           packInfo.customWeights?.[c.rarity] !== undefined &&
           packInfo.customWeights?.[c.rarity] !== ''
         ) {
           w = Number(packInfo.customWeights[c.rarity]);
         }
-        fallbackWeightsSum += w;
+        const perCardW = w / (rarityCounts[c.rarity] || 1);
+        fallbackWeightsSum += perCardW;
       }
     }
 
@@ -990,9 +1000,10 @@ export default function AdminView({
     } else {
       // Для карток без точного відсотка розраховуємо шанс з залишку
       let remainingPercentage = 100 - exactPercentageSum;
-      if (remainingPercentage < 0) remainingPercentage = 0; // Захист від суми > 100%
+      if (remainingPercentage < 0) remainingPercentage = 0;
 
-      let targetW = 1;
+      const globalW = rarities.find((r) => r.name === targetCard.rarity)?.weight || 1;
+      let targetW = globalW;
       if (
         packInfo.customWeights?.[targetCard.rarity] !== undefined &&
         packInfo.customWeights?.[targetCard.rarity] !== ''
@@ -1000,8 +1011,10 @@ export default function AdminView({
         targetW = Number(packInfo.customWeights[targetCard.rarity]);
       }
 
+      const perCardTargetW = targetW / (rarityCounts[targetCard.rarity] || 1);
+
       if (fallbackWeightsSum > 0) {
-        chance = (targetW / fallbackWeightsSum) * remainingPercentage;
+        chance = (perCardTargetW / fallbackWeightsSum) * remainingPercentage;
       }
     }
 
