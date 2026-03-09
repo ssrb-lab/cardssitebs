@@ -1,21 +1,20 @@
 import React from 'react';
 
 export default function CardFrame({ frame = 'normal', children, className = '' }) {
-  // Базовий контейнер для картки, відносно якого будуть позиціонуватись рамки
-  // normal - без рамки (повертаємо просто children)
+  // Базовий контейнер для картки
+  const containerClass = `relative w-full h-full overflow-hidden ${className || 'rounded-xl bg-neutral-900'}`;
 
   if (!frame || frame === 'normal') {
     return (
-      <div
-        className={`relative w-full h-full overflow-hidden rounded-xl bg-neutral-900 ${className}`}
-      >
+      <div className={containerClass}>
         {children}
       </div>
     );
   }
 
   // Загальні класи для всіх рамок (накладаються ПОВЕРХ картинки)
-  const baseFrameClass = 'pointer-events-none absolute inset-0 z-20 rounded-xl border-[6px]';
+  // Використовуємо rounded-[inherit], щоб рамка повторювала заокруглення контейнера
+  const baseFrameClass = 'pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-[6px]';
 
   // Класи для конкретних рамок
   const frameStyles = {

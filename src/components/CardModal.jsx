@@ -67,23 +67,27 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
           onTouchEnd={handleMouseLeave}
           style={tiltStyle}
         >
-          <div
-            className={`w-full aspect-[2/3] rounded-3xl border-4 overflow-hidden ${style.border} ${effectClass} relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)]`}
+          <CardFrame
+            frame={card.frame}
+            className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] ${
+              !card.frame ? `border-4 ${style.border}` : ''
+            } ${effectClass}`}
           >
-            <CardFrame frame={card.frame}>
-              <img
-                src={card.image}
-                alt={card.name}
-                className="w-full h-full object-cover transform-gpu will-change-transform"
-                loading="lazy"
-              />
-            </CardFrame>
-            {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
-            {/* Відблиск світла при нахилі */}
+            <img
+              src={card.image}
+              alt={card.name}
+              className="w-full h-full object-cover transform-gpu will-change-transform"
+              loading="lazy"
+            />
+
+            {/* Оверлей ефекту, якщо він потребує окремого div (як .glitch для сканованих ліній) */}
+            {card.effect && <div className={`${card.effect} pointer-events-none absolute inset-0 z-10`} />}
+
+            {/* Відблиск світла при нахилі (поверх всього, z-30) */}
             {isHovering && (
-              <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-tr from-white/0 via-white to-white/0"></div>
+              <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-tr from-white/0 via-white to-white/0 z-30" />
             )}
-          </div>
+          </CardFrame>
         </div>
 
         <div className="mt-8 flex flex-col items-center text-center w-full">
