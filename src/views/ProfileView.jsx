@@ -274,6 +274,7 @@ export default function ProfileView({
             ) : (
               marketHistory.map((item) => {
                 const isSale = item.sellerId === profile?.uid;
+                const effectClass = item.card?.effect ? `effect-${item.card.effect}` : '';
                 return (
                   <div
                     key={item.id}
@@ -281,7 +282,7 @@ export default function ProfileView({
                   >
                     <div className="flex items-center gap-3">
                       {item.card?.image && (
-                        <div className="w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative">
+                        <div className={`w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative ${effectClass}`}>
                           <CardFrame frame={item.card.frame}>
                             <img
                               src={item.card.image}
@@ -291,6 +292,9 @@ export default function ProfileView({
                             />
                           </CardFrame>
                           <PerkBadge perk={item.card.perk} position="right" />
+                          {item.card.effect && (
+                            <div className={`${item.card.effect} pointer-events-none z-10`} />
+                          )}
                         </div>
                       )}
                       <div>

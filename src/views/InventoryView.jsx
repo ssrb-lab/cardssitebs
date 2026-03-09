@@ -339,21 +339,20 @@ export default function InventoryView({
                       style={{ animationDelay: `${index * 15}ms`, fillMode: 'backwards' }}
                     >
                       <div
-                        onClick={() => {
-                          if (allBasicDefending) return;
-                          if (isSafeOpen) {
-                            if (!isGameItem) {
-                              setSafeTransferModal({ item, isEnteringSafe: true, maxAmount: item.amount });
-                            } else {
-                              setViewingGameCard({ ...item });
-                            }
+                      onClick={() => {
+                        if (allBasicDefending) return;
+                        if (isSafeOpen) {
+                          if (!isGameItem) {
+                            setSafeTransferModal({ item, isEnteringSafe: true, maxAmount: item.amount });
                           } else {
-                            setViewingCard({ card: item.card, amount: item.amount });
+                            setViewingGameCard({ ...item });
                           }
-                        }}
-                        className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} transform-gpu will-change-transform ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
-                      >
-                        {allBasicDefending && (
+                        } else {
+                          setViewingCard({ card: item.card, amount: item.amount });
+                        }
+                      }}
+                      className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass} transform-gpu will-change-transform ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
+                      >                        {allBasicDefending && (
                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[10px] px-2 py-1 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
                             Захищає Арену
                           </div>
@@ -662,6 +661,7 @@ export default function InventoryView({
                   const cData = cardsCatalog.find((c) => c.id === cId);
                   if (!cData) return null;
                   const style = getCardStyle(cData.rarity, rarities);
+                  const effectClass = cData.effect ? `effect-${cData.effect}` : '';
 
                   return (
                     <div
@@ -670,7 +670,7 @@ export default function InventoryView({
                       className="relative group cursor-pointer animate-in zoom-in-95"
                     >
                       <div
-                        className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border}`}
+                        className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass}`}
                       >
                         <CardFrame frame={cData.frame}>
                           <img
@@ -964,6 +964,7 @@ export default function InventoryView({
                 <div className="grid grid-cols-2 gap-3">
                   {safeCards.map((pSafe, idx) => {
                     const style = getCardStyle(pSafe.card.rarity, rarities);
+                    const effectClass = pSafe.card.effect ? `effect-${pSafe.card.effect}` : '';
                     return (
                       <div
                         key={idx}
@@ -980,7 +981,7 @@ export default function InventoryView({
                         }}
                         className="relative cursor-pointer group hover:scale-105 transition-transform"
                       >
-                        <div className={`relative w-full aspect-[2/3] rounded-lg border-2 bg-neutral-950 overflow-hidden ${style.border}`}>
+                        <div className={`relative w-full aspect-[2/3] rounded-lg border-2 bg-neutral-950 overflow-hidden ${style.border} ${effectClass}`}>
                           {pSafe.count > 1 && (
                             <div className="absolute top-1 right-1 bg-black/80 text-white font-black text-[9px] px-1 py-0.5 rounded-sm z-10 border border-neutral-700">
                               x{pSafe.count}
@@ -989,6 +990,9 @@ export default function InventoryView({
                           <CardFrame frame={pSafe.card.frame}>
                             <img src={pSafe.card.image} alt="card" className="w-full h-full object-cover" />
                           </CardFrame>
+                          {pSafe.card.effect && (
+                            <div className={`${pSafe.card.effect} pointer-events-none z-10`} />
+                          )}
                         </div>
                         {pSafe.isGameCard && (
                           <div className="mt-1 flex justify-center gap-2 text-[10px] bg-neutral-900 rounded p-1">

@@ -133,20 +133,26 @@ export default function ForgeView({
               <div
                 className={`flex flex-col items-center relative transition-transform duration-500 w-full max-w-[200px] ${isForging ? 'animate-pulse scale-105 drop-shadow-[0_0_20px_rgba(234,88,12,0.6)]' : ''}`}
               >
-                <div
-                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${getCardStyle(selectedCard.card.rarity, rarities).border}`}
-                >
-                  <CardFrame frame={selectedCard.card.frame}>
-                    <img
-                      src={selectedCard.card.image}
-                      alt={selectedCard.card.name}
-                      className="w-full h-full object-cover transform-gpu will-change-transform"
-                    />
-                  </CardFrame>
-                  {selectedCard.card.effect && (
-                    <div className={`${selectedCard.card.effect} pointer-events-none z-10`} />
-                  )}
-                </div>
+                {(() => {
+                  const style = getCardStyle(selectedCard.card.rarity, rarities);
+                  const effectClass = selectedCard.card.effect ? `effect-${selectedCard.card.effect}` : '';
+                  return (
+                    <div
+                      className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${style.border} ${effectClass}`}
+                    >
+                      <CardFrame frame={selectedCard.card.frame}>
+                        <img
+                          src={selectedCard.card.image}
+                          alt={selectedCard.card.name}
+                          className="w-full h-full object-cover transform-gpu will-change-transform"
+                        />
+                      </CardFrame>
+                      {selectedCard.card.effect && (
+                        <div className={`${selectedCard.card.effect} pointer-events-none z-10`} />
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="mt-4 flex gap-1">
                   <div className="bg-black/60 px-2 py-1.5 rounded-xl border border-neutral-800 flex items-center justify-center gap-1 shadow-lg min-w-[60px]">
                     <Zap size={14} className="text-yellow-400 shrink-0" />
@@ -295,6 +301,7 @@ export default function ForgeView({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {forgeableCards.map((item, index) => {
             const style = getCardStyle(item.card.rarity, rarities);
+            const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
             const isSelected =
               selectedCard?.card.id === item.card.id && selectedCard?.power === item.power && selectedCard?.hp === item.hp;
             const isDefending = profile?.defendingInstances?.some(inst => inst.cardId === item.card.id && inst.statsIndex === item.statsIndex);
@@ -308,7 +315,7 @@ export default function ForgeView({
                 title={isDefending ? "Захищає точку на Арені" : ""}
               >
                 <div
-                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} hover:border-neutral-400`}`}
+                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} ${effectClass} hover:border-neutral-400`}`}
                 >
                   <CardFrame frame={item.card.frame}>
                     <img
