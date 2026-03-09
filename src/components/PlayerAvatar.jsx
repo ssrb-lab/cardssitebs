@@ -4,24 +4,22 @@ import { Crown, Shield } from 'lucide-react';
 export default function PlayerAvatar({ profile, className = '', iconSize = 24 }) {
   if (profile?.avatarUrl) {
     return (
-      <div
-        className={`overflow-hidden bg-neutral-800 ${className} flex items-center justify-center border-2 border-neutral-700 shadow-md relative shrink-0`}
-      >
-        <img
-          src={profile.avatarUrl}
-          alt="avatar"
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => {
-            e.target.style.display = 'none';
-          }}
-        />
-        {profile.isSuperAdmin && (
-          <Crown
-            size={14}
-            className="absolute top-0 right-0 text-red-500 bg-neutral-900 rounded-full"
-            title="Супер Адмін"
+      <div className={`relative shrink-0 ${className}`}>
+        <div className="w-full h-full overflow-hidden bg-neutral-800 flex items-center justify-center border-2 border-neutral-700 shadow-md rounded-[inherit]">
+          <img
+            src={profile.avatarUrl}
+            alt="avatar"
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
           />
+        </div>
+        {profile.isSuperAdmin && (
+          <div className="absolute -top-1 -right-1 bg-neutral-900 rounded-full p-0.5 shadow-lg border border-neutral-800 z-10">
+            <Crown size={12} className="text-red-500" title="Супер Адмін" />
+          </div>
         )}
       </div>
     );

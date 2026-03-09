@@ -1018,16 +1018,9 @@ const DEFAULT_RARITY_WEIGHTS = {
   'Звичайна': 70,
   'Рідкісна': 25,
   'Епічна': 4,
-<<<<<<< HEAD
   'Легендарна': 0.5,
   'Унікальна': 0.09
 };
-=======
-  'Легендарна': 1,
-  'Унікальна': 0.1
-};
-
->>>>>>> 7fde45fb6cef29ef29571699ad2214d3132eab5a
 app.post('/api/game/open-pack', authenticate, async (req, res) => {
   const { packId, amount } = req.body;
 
