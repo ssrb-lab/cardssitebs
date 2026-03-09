@@ -1021,6 +1021,57 @@ export default function AdminView({
     return chance < 0.01 && chance > 0 ? '<0.01%' : chance.toFixed(2) + '%';
   };
 
+  const calculatePackEV = (packInfo) => {
+    if (!packInfo) return 0;
+    const cardsInThisPack = cardsCatalog.filter((c) => c.packId === packInfo.id);
+    if (cardsInThisPack.length === 0) return 0;
+
+    const rarityCounts = {};
+    for (const c of cardsInThisPack) {
+      if (!(c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0)) {
+        rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + 1;
+      }
+    }
+
+    let exactPercentageSum = 0;
+    let fallbackWeightsSum = 0;
+
+    for (const c of cardsInThisPack) {
+      if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
+        exactPercentageSum += Number(c.weight);
+      } else {
+        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
+        let w = globalW;
+        if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== '') {
+          w = Number(packInfo.customWeights[c.rarity]);
+        }
+        fallbackWeightsSum += w / (rarityCounts[c.rarity] || 1);
+      }
+    }
+
+    let totalEV = 0;
+    for (const c of cardsInThisPack) {
+      let chance = 0;
+      if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
+        chance = Number(c.weight) / 100;
+      } else {
+        let remainingPercentage = (100 - exactPercentageSum) / 100;
+        if (remainingPercentage < 0) remainingPercentage = 0;
+        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
+        let targetW = globalW;
+        if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== '') {
+          targetW = Number(packInfo.customWeights[c.rarity]);
+        }
+        const perCardTargetW = targetW / (rarityCounts[c.rarity] || 1);
+        if (fallbackWeightsSum > 0) {
+          chance = (perCardTargetW / fallbackWeightsSum) * remainingPercentage;
+        }
+      }
+      totalEV += chance * (Number(c.sellPrice) || 15);
+    }
+    return totalEV;
+  };
+
   const filteredAdminUsers = allUsers.filter((u) =>
     u.nickname?.toLowerCase().includes(adminUserSearchTerm.toLowerCase())
   );
@@ -2841,10 +2892,32 @@ export default function AdminView({
                   {pack.category || 'Базові'}
                 </div>
                 <h4 className="text-center font-bold text-white mb-1">{pack.name}</h4>
-                <div className="text-center text-yellow-500 font-bold text-sm mb-4">
+                <div className="text-center text-yellow-500 font-bold text-sm mb-1">
                   {pack.cost} Монет
                 </div>
-                <div className="flex gap-2">
+
+                {/* Економічна статистика паку */}
+                {(() => {
+                  const ev = calculatePackEV(pack);
+                  const roi = pack.cost > 0 ? (ev / pack.cost) * 100 : 0;
+                  const isRisky = roi >= 100;
+                  return (
+                    <div className={`mb-4 px-2 py-1.5 rounded-lg border text-[10px] flex flex-col items-center gap-0.5 ${
+                      isRisky 
+                        ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                        : 'bg-green-500/10 border-green-500/30 text-green-400'
+                    }`}>
+                      <div className="font-bold flex items-center gap-1 uppercase tracking-tighter">
+                        {isRisky ? '⚠️ Збитковий' : '✅ Стабільний'}
+                      </div>
+                      <div className="flex gap-2 font-mono">
+                        <span>EV: {ev.toFixed(0)}🪙</span>
+                        <span className="opacity-50">|</span>
+                        <span>ROI: {roi.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })()}                <div className="flex gap-2">
                   <button
                     onClick={() => {
                       setEditingPack(pack);
