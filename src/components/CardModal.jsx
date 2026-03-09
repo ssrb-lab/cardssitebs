@@ -69,8 +69,8 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
         >
           <CardFrame
             frame={card.frame}
-            className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] ${
-              !card.frame ? `border-4 ${style.border}` : ''
+            className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] bg-neutral-900 ${
+              !card.frame || card.frame === 'normal' ? `border-4 ${style.border}` : ''
             } ${effectClass}`}
           >
             <img

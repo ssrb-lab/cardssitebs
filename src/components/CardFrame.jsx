@@ -1,8 +1,9 @@
 import React from 'react';
 
 export default function CardFrame({ frame = 'normal', children, className = '' }) {
-  // Базовий контейнер для картки
-  const containerClass = `relative w-full h-full overflow-hidden ${className || 'rounded-xl bg-neutral-900'}`;
+  // Базові класи, які мають бути завжди
+  const baseContainer = 'relative w-full h-full overflow-hidden';
+  const containerClass = `${baseContainer} ${className}`;
 
   if (!frame || frame === 'normal') {
     return (
