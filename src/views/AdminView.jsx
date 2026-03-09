@@ -1020,8 +1020,8 @@ export default function AdminView({
 
     if (chance === 0) return '0%';
     if (chance < 0.0001) return '<0.0001%';
-    if (chance < 0.1) return chance.toFixed(4) + '%';
-    return chance.toFixed(2) + '%';
+    const fixed = chance < 0.1 ? chance.toFixed(4) : chance.toFixed(2);
+    return parseFloat(fixed) + '%';
   };
 
   const calculatePackEV = (packInfo) => {
