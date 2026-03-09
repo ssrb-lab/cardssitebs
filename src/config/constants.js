@@ -44,6 +44,13 @@ export const EFFECT_OPTIONS = [
   { id: 'foil', name: 'Металік (Foil)' },
   { id: 'glow', name: 'Золоте світіння (Glow)' },
   { id: 'glitch', name: 'Глітч (Glitch)' },
+  { id: 'ember', name: 'Пекельний жар (Ember)' },
+  { id: 'cosmos', name: 'Зірковий пил (Cosmos)' },
+  { id: 'liquid-gold', name: 'Рідке золото (Liquid Gold)' },
+  { id: 'prismatic', name: 'Призматичний (Prismatic)' },
+  { id: 'ghost', name: 'Примарний (Ghost)' },
+  { id: 'electric', name: 'Електричний розряд (Electric)' },
+  { id: 'old-film', name: 'Стара плівка (Old Film)' },
 ];
 
 export const COLOR_PRESETS = {
