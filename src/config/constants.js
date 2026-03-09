@@ -57,11 +57,11 @@ export const COLOR_PRESETS = {
 };
 
 export const DEFAULT_RARITIES = [
-  { name: 'Звичайна', weight: 70, color: 'gray' },
-  { name: 'Рідкісна', weight: 25, color: 'blue' },
-  { name: 'Епічна', weight: 4, color: 'purple' },
-  { name: 'Легендарна', weight: 1, color: 'yellow' },
-  { name: 'Унікальна', weight: 0.1, color: 'red' },
+  { name: 'Звичайна', weight: 750, color: 'gray' },
+  { name: 'Рідкісна', weight: 200, color: 'blue' },
+  { name: 'Епічна', weight: 40, color: 'purple' },
+  { name: 'Легендарна', weight: 9, color: 'yellow' },
+  { name: 'Унікальна', weight: 1, color: 'red' },
 ];
 
 export const SELL_PRICE = 15;

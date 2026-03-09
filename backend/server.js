@@ -1015,11 +1015,11 @@ app.delete('/api/admin/packs/:id', authenticate, checkAdmin, async (req, res) =>
 // ----------------------------------------
 
 const DEFAULT_RARITY_WEIGHTS = {
-  'Звичайна': 70,
-  'Рідкісна': 25,
-  'Епічна': 4,
-  'Легендарна': 0.5,
-  'Унікальна': 0.09
+  'Звичайна': 750,
+  'Рідкісна': 200,
+  'Епічна': 40,
+  'Легендарна': 9,
+  'Унікальна': 1
 };
 app.post('/api/game/open-pack', authenticate, async (req, res) => {
   const { packId, amount } = req.body;

@@ -2655,14 +2655,16 @@ export default function AdminView({
                         step="0.01"
                         placeholder="Замовчування"
                         value={packForm.customWeights?.[r.name] || ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value.replace(',', '.');
                           setPackForm({
                             ...packForm,
                             customWeights: {
                               ...(packForm.customWeights || {}),
-                              [r.name]: e.target.value,
+                              [r.name]: val,
                             },
                           })
+                        }
                         }
                         className="bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-purple-500 outline-none transition-colors w-full"
                       />
@@ -2930,7 +2932,10 @@ export default function AdminView({
                 step="0.01"
                 placeholder="Шанс випадіння картки (в %)"
                 value={cardForm.weight}
-                onChange={(e) => setCardForm({ ...cardForm, weight: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value.replace(',', '.');
+                  setCardForm({ ...cardForm, weight: val });
+                }}
                 className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
                 title="Вкажіть точний відсоток або вагу випадіння цієї картки з паку. Ігнорує зашиті в код ймовірності рідкості."
               />
