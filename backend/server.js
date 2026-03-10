@@ -178,8 +178,41 @@ const checkTester = async (req, res, next) => {
 };
 
 // ----------------------------------------
-// ARENA HELPERS
+// ARENA HELPERS & CONCURRENCY
 // ----------------------------------------
+class Mutex {
+  constructor() {
+    this._locked = false;
+    this._queue = [];
+  }
+  async lock() {
+    if (this._locked) {
+      await new Promise(resolve => this._queue.push(resolve));
+    }
+    this._locked = true;
+    return () => this.unlock();
+  }
+  unlock() {
+    if (this._queue.length > 0) {
+      const next = this._queue.shift();
+      next();
+    } else {
+      this._locked = false;
+    }
+  }
+}
+const arenaMutexes = new Map();
+const userArenaMutexes = new Map();
+
+const getArenaMutex = (pointId) => {
+  if (!arenaMutexes.has(pointId)) arenaMutexes.set(pointId, new Mutex());
+  return arenaMutexes.get(pointId);
+};
+const getUserArenaMutex = (uid) => {
+  if (!userArenaMutexes.has(uid)) userArenaMutexes.set(uid, new Mutex());
+  return userArenaMutexes.get(uid);
+};
+
 const getDefendingInstances = async (uid) => {
   const points = await prisma.arenaPoint.findMany({
     where: { ownerId: uid },
@@ -2521,6 +2554,11 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
     return res.status(400).json({ error: 'Для захоплення точки необхідно обрати рівно 5 карт!' });
   }
 
+  const pointMutex = getArenaMutex(id);
+  const userMutex = getUserArenaMutex(req.user.uid);
+  const releaseUser = await userMutex.lock();
+  const releasePoint = await pointMutex.lock();
+
   try {
     const user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
@@ -2692,6 +2730,9 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
   } catch (error) {
     console.error('Помилка захоплення точки:', error);
     res.status(500).json({ error: 'Помилка захоплення точки.' });
+  } finally {
+    releasePoint();
+    releaseUser();
   }
 });
 
@@ -2703,6 +2744,11 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     console.log('[BATTLE START ERROR] Forcing 400: Для бою необхідно обрати рівно 5 карт!');
     return res.status(400).json({ error: 'Для бою необхідно обрати рівно 5 карт!' });
   }
+
+  const pointMutex = getArenaMutex(id);
+  const userMutex = getUserArenaMutex(req.user.uid);
+  const releaseUser = await userMutex.lock();
+  const releasePoint = await pointMutex.lock();
 
   try {
     const user = await prisma.user.findUnique({
@@ -2726,11 +2772,16 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
     for (let c of cards) {
       const invItem = user.inventory.find((item) => item.cardId === c.id);
-      if (!invItem)
+      if (!invItem) {
+        console.log('[BATTLE] No invItem for card', c.id);
         return res.status(400).json({ error: 'Ви не маєте обраних карт у своєму інвентарі!' });
+      }
 
       const catalogCard = catalogCards.find((cat) => cat.id === c.id);
-      if (!catalogCard) return res.status(400).json({ error: 'Недійсна карта.' });
+      if (!catalogCard) {
+        console.log('[BATTLE] No catalogCard for card', c.id);
+        return res.status(400).json({ error: 'Недійсна карта.' });
+      }
 
       let currentStats = [];
       if (typeof invItem.gameStats === 'string') {
@@ -2764,11 +2815,13 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
       const idx = c.statsIndex;
       if (idx === undefined || idx === null || idx < 0 || idx >= effectiveStats.length) {
+        console.log('[BATTLE] Invalid statsIndex:', idx, 'amount:', invItem.amount, 'effectiveStatsLen:', effectiveStats.length);
         return res.status(400).json({ error: 'Недійсні характеристики карти.' });
       }
 
       if (!usedIndicesByCard[c.id]) usedIndicesByCard[c.id] = new Set();
       if (usedIndicesByCard[c.id].has(idx)) {
+        console.log('[BATTLE] Reused index:', idx, 'for card:', c.id);
         return res
           .status(400)
           .json({ error: 'Ви не можете використовувати один і той же екземпляр карти двічі.' });
@@ -2793,28 +2846,38 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         (inst) => inst.cardId === vc.id && inst.statsIndex === vc.statsIndex
       );
       if (isDefending) {
+        console.log('[BATTLE] Card is defending:', vc.name, vc.id, vc.statsIndex);
         return res.status(400).json({ error: `Карта "${vc.name}" вже захищає іншу точку Арени!` });
       }
     }
 
     const point = await prisma.arenaPoint.findUnique({ where: { id } });
 
-    if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
-    if (!point.ownerId)
+    if (!point) {
+      console.log('[BATTLE] Point not found:', id);
+      return res.status(404).json({ error: 'Точку не знайдено.' });
+    }
+    if (!point.ownerId) {
+      console.log('[BATTLE] Point has no owner');
       return res.status(400).json({ error: 'Точка вільна, її можна просто захопити.' });
-    if (point.ownerId === user.uid)
+    }
+    if (point.ownerId === user.uid) {
+      console.log('[BATTLE] Attacking own point');
       return res.status(400).json({ error: 'Ви не можете атакувати власну точку.' });
+    }
 
     // Перевірка доступу: якщо точка НЕ landing zone — гравець повинен володіти хоча б одним сусідом
     if (!point.isLandingZone) {
       const neighborIds = Array.isArray(point.neighborIds) ? point.neighborIds : [];
       if (neighborIds.length === 0) {
+        console.log('[BATTLE] Not landing zone and no neighbors');
         return res.status(400).json({ error: 'Ця точка недоступна для атаки (немає з\'єднаних зон висадки).' });
       }
       const ownedNeighbors = await prisma.arenaPoint.findMany({
         where: { id: { in: neighborIds }, ownerId: user.uid },
       });
       if (ownedNeighbors.length === 0) {
+        console.log('[BATTLE] Player does not own any neighbors');
         return res.status(400).json({ error: 'Щоб атакувати цю точку, спершу захопіть сусідню зону!' });
       }
     }
@@ -2822,6 +2885,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
 
     if (user.coins < point.entryFee) {
+      console.log('[BATTLE] Insufficient coins');
       return res.status(400).json({ error: 'Недостатньо монет для атаки.' });
     }
 
@@ -3038,16 +3102,18 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
       // Збереження пошкоджень атакуючих
       for (const card of attackerCards) {
-        const invItem = user.inventory.find((item) => item.cardId === card.id);
-        if (!invItem) continue;
+        const freshInvItem = await tx.inventoryItem.findFirst({
+          where: { userId: user.uid, cardId: card.id },
+        });
+        if (!freshInvItem) continue;
 
         let currentStats = [];
-        if (typeof invItem.gameStats === 'string') {
+        if (typeof freshInvItem.gameStats === 'string') {
           try {
-            currentStats = JSON.parse(invItem.gameStats);
+            currentStats = JSON.parse(freshInvItem.gameStats);
           } catch (e) {}
-        } else if (Array.isArray(invItem.gameStats)) {
-          currentStats = invItem.gameStats;
+        } else if (Array.isArray(freshInvItem.gameStats)) {
+          currentStats = freshInvItem.gameStats;
         }
 
         const effectiveStats = currentStats.map((s) => ({
@@ -3061,7 +3127,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
                 : card.hp,
         }));
 
-        while (effectiveStats.length < invItem.amount) {
+        while (effectiveStats.length < freshInvItem.amount) {
           effectiveStats.push({ power: card.power, hp: card.hp, maxHp: card.maxHp || card.hp }); // Оригінальні арти
         }
 
@@ -3074,12 +3140,12 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             // Delete dead instance
             effectiveStats.splice(card.statsIndex, 1);
             card._isDestroyed = true; // Mark as dead for defending snapshot
-            if (effectiveStats.length === 0 && invItem.amount === 1) {
-              await tx.inventoryItem.delete({ where: { id: invItem.id } });
+            if (effectiveStats.length === 0 && freshInvItem.amount === 1) {
+              await tx.inventoryItem.delete({ where: { id: freshInvItem.id } });
               continue;
             } else {
               await tx.inventoryItem.update({
-                where: { id: invItem.id },
+                where: { id: freshInvItem.id },
                 data: { gameStats: effectiveStats, amount: { decrement: 1 } },
               });
               continue;
@@ -3109,7 +3175,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         }
 
         await tx.inventoryItem.update({
-          where: { id: invItem.id },
+          where: { id: freshInvItem.id },
           data: { gameStats: effectiveStats },
         });
       }
@@ -3185,6 +3251,9 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
   } catch (error) {
     console.error('Помилка бою на арені:', error);
     res.status(500).json({ error: 'Помилка бою.' });
+  } finally {
+    releasePoint();
+    releaseUser();
   }
 });
 

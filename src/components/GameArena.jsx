@@ -123,6 +123,15 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       );
 
       if (match) {
+        const isDefending = profile?.defendingInstances?.some(
+          inst => inst.cardId === match.id && inst.statsIndex === match.statsIndex
+        );
+        
+        if (isDefending) {
+          deckChanged = true;
+          return null; // Remove from deck if it's currently defending
+        }
+
         claimedUniqueIds.add(match.uniqueInstanceId);
         // If the uniqueInstanceId (which includes statsIndex) changed, mark as deck changed
         if (match.uniqueInstanceId !== deckCard.uniqueInstanceId || match.statsIndex !== deckCard.statsIndex) {
@@ -1223,6 +1232,16 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                             <Anchor size={7} className="text-white" />
                           </div>
                         )}
+
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap pointer-events-none">
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest drop-shadow-md"
+                                style={{
+                                  textShadow: `1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 2px 4px rgba(0,0,0,0.8)`,
+                                }}
+                          >
+                            {point.name}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
