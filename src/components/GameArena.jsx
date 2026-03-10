@@ -568,7 +568,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       const data = await battleArenaPointRequest(getToken(), battleState.point.id, deck);
 
       const attackerCards = deck.map((c) => ({ ...c, currentHp: c.hp || c.power }));
-      const defenderCards = battleState.defenderDeck.map((c) => ({
+      const defenderCards = (data.initialDefenderCards || battleState.defenderDeck).map((c) => ({
         ...c,
         currentHp: c.hp || c.power || 1,
       }));
@@ -1276,6 +1276,23 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   )}
                 </div>
 
+                {/* Battle Mode badge */}
+                <div className="flex flex-col gap-1 mb-2">
+                  {selectedPoint.battleMode === 'HARDCORE' ? (
+                    <div className="flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-lg bg-red-900/30 text-red-500 border border-red-800/50">
+                      🔴 Режим: Хардкор (Смерть карток)
+                    </div>
+                  ) : selectedPoint.battleMode === 'CHIP_DAMAGE' ? (
+                    <div className="flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-lg bg-yellow-900/30 text-yellow-500 border border-yellow-800/50" title={`Шанс втрати статів: ${selectedPoint.chipDamageChance || 0}%`}>
+                      🟡 Режим: Втрата Статів ({selectedPoint.chipDamageChance || 0}%)
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-lg bg-green-900/30 text-green-500 border border-green-800/50">
+                      🟢 Режим: Відновлення ХП
+                    </div>
+                  )}
+                </div>
+
                 {selectedPoint.ownerId ? (
                   <>
                     <div className="flex items-center justify-between text-sm">
@@ -1339,22 +1356,36 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     Захисники
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {selectedPoint.defendingCards.map((defCard, idx) => (
-                      <div
-                        key={idx}
-                        className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-950 ${getCardStyle(defCard.rarity).border}`}
-                      >
-                        <PerkBadge perk={defCard.perk} position="right" />
-                        <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
-                          <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{defCard.power}</span></div>
-                          <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{defCard.hp || defCard.power || 50}</span></div>
+                    {selectedPoint.defendingCards.map((defCard, idx) => {
+                      const isOwner = selectedPoint.ownerId === profile?.uid;
+                      const isHidden = !isOwner && idx > 0;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-950 ${isHidden ? 'border-neutral-800' : getCardStyle(defCard.rarity).border}`}
+                        >
+                          {!isHidden && <PerkBadge perk={defCard.perk} position="right" />}
+                          {!isHidden && (
+                            <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
+                              <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{defCard.power}</span></div>
+                              <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{defCard.hp || defCard.power || 50}</span></div>
+                            </div>
+                          )}
+                          
+                          {isHidden ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
+                              <span className="text-5xl text-neutral-800 font-black">?</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={defCard.image}
+                              className="w-full h-full object-cover pointer-events-none"
+                            />
+                          )}
                         </div>
-                        <img
-                          src={defCard.image}
-                          className="w-full h-full object-cover pointer-events-none"
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

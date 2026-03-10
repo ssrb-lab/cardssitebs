@@ -2469,8 +2469,30 @@ app.get('/api/game/crash/:gameId/status', authenticate, (req, res) => {
 app.get('/api/game/arena/points', authenticate, async (req, res) => {
   try {
     const points = await prisma.arenaPoint.findMany();
-    res.json(points);
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    const isAdmin = user && user.role === 'admin';
+
+    // Mask defending cards for non-owners to prevent cheating via API inspection
+    const maskedPoints = points.map(point => {
+      if (point.defendingCards && point.defendingCards.length > 0) {
+        if (!isAdmin && point.ownerId !== req.user.uid) {
+          const maskedCards = point.defendingCards.map((card, idx) => {
+            if (idx === 0) return card; // Keep first card visible
+            // Return only essential structure for the frontend, mask everything else
+            return {
+              isHidden: true,
+              rarity: card.rarity // Only passing rarity to render the border color roughly, or can mask that too
+            };
+          });
+          return { ...point, defendingCards: maskedCards };
+        }
+      }
+      return point;
+    });
+
+    res.json(maskedPoints);
   } catch (error) {
+    console.error('Points fetch error:', error);
     res.status(500).json({ error: 'Помилка завантаження точок Арени.' });
   }
 });
@@ -2911,6 +2933,8 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       return { ...c, currentHp, maxHp };
     });
 
+    const initialDefenderCards = defenderCards.map(c => ({ ...c }));
+
     const battleLog = [];
     const isTeamDead = (team) => team.every((c) => c.currentHp <= 0);
 
@@ -3245,6 +3269,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       success: true,
       attackerWon,
       battleLog,
+      initialDefenderCards,
       point: updatedPoint,
       profile: profileWithDefending,
     });
