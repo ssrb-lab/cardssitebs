@@ -95,8 +95,9 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         const deltaTime = now - lastFrameTime;
         lastFrameTime = now;
 
-        // Якщо гравець вже забрав гроші, але гра ще не крашнулась, продовжуємо звичну анімацію
-        simulatedTimeElapsed += deltaTime;
+        // Якщо гравець вже забрав гроші, але гра ще не крашнулась, продовжуємо анімацію в 5 разів швидше
+        const timeMultiplier = hasCashedOutRef.current ? 5 : 1;
+        simulatedTimeElapsed += deltaTime * timeMultiplier;
         startTimeRef.current = simulatedTimeElapsed;
 
         // Розрахунок поточного множника на клієнті
