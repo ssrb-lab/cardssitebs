@@ -572,14 +572,23 @@ export default function App() {
     }
   };
 
-  const openPack = async (packId, cost, amountToOpen = 1) => {
+  const openPack = async (packId, cost, amountToOpen = 1, currency = 'coins') => {
     if (actionLock.current || !profile || openingPackId || isRouletteSpinning) return;
     actionLock.current = true;
     setIsProcessing(true);
 
     try {
       const totalCost = cost * amountToOpen;
-      if (profile.coins < totalCost) {
+      const isCrystals = currency === 'crystals';
+
+      if (isCrystals && (profile.crystals || 0) < totalCost) {
+        showToast('Недостатньо кристалів!');
+        actionLock.current = false;
+        setIsProcessing(false);
+        return;
+      }
+      
+      if (!isCrystals && (profile.coins || 0) < totalCost) {
         showToast('Недостатньо монет!');
         actionLock.current = false;
         setIsProcessing(false);
@@ -590,7 +599,7 @@ export default function App() {
       setPulledCards([]);
 
       try {
-        const data = await openPackRequest(getToken(), packId, amountToOpen);
+        const data = await openPackRequest(getToken(), packId, amountToOpen, currency);
         const results = data.pulledCards;
 
         if (amountToOpen === 1) {

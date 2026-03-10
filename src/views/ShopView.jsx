@@ -347,51 +347,89 @@ export default function ShopView({
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-2 sm:gap-3 w-full">
-            <OpenButton
-              amount={1}
-              cost={selectedPack.cost}
-              onClick={() => openPack(selectedPack.id, selectedPack.cost, 1)}
-              opening={openingPackId === selectedPack.id || isProcessing}
-            />
-            <OpenButton
-              amount={5}
-              cost={selectedPack.cost}
-              onClick={() => openPack(selectedPack.id, selectedPack.cost, 5)}
-              opening={openingPackId === selectedPack.id || isProcessing}
-              color="bg-orange-500 hover:bg-orange-400 text-white"
-            />
-            <OpenButton
-              amount={10}
-              cost={selectedPack.cost}
-              onClick={() => openPack(selectedPack.id, selectedPack.cost, 10)}
-              opening={openingPackId === selectedPack.id || isProcessing}
-              color="bg-red-500 hover:bg-red-400 text-white"
-            />
-            <OpenButton
-              amount={100}
-              cost={selectedPack.cost}
-              onClick={() => openPack(selectedPack.id, selectedPack.cost, 100)}
-              opening={openingPackId === selectedPack.id || isProcessing}
-              color="bg-purple-600 hover:bg-purple-500 text-white"
-            />
-            {maxPacksAffordable > 0 && (
+          <div className="flex flex-col gap-4 w-full items-center">
+            {/* Базова валюта (Монети) */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-2 sm:gap-3 w-full">
               <OpenButton
-                amount={maxPacksAffordable}
+                amount={1}
                 cost={selectedPack.cost}
-                label={`На всі (${maxPacksAffordable}x)`}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`
-                    )
-                  ) {
-                    openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable);
-                  }
-                }}
+                currency="coins"
+                onClick={() => openPack(selectedPack.id, selectedPack.cost, 1, 'coins')}
                 opening={openingPackId === selectedPack.id || isProcessing}
-                color="bg-green-600 hover:bg-green-500 text-white"
               />
+              <OpenButton
+                amount={5}
+                cost={selectedPack.cost}
+                currency="coins"
+                onClick={() => openPack(selectedPack.id, selectedPack.cost, 5, 'coins')}
+                opening={openingPackId === selectedPack.id || isProcessing}
+                color="bg-orange-500 hover:bg-orange-400 text-white"
+              />
+              <OpenButton
+                amount={10}
+                cost={selectedPack.cost}
+                currency="coins"
+                onClick={() => openPack(selectedPack.id, selectedPack.cost, 10, 'coins')}
+                opening={openingPackId === selectedPack.id || isProcessing}
+                color="bg-red-500 hover:bg-red-400 text-white"
+              />
+              <OpenButton
+                amount={100}
+                cost={selectedPack.cost}
+                currency="coins"
+                onClick={() => openPack(selectedPack.id, selectedPack.cost, 100, 'coins')}
+                opening={openingPackId === selectedPack.id || isProcessing}
+                color="bg-purple-600 hover:bg-purple-500 text-white"
+              />
+              {maxPacksAffordable > 0 && (
+                <OpenButton
+                  amount={maxPacksAffordable}
+                  cost={selectedPack.cost}
+                  currency="coins"
+                  label={`На всі (${maxPacksAffordable}x)`}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Ви впевнені, що хочете відкрити ${maxPacksAffordable} паків одразу за всі свої гроші?`
+                      )
+                    ) {
+                      openPack(selectedPack.id, selectedPack.cost, maxPacksAffordable, 'coins');
+                    }
+                  }}
+                  opening={openingPackId === selectedPack.id || isProcessing}
+                  color="bg-green-600 hover:bg-green-500 text-white"
+                />
+              )}
+            </div>
+
+            {/* Преміум валюта (Кристали) */}
+            {selectedPack.premiumCost > 0 && (
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-2 sm:gap-3 w-full border-t border-fuchsia-900/40 pt-4 mt-2">
+                <OpenButton
+                  amount={1}
+                  cost={selectedPack.premiumCost}
+                  currency="crystals"
+                  onClick={() => openPack(selectedPack.id, selectedPack.premiumCost, 1, 'crystals')}
+                  opening={openingPackId === selectedPack.id || isProcessing}
+                  color="bg-fuchsia-600 hover:bg-fuchsia-500 text-white"
+                />
+                <OpenButton
+                  amount={5}
+                  cost={selectedPack.premiumCost}
+                  currency="crystals"
+                  onClick={() => openPack(selectedPack.id, selectedPack.premiumCost, 5, 'crystals')}
+                  opening={openingPackId === selectedPack.id || isProcessing}
+                  color="bg-fuchsia-700 hover:bg-fuchsia-600 text-white"
+                />
+                <OpenButton
+                  amount={10}
+                  cost={selectedPack.premiumCost}
+                  currency="crystals"
+                  onClick={() => openPack(selectedPack.id, selectedPack.premiumCost, 10, 'crystals')}
+                  opening={openingPackId === selectedPack.id || isProcessing}
+                  color="bg-fuchsia-800 hover:bg-fuchsia-700 text-white"
+                />
+              </div>
             )}
           </div>
 
@@ -610,8 +648,15 @@ export default function ShopView({
               {pack.name}
             </h3>
 
-            <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-yellow-500 font-bold mb-3 sm:mb-4 bg-yellow-500/10 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10 text-xs sm:text-base">
-              {pack.cost} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 mb-3 sm:mb-4 w-full">
+              <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-yellow-500 font-bold bg-yellow-500/10 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full border border-yellow-500/20 shadow-inner relative z-10 text-xs sm:text-base">
+                {pack.cost} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />
+              </div>
+              {pack.premiumCost > 0 && (
+                <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-fuchsia-400 font-bold bg-fuchsia-500/10 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full border border-fuchsia-500/20 shadow-inner relative z-10 text-xs sm:text-base">
+                  {pack.premiumCost} <Gem size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />
+                </div>
+              )}
             </div>
 
             <div className="relative w-20 h-20 sm:w-40 sm:h-40 mb-3 sm:mb-6 flex justify-center items-center perspective-1000">
@@ -647,6 +692,7 @@ export default function ShopView({
 function OpenButton({
   amount,
   cost,
+  currency = 'coins',
   onClick,
   opening,
   color = 'bg-yellow-500 hover:bg-yellow-400 text-white',
@@ -664,7 +710,7 @@ function OpenButton({
     >
       <span className="text-center">{label ? label : `Відкрити ${amount}x`}</span>
       <span className="flex items-center text-[10px] sm:text-sm bg-black/20 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded sm:ml-1 mt-0.5 sm:mt-0">
-        {cost * amount} <Coins size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" />
+        {cost * amount} {currency === 'crystals' ? <Gem size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" /> : <Coins size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" />}
       </span>
     </button>
   );

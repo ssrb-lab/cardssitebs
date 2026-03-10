@@ -150,6 +150,7 @@ export default function AdminView({
     name: '',
     category: 'Базові',
     cost: 50,
+    premiumCost: '',
     image: '',
     customWeights: {},
     statsRanges: {},
@@ -723,6 +724,10 @@ export default function AdminView({
       perk: cardForm.perk || '',
       perkValue: cardForm.perkValue ? Number(cardForm.perkValue) : '',
       pulledCount: editingCard ? editingCard.pulledCount || 0 : 0,
+      minPower: cardForm.minPower !== '' && cardForm.minPower !== null && cardForm.minPower !== undefined ? Number(cardForm.minPower) : null,
+      maxPower: cardForm.maxPower !== '' && cardForm.maxPower !== null && cardForm.maxPower !== undefined ? Number(cardForm.maxPower) : null,
+      minHp: cardForm.minHp !== '' && cardForm.minHp !== null && cardForm.minHp !== undefined ? Number(cardForm.minHp) : null,
+      maxHp: cardForm.maxHp !== '' && cardForm.maxHp !== null && cardForm.maxHp !== undefined ? Number(cardForm.maxHp) : null,
     };
     if (cardImageFile) {
       newCardData.imageFile = cardImageFile;
@@ -955,69 +960,55 @@ export default function AdminView({
   const calculateDropChance = (targetCard, packInfo) => {
     if (!packInfo) return '0%';
 
-    // Знаходимо всі картки, що належать до цього ж паку
     const cardsInThisPack = cardsCatalog.filter((c) => c.packId === packInfo.id);
     if (cardsInThisPack.length === 0) return '0%';
 
-    // Підраховуємо кількість карток для кожної рідкісності (для тих, хто без фіксованого %)
+    const DEFAULT_RARITY_WEIGHTS = {
+      'Звичайна': 8500,
+      'Рідкісна': 1350,
+      'Епічна': 135,
+      'Легендарна': 14,
+      'Унікальна': 1
+    };
+
+    let availableCards = cardsInThisPack.filter(c => !(c.maxSupply > 0 && (c.pulledCount || 0) >= c.maxSupply));
+    if (availableCards.length === 0) return '0%';
+
     const rarityCounts = {};
-    for (const c of cardsInThisPack) {
-      if (!(c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0)) {
+    for (const c of availableCards) {
+      if (c.weight === null || c.weight === undefined || c.weight === '') {
         rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + 1;
       }
     }
 
-    let exactPercentageSum = 0;
-    let fallbackWeightsSum = 0;
+    let totalWeight = 0;
+    let targetCardWeight = 0;
 
-    // Перший прохід: збираємо точні відсотки та ваги для інших
-    for (const c of cardsInThisPack) {
-      if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
-        exactPercentageSum += Number(c.weight);
+    for (const c of availableCards) {
+      let w = 0;
+      if (c.weight !== null && c.weight !== undefined && c.weight !== '') {
+        w = Number(c.weight);
       } else {
-        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
-        let w = globalW;
+        const globalW = DEFAULT_RARITY_WEIGHTS[c.rarity] || 1;
+        let baseW = globalW;
         if (
-          packInfo.customWeights?.[c.rarity] !== undefined &&
-          packInfo.customWeights?.[c.rarity] !== ''
+          packInfo.customWeights &&
+          packInfo.customWeights[c.rarity] !== undefined &&
+          packInfo.customWeights[c.rarity] !== ''
         ) {
-          w = Number(packInfo.customWeights[c.rarity]);
+          baseW = Number(packInfo.customWeights[c.rarity]);
         }
-        const perCardW = w / (rarityCounts[c.rarity] || 1);
-        fallbackWeightsSum += perCardW;
+        w = baseW / (rarityCounts[c.rarity] || 1);
+      }
+
+      totalWeight += w;
+      if (c.id === targetCard.id) {
+        targetCardWeight = w;
       }
     }
 
-    // Розраховуємо шанс цільової картки
-    let chance = 0;
-    if (
-      targetCard.weight !== null &&
-      targetCard.weight !== undefined &&
-      targetCard.weight !== '' &&
-      Number(targetCard.weight) > 0
-    ) {
-      chance = Number(targetCard.weight); // Використовуємо точний відсоток
-    } else {
-      // Для карток без точного відсотка розраховуємо шанс з залишку
-      let remainingPercentage = 100 - exactPercentageSum;
-      if (remainingPercentage < 0) remainingPercentage = 0;
-
-      const globalW = rarities.find((r) => r.name === targetCard.rarity)?.weight || 1;
-      let targetW = globalW;
-      if (
-        packInfo.customWeights?.[targetCard.rarity] !== undefined &&
-        packInfo.customWeights?.[targetCard.rarity] !== ''
-      ) {
-        targetW = Number(packInfo.customWeights[targetCard.rarity]);
-      }
-
-      const perCardTargetW = targetW / (rarityCounts[targetCard.rarity] || 1);
-
-      if (fallbackWeightsSum > 0) {
-        chance = (perCardTargetW / fallbackWeightsSum) * remainingPercentage;
-      }
-    }
-
+    if (totalWeight === 0) return '0%';
+    const chance = (targetCardWeight / totalWeight) * 100;
     if (chance === 0) return '0%';
     if (chance < 0.0001) return '<0.0001%';
     const fixed = chance < 0.1 ? chance.toFixed(4) : chance.toFixed(2);
@@ -1029,48 +1020,53 @@ export default function AdminView({
     const cardsInThisPack = cardsCatalog.filter((c) => c.packId === packInfo.id);
     if (cardsInThisPack.length === 0) return 0;
 
+    const DEFAULT_RARITY_WEIGHTS = {
+      'Звичайна': 8500,
+      'Рідкісна': 1350,
+      'Епічна': 135,
+      'Легендарна': 14,
+      'Унікальна': 1
+    };
+
+    let availableCards = cardsInThisPack.filter(c => !(c.maxSupply > 0 && (c.pulledCount || 0) >= c.maxSupply));
+    if (availableCards.length === 0) return 0;
+
     const rarityCounts = {};
-    for (const c of cardsInThisPack) {
-      if (!(c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0)) {
+    for (const c of availableCards) {
+      if (c.weight === null || c.weight === undefined || c.weight === '') {
         rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + 1;
       }
     }
 
-    let exactPercentageSum = 0;
-    let fallbackWeightsSum = 0;
+    let totalWeight = 0;
+    const cardsWithWeights = [];
 
-    for (const c of cardsInThisPack) {
-      if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
-        exactPercentageSum += Number(c.weight);
+    for (const c of availableCards) {
+      let w = 0;
+      if (c.weight !== null && c.weight !== undefined && c.weight !== '') {
+        w = Number(c.weight);
       } else {
-        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
-        let w = globalW;
-        if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== '') {
-          w = Number(packInfo.customWeights[c.rarity]);
+        const globalW = DEFAULT_RARITY_WEIGHTS[c.rarity] || 1;
+        let baseW = globalW;
+        if (
+          packInfo.customWeights &&
+          packInfo.customWeights[c.rarity] !== undefined &&
+          packInfo.customWeights[c.rarity] !== ''
+        ) {
+          baseW = Number(packInfo.customWeights[c.rarity]);
         }
-        fallbackWeightsSum += w / (rarityCounts[c.rarity] || 1);
+        w = baseW / (rarityCounts[c.rarity] || 1);
       }
+      totalWeight += w;
+      cardsWithWeights.push({ card: c, weight: w });
     }
 
+    if (totalWeight === 0) return 0;
+
     let totalEV = 0;
-    for (const c of cardsInThisPack) {
-      let chance = 0;
-      if (c.weight !== null && c.weight !== undefined && c.weight !== '' && Number(c.weight) > 0) {
-        chance = Number(c.weight) / 100;
-      } else {
-        let remainingPercentage = (100 - exactPercentageSum) / 100;
-        if (remainingPercentage < 0) remainingPercentage = 0;
-        const globalW = rarities.find((r) => r.name === c.rarity)?.weight || 1;
-        let targetW = globalW;
-        if (packInfo.customWeights?.[c.rarity] !== undefined && packInfo.customWeights?.[c.rarity] !== '') {
-          targetW = Number(packInfo.customWeights[c.rarity]);
-        }
-        const perCardTargetW = targetW / (rarityCounts[c.rarity] || 1);
-        if (fallbackWeightsSum > 0) {
-          chance = (perCardTargetW / fallbackWeightsSum) * remainingPercentage;
-        }
-      }
-      totalEV += chance * (Number(c.sellPrice) || 15);
+    for (const item of cardsWithWeights) {
+      const chance = item.weight / totalWeight;
+      totalEV += chance * (Number(item.card.sellPrice) || 15);
     }
     return totalEV;
   };
@@ -2663,15 +2659,25 @@ export default function AdminView({
                   </div>
                 )}
               </div>
-              <input
-                type="number"
-                placeholder="Вартість"
-                value={packForm.cost}
-                onChange={(e) => setPackForm({ ...packForm, cost: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                min="0"
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Вартість (Монети)"
+                  value={packForm.cost}
+                  onChange={(e) => setPackForm({ ...packForm, cost: e.target.value })}
+                  className="w-1/2 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
+                  min="0"
+                  required
+                />
+                <input
+                  type="number"
+                  placeholder="Ціна в Кристалах"
+                  value={packForm.premiumCost || ''}
+                  onChange={(e) => setPackForm({ ...packForm, premiumCost: e.target.value })}
+                  className="w-1/2 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-fuchsia-500"
+                  min="0"
+                />
+              </div>
               <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 flex flex-col gap-2">
                 <input
                   type="text"

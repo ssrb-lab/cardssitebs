@@ -167,11 +167,11 @@ export const deletePackFromDb = async (token, packId) => {
   return res.json();
 };
 
-export const openPackRequest = async (token, packId, amount) => {
+export const openPackRequest = async (token, packId, amount, currency = 'coins') => {
   const res = await safeFetch(`${API_URL}/game/open-pack`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ packId, amount }),
+    body: JSON.stringify({ packId, amount, currency }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Помилка відкриття паку');

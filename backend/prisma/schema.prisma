@@ -117,6 +117,7 @@ model PackCatalog {
   name          String
   category      String  @default("Базові")
   cost          Int     @default(50)
+  premiumCost   Int?    // Optional cost in crystals
   image         String  @db.Text
   isHidden      Boolean @default(false)
   isPremiumOnly Boolean @default(false)

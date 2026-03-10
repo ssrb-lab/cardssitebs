@@ -48,6 +48,38 @@ import {
   getToken,
 } from '../config/api';
 
+const StaticAvatar = ({ src, alt, className }) => {
+  const [staticSrc, setStaticSrc] = useState(src);
+
+  useEffect(() => {
+    if (!src) return;
+    if (src.includes('cdn.discordapp.com') && src.endsWith('.gif')) {
+      setStaticSrc(src.replace('.gif', '.png'));
+      return;
+    }
+    if (src.endsWith('.gif') || src.includes('.gif?')) {
+      const img = new window.Image();
+      img.crossOrigin = "Anonymous";
+      img.src = src;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        setStaticSrc(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => {
+        setStaticSrc(src); // Fallback
+      };
+    } else {
+      setStaticSrc(src);
+    }
+  }, [src]);
+
+  return <img src={staticSrc} alt={alt} className={className} />;
+};
+
 const ICONS = {
   castle: Castle,
   tower: TowerControl,
@@ -104,6 +136,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       localStorage.removeItem('arenaDeck');
     }
   }, [deck]);
+
+  const [showRules, setShowRules] = useState(false);
 
   // Re-validate deck whenever inventory or catalog changes
   useEffect(() => {
@@ -618,6 +652,13 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
             title="Інфо про перки"
           >
             <Info size={18} />
+          </button>
+          <button
+            onClick={() => setShowRules(true)}
+            className="bg-red-950/50 border border-red-700/50 hover:border-red-500 text-red-500 hover:text-red-400 p-1.5 rounded-lg transition-colors flex items-center justify-center"
+            title="Правила Арени"
+          >
+            <ShieldAlert size={18} />
           </button>
         </div>
 
@@ -1195,6 +1236,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     return `${m}:${s}`;
                   };
 
+                  const avatarUrl = (point.ownerId === profile?.uid && profile?.avatarUrl) 
+                    ? profile.avatarUrl 
+                    : point.ownerAvatarUrl;
+
                   return (
                     <div
                       key={point.id}
@@ -1212,20 +1257,24 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         <div
                           className={`
                                           w-8 h-8 rounded-full border-2 bg-neutral-900/80 backdrop-blur-sm
-                                          flex items-center justify-center shadow-lg hover:scale-125 transition-transform cursor-pointer
+                                          flex items-center justify-center shadow-lg hover:scale-125 transition-transform cursor-pointer overflow-hidden
                                       `}
                           style={{
                             borderColor:
                               point.ownerId === profile?.uid ? '#22c55e' : point.color || '#4f46e5',
                           }}
                         >
-                          <PointIcon
-                            size={16}
-                            style={{
-                              color:
-                                point.ownerId === profile?.uid ? '#22c55e' : point.color || '#4f46e5',
-                            }}
-                          />
+                          {avatarUrl ? (
+                            <StaticAvatar src={avatarUrl} alt="Owner" className="w-full h-full object-cover" />
+                          ) : (
+                            <PointIcon
+                              size={16}
+                              style={{
+                                color:
+                                  point.ownerId === profile?.uid ? '#22c55e' : point.color || '#4f46e5',
+                              }}
+                            />
+                          )}
                         </div>
                         {point.isLandingZone && (
                           <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-500 border border-cyan-300 flex items-center justify-center shadow-md">
@@ -1762,6 +1811,73 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           </div>
         </div>
       )}
+
+      {/* RULES INFO MODAL */}
+      {showRules && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowRules(false)}>
+          <div className="bg-neutral-900 border border-red-500/30 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-[0_0_40px_rgba(239,68,68,0.2)] custom-scrollbar animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6 border-b border-red-900/50 pb-4">
+              <h3 className="text-2xl font-black text-white uppercase tracking-wider flex items-center gap-3">
+                <ShieldAlert size={28} className="text-red-500" /> Правила Арени
+              </h3>
+              <button onClick={() => setShowRules(false)} className="p-2 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-6 text-sm text-neutral-300 leading-relaxed">
+              
+              <div className="bg-indigo-950/20 border border-indigo-900/50 rounded-xl p-4">
+                <h4 className="text-lg font-black text-indigo-400 uppercase mb-2 flex items-center gap-2">
+                  <Swords size={18} /> Базові Правила
+                </h4>
+                <ul className="list-disc pl-5 space-y-2">
+                  <li>Щоб <b>захопити</b> або <b>атакувати</b> точку, вам потрібно вибрати рівно <b>5 карт</b> зі свого інвентаря, які сформують вашу колоду.</li>
+                  <li>Кожна точка має свій кулдаун захисту, протягом якого її неможливо атакувати.</li>
+                  <li>Власник точки отримує кристали (дохід залежить від точки). Дохід накопичується, його потрібно забирати вручну.</li>
+                  <li>Карти, які захищають точку, фіксуються в ній. Ви <b>не зможете</b> їх продати на ринку або сховати в сейф, поки вони там!</li>
+                </ul>
+              </div>
+
+              <div className="bg-neutral-950/50 border border-neutral-800 rounded-xl p-4">
+                <h4 className="text-lg font-black text-white uppercase mb-3 flex items-center gap-2">
+                  <Target size={18} className="text-amber-500" /> Режими Бою
+                </h4>
+                <p className="mb-3">Кожна точка може мати один з трьох режимів бою. Звертайте на це увагу перед атакою!</p>
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-green-900/30">
+                    <div className="text-green-500 font-bold w-1/4 shrink-0">🟢 Повний (Default)</div>
+                    <div className="w-3/4">Найбезпечніший режим. Усі карти повністю відновлюють свої характеристики після завершення бою. Ніхто нічого не втрачає.</div>
+                  </div>
+                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-yellow-900/30">
+                    <div className="text-yellow-500 font-bold w-1/4 shrink-0 text-sm">🟡 Chip Damage</div>
+                    <div className="w-3/4">Кожна ваша карта має певний <b>шанс втратити частину Сили або ХП (5%)</b>. Чим частіше вона отримує шкоду, тим більший ризик, що її показники знизяться назавжди.</div>
+                  </div>
+                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-red-900/40">
+                    <div className="text-red-500 font-bold w-1/4 shrink-0">🔴 Хардкор</div>
+                    <div className="w-3/4"><b>Перманентна смерть!</b> Будь-яка ваша карта, яка закінчує бій маючи 0 ХП — <b>видаляється з вашого інвентаря назавжди!</b> Використовуйте цей режим обережно та беріть найкращих цілителів.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4">
+                 <h4 className="text-lg font-black text-red-400 border-red-900/50 uppercase mb-2 flex items-center gap-2">
+                  <Skull size={18} /> Механіка Атаки
+                </h4>
+                <p>Бій проходить автоматично у форматі 5 на 5. Карти самостійно атакують і використовують свої перки (наприклад цілитель лікує, танк поглинає шкоду і так далі). Хто залишився хоча б з однією живою картою — той і перемагає!</p>
+              </div>
+
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-neutral-800 text-center">
+              <button onClick={() => setShowRules(false)} className="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_0_15px_rgba(220,38,38,0.4)]">
+                Я зрозумів
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
