@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Effects Preview (Live from Code)</title>
+    <!-- Tailwind CDN для базових стилів -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Підключаємо твій реальний CSS файл */
+        @import url("./src/index.css");
+        
+        /* Фолбек для змінних, які Tailwind може не підтягнути з файлу */
+        body { background-color: black; color: white; font-family: sans-serif; }
+        .card-container { width: 200px; height: 300px; border-radius: 12px; position: relative; overflow: hidden; background: #1a1a1a; }
+        .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2rem; padding: 2rem; }
+        
+        /* Емуляція CardFrame.jsx стилів, щоб вони були як у коді */
+        .frame-bronze { border: 4px solid #cd7f32; box-shadow: 0 0 15px rgba(205, 127, 50, 0.4); }
+        .frame-silver { border: 4px solid #c0c0c0; box-shadow: 0 0 15px rgba(192, 192, 192, 0.4); }
+        .frame-gold { 
+            border: 4px solid #eab308; 
+            animation: gold-pulse 2s infinite ease-in-out;
+        }
+        .frame-neon {
+            border: 4px solid #d946ef;
+            animation: neon-pulse 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="p-10">
+        <h1 class="text-4xl font-black mb-2 uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
+            Card Effects LIVE Preview
+        </h1>
+        <p class="text-neutral-500 mb-10 italic">
+            Цей файл бере стилі безпосередньо з <b>src/index.css</b>. <br>
+            Будь-які зміни в CSS файлі відобразяться тут після оновлення сторінки (F5).
+        </p>
+
+        <h2 class="text-2xl font-bold mb-6 border-l-4 border-yellow-500 pl-4 uppercase">Рамки (Frames)</h2>
+        <div class="preview-grid mb-12">
+            <div class="text-center">
+                <div class="card-container frame-bronze mx-auto">
+                    <img src="https://placehold.co/200x300/222/555?text=BRONZE" class="w-full h-full object-cover">
+                </div>
+                <p class="mt-2 font-bold">Bronze</p>
+            </div>
+            <div class="text-center">
+                <div class="card-container frame-silver mx-auto">
+                    <img src="https://placehold.co/200x300/222/555?text=SILVER" class="w-full h-full object-cover">
+                </div>
+                <p class="mt-2 font-bold">Silver</p>
+            </div>
+            <div class="text-center">
+                <div class="card-container frame-gold mx-auto">
+                    <img src="https://placehold.co/200x300/222/555?text=GOLD" class="w-full h-full object-cover">
+                    <div class="absolute inset-[-50%] z-[-1] bg-yellow-500/10 rounded-full animate-spin-slow"></div>
+                </div>
+                <p class="mt-2 font-bold">Gold</p>
+            </div>
+            <div class="text-center">
+                <div class="card-container frame-neon mx-auto">
+                    <img src="https://placehold.co/200x300/222/555?text=NEON" class="w-full h-full object-cover">
+                    <div class="absolute inset-[-50%] z-[-2] bg-fuchsia-500/20 blur-[40px] rounded-full animate-[spin_3s_linear_infinite]"></div>
+                </div>
+                <p class="mt-2 font-bold">Neon</p>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-bold mb-6 border-l-4 border-purple-500 pl-4 uppercase">Ефекти (Effects)</h2>
+        <div id="effects-grid" class="preview-grid">
+            <!-- JS згенерує картки для кожного ефекту -->
+        </div>
+    </div>
+
+    <script>
+        const effects = [
+            { id: 'holo', name: 'Holographic' },
+            { id: 'foil', name: 'Foil Glint' },
+            { id: 'glow', name: 'Inner Glow' },
+            { id: 'glitch', name: 'Cyber Glitch' },
+            { id: 'ember', name: 'Ember Sparks' },
+            { id: 'liquid-gold', name: 'Liquid Gold' },
+            { id: 'prismatic', name: 'Prismatic' },
+            { id: 'cosmos', name: 'Cosmic Stars' },
+            { id: 'electric', name: 'Electric' },
+            { id: 'old-film', name: 'Old Film' },
+            { id: 'ghost', name: 'Ghostly' }
+        ];
+
+        const grid = document.getElementById('effects-grid');
+        effects.forEach(eff => {
+            const div = document.createElement('div');
+            div.className = 'text-center';
+            div.innerHTML = `
+                <div class="card-container effect-${eff.id} mx-auto">
+                    <img src="https://placehold.co/200x300/111/444?text=${eff.id.toUpperCase()}" class="w-full h-full object-cover">
+                    <div class="${eff.id} absolute inset-0 pointer-events-none z-10"></div>
+                </div>
+                <p class="mt-2 text-sm font-mono text-neutral-400">.effect-${eff.id}</p>
+                <p class="font-bold">${eff.name}</p>
+            `;
+            grid.appendChild(div);
+        });
+
+        // Емуляція 3D нахилу для перевірки ефектів
+        document.querySelectorAll('.card-container').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const rX = (y - rect.height/2) / 10 * -1;
+                const rY = (x - rect.width/2) / 10;
+                card.style.transform = `perspective(500px) rotateX(${rX}deg) rotateY(${rY}deg) scale(1.05)`;
+                card.style.transition = 'none';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(500px) rotateX(0) rotateY(0) scale(1)';
+                card.style.transition = 'transform 0.5s ease';
+            });
+        });
+    </script>
+</body>
+</html>

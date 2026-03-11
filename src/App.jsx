@@ -67,6 +67,7 @@ import ProfileView from './views/ProfileView';
 import RatingView from './views/RatingView';
 import PublicProfileView from './views/PublicProfileView';
 import AdminView from './views/AdminView';
+import EffectsPreview from './views/EffectsPreview';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -1565,6 +1566,9 @@ export default function App() {
               <div className="text-center text-red-500 mt-10">Доступ заборонено</div>
             )
           } />
+          {import.meta.env.DEV && (
+            <Route path="/effects-preview" element={<EffectsPreview />} />
+          )}
         </Routes>
       </main>
 

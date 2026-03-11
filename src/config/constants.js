@@ -53,6 +53,14 @@ export const EFFECT_OPTIONS = [
   { id: 'old-film', name: 'Стара плівка (Old Film)' },
 ];
 
+export const FRAME_OPTIONS = [
+  { id: 'normal', name: 'Звичайна рамка' },
+  { id: 'bronze', name: 'Бронзова' },
+  { id: 'silver', name: 'Срібна' },
+  { id: 'gold', name: 'Золота сяюча' },
+  { id: 'neon', name: 'Неонова пульсуюча' },
+];
+
 export const COLOR_PRESETS = {
   gray: { border: 'border-gray-500 shadow-gray-500/30', text: 'text-gray-400' },
   blue: { border: 'border-blue-500 shadow-blue-500/40', text: 'text-blue-400' },

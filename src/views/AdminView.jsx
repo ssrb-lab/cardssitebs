@@ -51,7 +51,7 @@ import {
   uploadBannerRequest,
 } from '../config/api';
 import { formatDate, getCardStyle } from '../utils/helpers';
-import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
+import { EFFECT_OPTIONS, FRAME_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
 import PlayerAvatar from '../components/PlayerAvatar';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon, { ACHIEVEMENT_PRESETS } from '../components/AchievementIcon';
