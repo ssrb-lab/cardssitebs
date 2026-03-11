@@ -81,10 +81,10 @@ const bannersStorage = multer.diskStorage({
 
 const uploadBanner = multer({
   storage: bannersStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB limit (for video plates)
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Дозволені лише зображення'));
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);
+    else cb(new Error('Дозволені лише зображення та відео'));
   },
 });
 
@@ -141,10 +141,10 @@ const validateImageSignature = async (req, res, next) => {
     const { fileTypeFromFile } = await import('file-type');
     const type = await fileTypeFromFile(req.file.path);
 
-    if (!type || !type.mime.startsWith('image/')) {
-      // Файл не є зображенням, видаляємо його
+    if (!type || (!type.mime.startsWith('image/') && !type.mime.startsWith('video/'))) {
+      // Файл не є зображенням або відео, видаляємо його
       fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Завантажений файл не є валідним зображенням' });
+      return res.status(400).json({ error: 'Завантажений файл не є валідним зображенням або відео' });
     }
 
     next();
@@ -4041,6 +4041,7 @@ app.get('/api/game/leaderboard', async (req, res) => {
         isPremium: true, // <-- ДОДАНО
         premiumUntil: true, // <-- ДОДАНО
         lastIp: true, // <-- ДОДАНО для адмінів
+        activePlateUrl: true, // <-- ДОДАНО для плашок
         // Рахуємо кількість унікальних записів в інвентарі гравця (лише з відкритих паків)
         _count: {
           select: { 
@@ -4065,6 +4066,7 @@ app.get('/api/game/leaderboard', async (req, res) => {
       isPremium: user.isPremium, // <-- ДОДАНО
       premiumUntil: user.premiumUntil, // <-- ДОДАНО
       lastIp: user.lastIp, // <-- ДОДАНО
+      activePlateUrl: user.activePlateUrl, // <-- ДОДАНО для плашок
       uniqueCardsCount: user._count.inventory,
     }));
 
@@ -4609,6 +4611,36 @@ app.post('/api/profile/equip-banner', authenticate, async (req, res) => {
   }
 });
 
+// Екіпірування плашки рейтингу
+app.post('/api/profile/equip-plate', authenticate, async (req, res) => {
+  const { plateUrl } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено.' });
+
+    if (plateUrl) {
+      const ownedPlates = user.ownedPlates 
+        ? (Array.isArray(user.ownedPlates) ? user.ownedPlates : (typeof user.ownedPlates === 'string' ? JSON.parse(user.ownedPlates) : [])) 
+        : [];
+      
+      if (!ownedPlates.includes(plateUrl) && !user.isAdmin) {
+        return res.status(403).json({ error: 'Ви не володієте цією плашкою.' });
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: { activePlateUrl: plateUrl || null },
+    });
+
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    console.error('Помилка при екіпіруванні плашки:', error);
+    res.status(500).json({ error: 'Помилка встановлення плашки на сервері.' });
+  }
+});
+
 app.post(
   '/api/profile/upload-avatar',
   authenticate,
@@ -4748,6 +4780,27 @@ app.post('/api/game/premium-shop/buy', authenticate, async (req, res) => {
              data: { 
                ownedBanners: owned,
                profileBannerUrl: realItem.image // Відразу екіпіруємо після покупки
+             }
+           });
+         }
+      } else if (realItem.type === 'plate') {
+         // Логіка для плашок (фон рядка в рейтингу)
+         let ownedPlates = [];
+         if (user.ownedPlates) {
+           if (typeof user.ownedPlates === 'string') {
+             try { ownedPlates = JSON.parse(user.ownedPlates); } catch(e){}
+           } else {
+             ownedPlates = user.ownedPlates;
+           }
+         }
+         
+         if (!ownedPlates.includes(realItem.image)) {
+           ownedPlates.push(realItem.image);
+           await tx.user.update({
+             where: { uid: user.uid },
+             data: { 
+               ownedPlates: ownedPlates,
+               activePlateUrl: realItem.image // Відразу екіпіруємо після покупки
              }
            });
          }

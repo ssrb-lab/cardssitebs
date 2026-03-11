@@ -246,6 +246,7 @@ export default function AdminView({
     description: '',
     imageFile: null,
   });
+  const [editingShopItem, setEditingShopItem] = useState(null);
 
   const updatePackStatsRange = (rarity, field, value) => {
     setPackForm((prev) => ({
@@ -847,24 +848,40 @@ export default function AdminView({
     }
   };
 
+  const editPremiumShopItem = (item) => {
+    setEditingShopItem(item);
+    setShopItemForm({
+      type: item.type,
+      itemId: item.itemId || '',
+      price: item.price,
+      currency: item.currency || 'coins',
+      description: item.description || '',
+      imageFile: null,
+    });
+  };
+
   const addPremiumShopItem = async (e) => {
     e.preventDefault();
     try {
-      let finalImage = undefined;
+      let finalImage = editingShopItem ? editingShopItem.image : undefined;
       let finalItemId = shopItemForm.itemId;
 
-      if (shopItemForm.type === 'banner') {
-        if (!shopItemForm.imageFile) {
-          return showToast('Будь ласка, завантажте зображення банера.', 'error');
+      if (shopItemForm.type === 'banner' || shopItemForm.type === 'plate') {
+        const typeLabel = shopItemForm.type === 'plate' ? 'плашки' : 'банера';
+        if (shopItemForm.imageFile) {
+          showToast(`Завантаження ${typeLabel}...`, 'success');
+          const res = await uploadBannerRequest(getToken(), shopItemForm.imageFile);
+          finalImage = res.url;
+          finalItemId = editingShopItem ? editingShopItem.itemId : `${shopItemForm.type}_${Date.now()}`;
+        } else if (!editingShopItem) {
+          return showToast(`Будь ласка, завантажте файл ${typeLabel}.`, 'error');
+        } else {
+          finalItemId = editingShopItem.itemId;
         }
-        showToast('Завантаження банера...', 'success');
-        const res = await uploadBannerRequest(getToken(), shopItemForm.imageFile);
-        finalImage = res.url;
-        finalItemId = `banner_${Date.now()}`;
       }
 
       const newItem = {
-        id: 'si_' + Date.now(),
+        id: editingShopItem ? editingShopItem.id : 'si_' + Date.now(),
         type: shopItemForm.type,
         itemId: finalItemId,
         image: finalImage,
@@ -873,13 +890,20 @@ export default function AdminView({
         description: shopItemForm.description,
       };
       const newSettings = getFullSettings();
-      newSettings.premiumShopItems = [...premiumShopItems, newItem];
+      if (editingShopItem) {
+        newSettings.premiumShopItems = premiumShopItems.map((i) =>
+          i.id === editingShopItem.id ? newItem : i
+        );
+      } else {
+        newSettings.premiumShopItems = [...premiumShopItems, newItem];
+      }
       await saveSettingsRequest(getToken(), newSettings);
       await reloadSettings();
-      showToast('Товар додано!', 'success');
+      showToast(editingShopItem ? 'Товар оновлено!' : 'Товар додано!', 'success');
       setShopItemForm({ type: 'card', itemId: '', price: 500, currency: 'coins', description: '', imageFile: null });
+      setEditingShopItem(null);
     } catch {
-      showToast('Помилка додавання товару.', 'error');
+      showToast('Помилка збереження товару.', 'error');
     }
   };
 
@@ -2185,7 +2209,7 @@ export default function AdminView({
             className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-2xl"
           >
             <h3 className="text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2">
-              <Gem /> Додати товар у Прем. Магазин
+              <Gem /> {editingShopItem ? 'Редагувати товар' : 'Додати товар у Прем. Магазин'}
             </h3>
             
             <div className="mb-4">
@@ -2199,6 +2223,7 @@ export default function AdminView({
               >
                 <option value="card">Ексклюзивна картка</option>
                 <option value="banner">Банер для профілю</option>
+                <option value="plate">Плашка для рейтингу</option>
               </select>
             </div>
 
@@ -2225,15 +2250,25 @@ export default function AdminView({
               ) : (
                 <div>
                   <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
-                    Зображення банера:
+                    {shopItemForm.type === 'plate' ? 'Відео/GIF плашки:' : 'Зображення банера:'}
                   </label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={shopItemForm.type === 'plate' ? 'video/*,image/gif,image/*' : 'image/*'}
                     onChange={(e) => setShopItemForm({ ...shopItemForm, imageFile: e.target.files[0] })}
                     className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-neutral-400 outline-none focus:border-fuchsia-500"
-                    required
+                    required={!editingShopItem}
                   />
+                  {editingShopItem && editingShopItem.image && !shopItemForm.imageFile && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {shopItemForm.type === 'plate' && editingShopItem.image.match(/\.(mp4|webm|mov)$/i) ? (
+                        <video src={editingShopItem.image} className="h-10 rounded border border-neutral-700" muted autoPlay loop />
+                      ) : (
+                        <img src={editingShopItem.image} alt="Поточне" className="h-10 rounded border border-neutral-700" />
+                      )}
+                      <span className="text-xs text-neutral-500">Поточне зображення (залишиться, якщо не обрати нове)</span>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -2276,52 +2311,82 @@ export default function AdminView({
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors"
-            >
-              Додати товар
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="flex-1 bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors"
+              >
+                {editingShopItem ? 'Зберегти зміни' : 'Додати товар'}
+              </button>
+              {editingShopItem && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingShopItem(null);
+                    setShopItemForm({ type: 'card', itemId: '', price: 500, currency: 'coins', description: '', imageFile: null });
+                  }}
+                  className="px-6 bg-neutral-700 hover:bg-neutral-600 text-white font-bold py-3 rounded-xl shadow-lg transition-colors"
+                >
+                  Скасувати
+                </button>
+              )}
+            </div>
           </form>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {premiumShopItems.map((item) => {
               const cDef = item.type === 'card' ? cardsCatalog.find((c) => c.id === item.itemId) : null;
               const isBanner = item.type === 'banner';
+              const isPlate = item.type === 'plate';
+              const isMedia = isBanner || isPlate;
+              const isVideo = isPlate && item.image && item.image.match(/\.(mp4|webm|mov)$/i);
               return (
                 <div
                   key={item.id}
-                  className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex gap-4 relative"
+                  className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex flex-col items-center relative group/item"
                 >
-                  <button
-                    onClick={() => deletePremiumShopItem(item.id)}
-                    className="absolute top-2 right-2 text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors z-10"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <div className={`flex-shrink-0 bg-neutral-950 border border-neutral-700 rounded-md overflow-hidden ${isBanner ? 'w-24 h-16' : 'w-16 h-24'}`}>
-                    <img
-                      src={isBanner ? item.image : cDef?.image}
-                      className="w-full h-full object-cover"
-                      alt=""
-                      loading="lazy"
-                    />
+                  {/* Hover overlay with edit & delete buttons */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 rounded-xl z-10 flex items-center justify-center gap-3 pointer-events-none group-hover/item:pointer-events-auto">
+                    <button
+                      onClick={() => editPremiumShopItem(item)}
+                      className="w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-lg transition-all transform scale-75 group-hover/item:scale-100 duration-200"
+                      title="Редагувати"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => deletePremiumShopItem(item.id)}
+                      className="w-11 h-11 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white shadow-lg transition-all transform scale-75 group-hover/item:scale-100 duration-200"
+                      title="Видалити"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0 pr-6">
-                    <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-1">
-                      {isBanner ? 'Банер' : 'Картка'}
-                    </div>
-                    <div className="font-bold text-white text-sm truncate">
-                      {isBanner ? (item.description || 'Банер') : (cDef?.name || 'Невідомо')}
-                    </div>
-                    <div className={`text-xs font-bold mt-1 mb-2 ${item.currency === 'crystals' ? 'text-fuchsia-400' : 'text-yellow-500'}`}>
-                      {item.price} {item.currency === 'crystals' ? <Gem size={10} className="inline" /> : <Coins size={10} className="inline" />}
-                    </div>
-                    {!isBanner && (
-                      <div className="text-[10px] text-neutral-500 line-clamp-2 leading-tight">
-                        {item.description}
-                      </div>
+                  <div className={`bg-neutral-950 border border-neutral-700 rounded-lg overflow-hidden mb-2 ${isMedia ? 'w-full aspect-[2/1]' : 'w-20 aspect-[2/3]'}`}>
+                    {isVideo ? (
+                      <video src={item.image} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                    ) : (
+                      <img
+                        src={isMedia ? item.image : cDef?.image}
+                        className="w-full h-full object-cover"
+                        alt=""
+                        loading="lazy"
+                      />
                     )}
+                  </div>
+                  <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-0.5">
+                    {isPlate ? 'Плашка' : isBanner ? 'Банер' : 'Картка'}
+                  </div>
+                  <div className="font-bold text-white text-xs text-center truncate w-full mb-1">
+                    {isMedia ? (item.description || (isPlate ? 'Плашка' : 'Банер')) : (cDef?.name || 'Невідомо')}
+                  </div>
+                  {!isMedia && item.description && (
+                    <div className="text-[10px] text-neutral-500 text-center line-clamp-1 leading-tight w-full mb-1">
+                      {item.description}
+                    </div>
+                  )}
+                  <div className={`flex items-center gap-1 text-xs font-bold mt-auto pt-1 ${item.currency === 'crystals' ? 'text-fuchsia-400' : 'text-yellow-500'}`}>
+                    {item.price} {item.currency === 'crystals' ? <Gem size={12} /> : <Coins size={12} />}
                   </div>
                 </div>
               );

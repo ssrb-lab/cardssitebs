@@ -34,6 +34,8 @@ model User {
   avatarUrl            String?  @db.Text
   profileBannerUrl     String?  @db.Text
   ownedBanners         Json?    @default("[]")
+  ownedPlates          Json?    @default("[]")
+  activePlateUrl       String?  @db.Text
   mainShowcaseId       String?
   lastIp               String?
   autoSoundEnabled     Boolean  @default(true)

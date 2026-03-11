@@ -105,19 +105,34 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
             <div
               key={leader.uid}
               onClick={() => setViewingPlayerProfile(leader.nickname)}
-              className={`flex items-center justify-between p-2 sm:p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group ${leader.uid === currentUid ? 'bg-yellow-900/10' : 'hover:bg-neutral-800/80'} ${leader.isBanned ? 'opacity-50' : ''}`}
+              className={`flex items-center justify-between p-2 sm:p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group relative overflow-hidden ${leader.uid === currentUid ? 'border-l-4 border-l-yellow-500' : 'hover:bg-neutral-800/80'} ${leader.isBanned ? 'opacity-50' : ''}`}
             >
-              <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+              {/* Плашка — відео/GIF фон рядка */}
+              {leader.activePlateUrl && (
+                leader.activePlateUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                  <video
+                    src={leader.activePlateUrl}
+                    className="absolute left-[47%] top-0 h-full w-auto opacity-40 pointer-events-none z-0"
+                    muted autoPlay loop playsInline
+                  />
+                ) : (
+                  <img
+                    src={leader.activePlateUrl}
+                    className="absolute left-[47%] top-0 h-full w-auto opacity-40 pointer-events-none z-0"
+                    alt=""
+                  />
+                )
+              )}
+              <div className="flex items-center gap-2 sm:gap-4 overflow-hidden relative z-[1]">
                 <div
-                  className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center font-black text-sm sm:text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${
-                    realRank === 1
+                  className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center font-black text-sm sm:text-lg rounded-xl border transition-transform group-hover:scale-110 shrink-0 ${realRank === 1
                       ? 'bg-yellow-500 text-yellow-950 border-yellow-400'
                       : realRank === 2
                         ? 'bg-gray-300 text-gray-800 border-gray-100'
                         : realRank === 3
                           ? 'bg-amber-700 text-orange-100 border-amber-600'
                           : 'bg-neutral-950 text-neutral-500 border-neutral-800'
-                  }`}
+                    }`}
                 >
                   {realRank}
                 </div>
@@ -167,7 +182,7 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-4 shrink-0 pl-2">
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0 pl-2 relative z-[1]">
                 <div className="text-right">
                   <div className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase">
                     {ratingSort === 'cards' ? 'Унікальні карти' : 'Монети'}

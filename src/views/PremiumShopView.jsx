@@ -129,6 +129,24 @@ export default function PremiumShopView({
 
               const isOwnedBanner = item.type === 'banner' && userBanners.includes(item.image);
 
+              let userPlates = [];
+              try {
+                if (profile?.ownedPlates) {
+                  if (Array.isArray(profile.ownedPlates)) {
+                    userPlates = profile.ownedPlates;
+                  } else if (typeof profile.ownedPlates === 'string') {
+                    userPlates = JSON.parse(profile.ownedPlates);
+                  }
+                }
+              } catch (e) {}
+              const isOwnedPlate = item.type === 'plate' && userPlates.includes(item.image);
+              const isOwned = isOwnedBanner || isOwnedPlate;
+
+              const isBanner = item.type === 'banner';
+              const isPlate = item.type === 'plate';
+              const isMedia = isBanner || isPlate;
+              const isVideo = isPlate && item.image && item.image.match(/\.(mp4|webm|mov)$/i);
+
               return (
                 <div
                   key={idx}
@@ -144,20 +162,28 @@ export default function PremiumShopView({
                   )}
 
                   <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest text-center mb-1">
-                    {item.type === 'banner' ? 'Банер' : 'Ексклюзив'}
+                    {isPlate ? 'Плашка' : isBanner ? 'Банер' : 'Ексклюзив'}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2 text-center w-full">
-                    {item.type === 'banner' ? (item.description || 'Ексклюзивний Банер') : (cDef ? cDef.name : 'Невідомий товар')}
+                    {isMedia ? (item.description || (isPlate ? 'Плашка для рейтингу' : 'Ексклюзивний Банер')) : (cDef ? cDef.name : 'Невідомий товар')}
                   </h3>
 
-                  <div className={`relative ${item.type === 'banner' ? 'w-full aspect-[2/1]' : 'w-32 aspect-[2/3]'} mb-6 flex justify-center items-center shadow-xl rounded-xl overflow-hidden border-2 border-fuchsia-500/50`}>
-                    <img
-                      src={item.type === 'banner' ? item.image : (cDef ? cDef.image : '')}
-                      alt="item"
-                      className={`w-full h-full object-cover transition-opacity duration-300 ${isOwnedBanner ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
-                      loading="lazy"
-                    />
-                    {isOwnedBanner && (
+                  <div className={`relative ${isMedia ? 'w-full aspect-[2/1]' : 'w-32 aspect-[2/3]'} mb-6 flex justify-center items-center shadow-xl rounded-xl overflow-hidden border-2 border-fuchsia-500/50`}>
+                    {isVideo ? (
+                      <video
+                        src={item.image}
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
+                        muted autoPlay loop playsInline
+                      />
+                    ) : (
+                      <img
+                        src={isMedia ? item.image : (cDef ? cDef.image : '')}
+                        alt="item"
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
+                        loading="lazy"
+                      />
+                    )}
+                    {isOwned && (
                       <div className="absolute top-6 -right-12 transform rotate-45 bg-yellow-500 text-yellow-950 font-black py-1.5 w-44 text-center shadow-lg z-30 tracking-widest text-[10px] flex items-center justify-center leading-none">
                         ПРИДБАНО
                       </div>
@@ -172,13 +198,13 @@ export default function PremiumShopView({
                     )}
                   </div>
 
-                  {item.type !== 'banner' && (
+                  {!isMedia && (
                     <div className="text-center text-sm text-neutral-400 mb-4 h-10 overflow-hidden line-clamp-2">
                       {item.description}
                     </div>
                   )}
 
-                  {isOwnedBanner ? (
+                  {isOwned ? (
                     <button
                       disabled
                       className="w-full py-3 rounded-xl font-black text-neutral-500 bg-neutral-800 border border-neutral-700 cursor-not-allowed flex items-center justify-center gap-2"

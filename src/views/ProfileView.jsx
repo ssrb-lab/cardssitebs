@@ -36,6 +36,7 @@ import {
   fetchPublicProfileRequest,
   changePasswordRequest,
   equipBannerRequest,
+  equipPlateRequest,
 } from '../config/api';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon from '../components/AchievementIcon';
@@ -258,6 +259,22 @@ export default function ProfileView({
       showToast('Банер успішно встановлено!', 'success');
     } catch (e) {
       showToast(e.message || 'Помилка встановлення банера', 'error');
+    } finally {
+      actionLock.current = false;
+      setIsProcessing(false);
+    }
+  };
+
+  const handleEquipPlate = async (plateUrl) => {
+    if (actionLock.current || isProcessing) return;
+    actionLock.current = true;
+    setIsProcessing(true);
+    try {
+      await equipPlateRequest(getToken(), plateUrl);
+      setProfile((prev) => ({ ...prev, activePlateUrl: plateUrl }));
+      showToast(plateUrl ? 'Плашку встановлено!' : 'Плашку знято!', 'success');
+    } catch (e) {
+      showToast(e.message || 'Помилка встановлення плашки', 'error');
     } finally {
       actionLock.current = false;
       setIsProcessing(false);
@@ -544,6 +561,54 @@ export default function ProfileView({
                   ) : (
                     <div className="flex flex-col items-center text-center p-4 bg-neutral-900/50 rounded-xl border border-neutral-800/50">
                       <p className="text-neutral-400 text-sm mb-4">У вас ще немає ексклюзивних банерів</p>
+                      <button
+                        onClick={() => navigate('/premium')}
+                        className="bg-fuchsia-600/20 text-fuchsia-400 hover:bg-fuchsia-600 hover:text-white border border-fuchsia-500/30 px-6 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm"
+                      >
+                        <Gem size={16} /> Придбати в Преміумі
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ПЛАШКИ РЕЙТИНГУ */}
+            {(() => {
+              const userPlates = profile?.ownedPlates 
+                ? (Array.isArray(profile.ownedPlates) ? profile.ownedPlates : (typeof profile.ownedPlates === 'string' ? JSON.parse(profile.ownedPlates) : [])) 
+                : [];
+              return (
+                <div className="bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50 mt-2">
+                  <label className="block text-sm font-bold text-neutral-400 mb-3">
+                    Мої Плашки (Рейтинг)
+                  </label>
+                  {userPlates.length > 0 ? (
+                    <div className="flex flex-wrap gap-4">
+                       <div 
+                         onClick={() => handleEquipPlate('')} 
+                         className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.activePlateUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
+                       >Без плашки</div>
+                       {userPlates.map((pUrl, i) => {
+                         const isVideo = pUrl && pUrl.match(/\.(mp4|webm|mov)$/i);
+                         return (
+                           <div 
+                             key={i} 
+                             onClick={() => handleEquipPlate(pUrl)} 
+                             className={`w-32 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors relative ${profile.activePlateUrl === pUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                           >
+                             {isVideo ? (
+                               <video src={pUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                             ) : (
+                               <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${pUrl})` }}></div>
+                             )}
+                           </div>
+                         );
+                       })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center p-4 bg-neutral-900/50 rounded-xl border border-neutral-800/50">
+                      <p className="text-neutral-400 text-sm mb-4">У вас ще немає плашок для рейтингу</p>
                       <button
                         onClick={() => navigate('/premium')}
                         className="bg-fuchsia-600/20 text-fuchsia-400 hover:bg-fuchsia-600 hover:text-white border border-fuchsia-500/30 px-6 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm"

@@ -437,6 +437,17 @@ export const equipBannerRequest = async (token, bannerUrl) => {
   return data;
 };
 
+export const equipPlateRequest = async (token, plateUrl) => {
+  const res = await safeFetch(`${API_URL}/profile/equip-plate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ plateUrl }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 export const fetchLeaderboard = async () => {
   const res = await safeFetch(`${API_URL}/game/leaderboard`);
   const data = await res.json();
