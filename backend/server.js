@@ -4576,6 +4576,39 @@ app.post('/api/profile/update-avatar', authenticate, async (req, res) => {
   }
 });
 
+// Екіпірування банера профілю
+app.post('/api/profile/equip-banner', authenticate, async (req, res) => {
+  const { bannerUrl } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено.' });
+
+    // Якщо bannerUrl порожній, то просто прибираємо банер (стандартний)
+    // Якщо ні - перевіряємо чи він є в ownedBanners (якщо це не порожній рядок)
+    if (bannerUrl) {
+      const ownedBanners = user.ownedBanners 
+        ? (Array.isArray(user.ownedBanners) ? user.ownedBanners : (typeof user.ownedBanners === 'string' ? JSON.parse(user.ownedBanners) : [])) 
+        : [];
+      
+      if (!ownedBanners.includes(bannerUrl) && !user.isAdmin) {
+        return res.status(403).json({ error: 'Ви не володієте цим банером.' });
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { uid: req.user.uid },
+      data: { profileBannerUrl: bannerUrl || null },
+    });
+
+    console.log(`Банер оновлено для користувача: ${updatedUser.nickname}`);
+    res.json({ success: true, profile: updatedUser });
+  } catch (error) {
+    console.error('Помилка при екіпіруванні банера:', error);
+    res.status(500).json({ error: 'Помилка встановлення банера на сервері.' });
+  }
+});
+
 app.post(
   '/api/profile/upload-avatar',
   authenticate,
