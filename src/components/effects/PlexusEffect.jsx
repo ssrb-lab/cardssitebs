@@ -13,27 +13,27 @@ const PlexusEffect = memo(() => {
       },
       links: {
         color: '#ffffff',
-        distance: 120,
+        distance: 150, // Збільшена дистанція для кращих зв'язків
         enable: true,
-        opacity: 0.4,
+        opacity: 0.6, // Більш помітні лінії
         width: 1.5,
       },
       move: {
         direction: 'none',
         enable: true,
         outModes: {
-          default: 'out',
+          default: 'out', // Часточки вилітають і з'являються з іншого боку
         },
         random: false,
-        speed: 1.5,
+        speed: 1.2,
         straight: false,
       },
       number: {
         density: {
           enable: true,
-          area: 250, // Налаштування площі для збереження масштабу
+          area: 800, // Стандартний знаменник площі
         },
-        value: 15, // Базова кількість точок на одиницю площі
+        value: 180, // Це дасть ~20 часточок на маленькій картці та ~80 на великій
       },
       opacity: {
         value: 0.5,
