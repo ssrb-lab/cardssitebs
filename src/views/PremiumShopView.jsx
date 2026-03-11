@@ -28,6 +28,7 @@ export default function PremiumShopView({
   setViewingCard,
 }) {
   const [newNickname, setNewNickname] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
 
   let userBanners = [];
   try {
@@ -120,8 +121,36 @@ export default function PremiumShopView({
           <h3 className="text-2xl font-black text-white text-center mb-8 uppercase tracking-widest flex items-center justify-center gap-2">
             <Star className="text-fuchsia-500" /> Ексклюзивні Товари
           </h3>
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${activeFilter === 'all' ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+            >
+              Всі
+            </button>
+            <button
+              onClick={() => setActiveFilter('banner')}
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${activeFilter === 'banner' ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+            >
+              Банери
+            </button>
+            <button
+              onClick={() => setActiveFilter('plate')}
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${activeFilter === 'plate' ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+            >
+              Бейджі
+            </button>
+            <button
+              onClick={() => setActiveFilter('card')}
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${activeFilter === 'card' ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+            >
+              Прикраси аватару
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {premiumShopItems.map((item, idx) => {
+            {premiumShopItems
+              .filter((item) => activeFilter === 'all' || item.type === activeFilter)
+              .map((item, idx) => {
               let cDef = null;
               if (item.type === 'card') {
                 cDef = cardsCatalog.find((c) => c.id === item.itemId);
@@ -138,7 +167,7 @@ export default function PremiumShopView({
                     userPlates = JSON.parse(profile.ownedPlates);
                   }
                 }
-              } catch (e) {}
+              } catch (e) { }
               const isOwnedPlate = item.type === 'plate' && userPlates.includes(item.image);
               const isOwned = isOwnedBanner || isOwnedPlate;
 
@@ -151,6 +180,8 @@ export default function PremiumShopView({
                 <div
                   key={idx}
                   className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 flex flex-col items-center justify-between relative group hover:border-fuchsia-900 transition-colors shadow-lg"
+                  onMouseEnter={(e) => { const v = e.currentTarget.querySelector('video'); if(v) v.play().catch(()=>{}); }}
+                  onMouseLeave={(e) => { const v = e.currentTarget.querySelector('video'); if(v) { v.pause(); v.currentTime = 0; } }}
                 >
                   {!isPremiumActive && (
                     <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center rounded-3xl border-2 border-neutral-800">
@@ -162,24 +193,26 @@ export default function PremiumShopView({
                   )}
 
                   <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest text-center mb-1">
-                    {isPlate ? 'Плашка' : isBanner ? 'Банер' : 'Ексклюзив'}
+                    {isPlate ? 'Бейдж' : isBanner ? 'Банер' : 'Ексклюзив'}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2 text-center w-full">
-                    {isMedia ? (item.description || (isPlate ? 'Плашка для рейтингу' : 'Ексклюзивний Банер')) : (cDef ? cDef.name : 'Невідомий товар')}
+                    {isMedia ? (item.description || (isPlate ? 'Бейдж для рейтингу' : 'Ексклюзивний Банер')) : (cDef ? cDef.name : 'Невідомий товар')}
                   </h3>
 
-                  <div className={`relative ${isMedia ? 'w-full aspect-[2/1]' : 'w-32 aspect-[2/3]'} mb-6 flex justify-center items-center shadow-xl rounded-xl overflow-hidden border-2 border-fuchsia-500/50`}>
+                  <div 
+                    className={`relative ${isPlate ? 'w-full aspect-[5/1]' : isMedia ? 'w-full aspect-[2/1]' : 'w-32 aspect-[2/3]'} mb-6 flex justify-center items-center shadow-xl rounded-xl overflow-hidden border-2 border-fuchsia-500/50 bg-black/20`}
+                  >
                     {isVideo ? (
                       <video
                         src={item.image}
-                        className={`w-full h-full object-cover transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
-                        muted autoPlay loop playsInline
+                        className={`w-full h-full ${isPlate ? 'object-contain object-center' : 'object-cover'} transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
+                        muted loop playsInline
                       />
                     ) : (
                       <img
                         src={isMedia ? item.image : (cDef ? cDef.image : '')}
                         alt="item"
-                        className={`w-full h-full object-cover transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
+                        className={`w-full h-full ${isPlate ? 'object-contain object-center' : 'object-cover'} transition-opacity duration-300 ${isOwned ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
                         loading="lazy"
                       />
                     )}
@@ -268,7 +301,7 @@ export default function PremiumShopView({
 
           {/* Bottom Section */}
           <div className="flex flex-col md:flex-row items-stretch justify-between gap-8 md:gap-6">
-            
+
             {/* Buy Premium */}
             <div className="w-full md:w-[48%] flex flex-col justify-end">
               {isPremiumActive ? (

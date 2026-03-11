@@ -867,7 +867,7 @@ export default function AdminView({
       let finalItemId = shopItemForm.itemId;
 
       if (shopItemForm.type === 'banner' || shopItemForm.type === 'plate') {
-        const typeLabel = shopItemForm.type === 'plate' ? 'плашки' : 'банера';
+        const typeLabel = shopItemForm.type === 'plate' ? 'бейджа' : 'банера';
         if (shopItemForm.imageFile) {
           showToast(`Завантаження ${typeLabel}...`, 'success');
           const res = await uploadBannerRequest(getToken(), shopItemForm.imageFile);
@@ -2223,7 +2223,7 @@ export default function AdminView({
               >
                 <option value="card">Ексклюзивна картка</option>
                 <option value="banner">Банер для профілю</option>
-                <option value="plate">Плашка для рейтингу</option>
+                <option value="plate">Бейдж для рейтингу</option>
               </select>
             </div>
 
@@ -2250,7 +2250,7 @@ export default function AdminView({
               ) : (
                 <div>
                   <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
-                    {shopItemForm.type === 'plate' ? 'Відео/GIF плашки:' : 'Зображення банера:'}
+                    {shopItemForm.type === 'plate' ? 'Відео/GIF бейджа:' : 'Зображення банера:'}
                   </label>
                   <input
                     type="file"
@@ -2375,10 +2375,10 @@ export default function AdminView({
                     )}
                   </div>
                   <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-0.5">
-                    {isPlate ? 'Плашка' : isBanner ? 'Банер' : 'Картка'}
+                    {isPlate ? 'Бейдж' : isBanner ? 'Банер' : 'Картка'}
                   </div>
                   <div className="font-bold text-white text-xs text-center truncate w-full mb-1">
-                    {isMedia ? (item.description || (isPlate ? 'Плашка' : 'Банер')) : (cDef?.name || 'Невідомо')}
+                    {isMedia ? (item.description || (isPlate ? 'Бейдж' : 'Банер')) : (cDef?.name || 'Невідомо')}
                   </div>
                   {!isMedia && item.description && (
                     <div className="text-[10px] text-neutral-500 text-center line-clamp-1 leading-tight w-full mb-1">

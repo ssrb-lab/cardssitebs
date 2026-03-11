@@ -107,7 +107,7 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
               onClick={() => setViewingPlayerProfile(leader.nickname)}
               className={`flex items-center justify-between p-2 sm:p-4 border-b border-neutral-800/50 last:border-0 transition-colors cursor-pointer group relative overflow-hidden ${leader.uid === currentUid ? 'border-l-4 border-l-yellow-500' : 'hover:bg-neutral-800/80'} ${leader.isBanned ? 'opacity-50' : ''}`}
             >
-              {/* Плашка — відео/GIF фон рядка */}
+              {/* Бейдж — відео/GIF фон рядка */}
               {leader.activePlateUrl && (
                 leader.activePlateUrl.match(/\.(mp4|webm|mov)$/i) ? (
                   <video

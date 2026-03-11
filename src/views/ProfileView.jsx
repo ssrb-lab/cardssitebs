@@ -272,9 +272,9 @@ export default function ProfileView({
     try {
       await equipPlateRequest(getToken(), plateUrl);
       setProfile((prev) => ({ ...prev, activePlateUrl: plateUrl }));
-      showToast(plateUrl ? 'Плашку встановлено!' : 'Плашку знято!', 'success');
+      showToast(plateUrl ? 'Бейдж встановлено!' : 'Бейдж знято!', 'success');
     } catch (e) {
-      showToast(e.message || 'Помилка встановлення плашки', 'error');
+      showToast(e.message || 'Помилка встановлення бейджа', 'error');
     } finally {
       actionLock.current = false;
       setIsProcessing(false);
@@ -581,14 +581,14 @@ export default function ProfileView({
               return (
                 <div className="bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50 mt-2">
                   <label className="block text-sm font-bold text-neutral-400 mb-3">
-                    Мої Плашки (Рейтинг)
+                    Мої Бейджі (Рейтинг)
                   </label>
                   {userPlates.length > 0 ? (
                     <div className="flex flex-wrap gap-4">
                        <div 
                          onClick={() => handleEquipPlate('')} 
                          className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.activePlateUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
-                       >Без плашки</div>
+                       >Без бейджа</div>
                        {userPlates.map((pUrl, i) => {
                          const isVideo = pUrl && pUrl.match(/\.(mp4|webm|mov)$/i);
                          return (
