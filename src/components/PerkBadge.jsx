@@ -25,14 +25,16 @@ export const PERK_META = {
   healer: { icon: Stethoscope, color: 'text-emerald-400', bg: 'bg-emerald-500/20', label: 'Хілер', desc: 'Замість атаки лікує союзника з найнижчим % здоров\'я.' },
 };
 
-export const PerkBadge = ({ perk, position = 'left' }) => {
+export const PerkBadge = ({ perk }) => {
   if (!perk || !PERK_META[perk]) return null;
   const m = PERK_META[perk];
   const Icon = m.icon;
-  const posClass = position === 'right' ? 'top-7 right-1 sm:top-8 sm:right-1.5' : 'top-1 left-1';
   return (
-    <div className={`absolute ${posClass} z-20 ${m.bg} ${m.color} rounded-md px-1 py-0.5 flex items-center gap-0.5 text-[8px] font-black border border-white/10 backdrop-blur-sm`} title={m.label}>
-      <Icon size={10} /> {m.label}
+    <div
+      className={`absolute top-1 left-1 z-20 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full bg-black/80 ${m.color} border border-white/20 shadow-[0_0_6px_rgba(0,0,0,0.8)] backdrop-blur-sm`}
+      title={`${m.label}: ${m.desc}`}
+    >
+      <Icon size={13} className="sm:w-[15px] sm:h-[15px]" strokeWidth={2.5} />
     </div>
   );
 };

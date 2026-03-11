@@ -133,7 +133,7 @@ export default function ShopView({
                       loading="lazy"
                     />
                   </CardFrame>
-                  <PerkBadge perk={item.perk} position="right" />
+                  <PerkBadge perk={item.perk} />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
                     <span
                       className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}
@@ -217,7 +217,7 @@ export default function ShopView({
                       loading="lazy"
                     />
                   </CardFrame>
-                  <PerkBadge perk={card.perk} position="right" />
+                  <PerkBadge perk={card.perk} />
                   {Number(card.maxSupply) > 0 && (
                     <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
                       {cardStats[card.id] || 0} / {card.maxSupply}
@@ -469,7 +469,7 @@ export default function ShopView({
                         loading="lazy"
                       />
                     </CardFrame>
-                    <PerkBadge perk={card.perk} position="right" />
+                    <PerkBadge perk={card.perk} />
                     {maxSup > 0 && (
                       <div className="absolute top-1 right-1 bg-black/90 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 font-bold z-10">
                         {isSoldOut

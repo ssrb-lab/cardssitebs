@@ -3214,6 +3214,9 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     }, 0) + 1500);
     const lockedUntilDate = new Date(Date.now() + animationTimeMs);
 
+    const attackerResults = [];
+    const defenderResults = [];
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
@@ -3225,7 +3228,22 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         const freshInvItem = await tx.inventoryItem.findFirst({
           where: { userId: user.uid, cardId: card.id },
         });
-        if (!freshInvItem) continue;
+        
+        const cardResult = {
+          id: card.id,
+          name: card.name,
+          image: card.image,
+          rarity: card.rarity,
+          oldPower: card.power,
+          oldMaxHp: card.maxHp,
+          status: 'alive'
+        };
+
+        if (!freshInvItem) {
+          cardResult.status = 'error';
+          attackerResults.push(cardResult);
+          continue;
+        }
 
         let currentStats = [];
         if (typeof freshInvItem.gameStats === 'string') {
@@ -3248,33 +3266,39 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         }));
 
         while (effectiveStats.length < freshInvItem.amount) {
-          effectiveStats.push({ power: card.power, hp: card.hp, maxHp: card.maxHp || card.hp }); // Оригінальні арти
+          effectiveStats.push({ power: card.power, hp: card.hp, maxHp: card.maxHp || card.hp });
         }
 
         let stat = effectiveStats[card.statsIndex];
-        if (!stat) continue; // Safety check
+        if (!stat) {
+          cardResult.status = 'error';
+          attackerResults.push(cardResult);
+          continue;
+        }
         if (!stat.maxHp) stat.maxHp = card.maxHp || card.hp;
 
         if (point.battleMode === 'HARDCORE') {
           if (card.currentHp <= 0) {
             // Delete dead instance
             effectiveStats.splice(card.statsIndex, 1);
-            card._isDestroyed = true; // Mark as dead for defending snapshot
+            card._isDestroyed = true; 
+            cardResult.status = 'destroyed';
+            
             if (effectiveStats.length === 0 && freshInvItem.amount === 1) {
               await tx.inventoryItem.delete({ where: { id: freshInvItem.id } });
-              continue;
             } else {
               await tx.inventoryItem.update({
                 where: { id: freshInvItem.id },
                 data: { gameStats: effectiveStats, amount: { decrement: 1 } },
               });
-              continue;
             }
           } else {
             stat.hp = card.currentHp;
             card.hp = stat.hp;
             card.maxHp = stat.maxHp;
             card.power = stat.power;
+            cardResult.newPower = card.power;
+            cardResult.newMaxHp = card.maxHp;
           }
         } else if (point.battleMode === 'CHIP_DAMAGE') {
           stat.hp = stat.maxHp;
@@ -3282,25 +3306,34 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             stat.maxHp = Math.max(1, Math.floor(stat.maxHp * 0.95));
             stat.power = Math.max(1, Math.floor(stat.power * 0.95));
             stat.hp = stat.maxHp;
+            cardResult.status = 'weakened';
           }
           card.hp = stat.hp;
           card.maxHp = stat.maxHp;
           card.power = stat.power;
+          cardResult.newPower = card.power;
+          cardResult.newMaxHp = card.maxHp;
         } else {
           // FULL
           stat.hp = stat.maxHp;
           card.hp = stat.hp;
           card.maxHp = stat.maxHp;
           card.power = stat.power;
+          cardResult.newPower = card.power;
+          cardResult.newMaxHp = card.maxHp;
         }
 
-        await tx.inventoryItem.update({
-          where: { id: freshInvItem.id },
-          data: { gameStats: effectiveStats },
-        });
+        if (cardResult.status !== 'destroyed') {
+          await tx.inventoryItem.update({
+            where: { id: freshInvItem.id },
+            data: { gameStats: effectiveStats },
+          });
+        }
+        attackerResults.push(cardResult);
       }
 
       if (attackerWon) {
+        // ... (crystals logic unchanged)
         if (point.crystalRatePerHour > 0 && point.ownerId && point.crystalsLastClaimedAt) {
           const lastClaimed = new Date(point.crystalsLastClaimedAt).getTime();
           const hoursElapsed = (Date.now() - lastClaimed) / (1000 * 60 * 60);
@@ -3323,34 +3356,74 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             crystalsLastClaimedAt: new Date(),
             defendingCards: attackerCards.filter(c => !c._isDestroyed).map((c) => ({
               ...c,
-              hp: c.hp, // Already updated by the loop above based on battleMode
-              currentHp: undefined, // cleanup
+              hp: c.hp, 
+              currentHp: undefined, 
             })),
           },
         });
+        
+        // Defender cards are all lost
+        initialDefenderCards.forEach(c => {
+          defenderResults.push({
+            id: c.id,
+            name: c.name,
+            image: c.image,
+            rarity: c.rarity,
+            status: 'lost_point'
+          });
+        });
+
       } else {
         // Захисник переміг (атаку відбито)
+        const updatedDefCards = defenderCards.map((c) => {
+          const defResult = {
+            id: c.id,
+            name: c.name,
+            image: c.image,
+            rarity: c.rarity,
+            oldPower: c.power,
+            oldMaxHp: c.maxHp || c.hp,
+            status: 'alive'
+          };
+
+          let finalCard = null;
+
+          if (point.battleMode === 'HARDCORE') {
+            if (c.currentHp <= 0) {
+              defResult.status = 'destroyed';
+              finalCard = null;
+            } else {
+              defResult.newPower = c.power;
+              defResult.newMaxHp = c.currentHp;
+              finalCard = { ...c, hp: c.currentHp };
+            }
+          } else if (point.battleMode === 'CHIP_DAMAGE') {
+            let newMax = c.maxHp || c.hp;
+            let newPow = c.power;
+            if (Math.random() * 100 < (point.chipDamageChance || 0)) {
+              newMax = Math.max(1, Math.floor(newMax * 0.95));
+              newPow = Math.max(1, Math.floor(newPow * 0.95));
+              defResult.status = 'weakened';
+            }
+            defResult.newPower = newPow;
+            defResult.newMaxHp = newMax;
+            finalCard = { ...c, maxHp: newMax, power: newPow, hp: newMax };
+          } else {
+            // FULL mode
+            defResult.newPower = c.power;
+            defResult.newMaxHp = c.maxHp || c.hp;
+            finalCard = { ...c, hp: c.maxHp || c.hp };
+          }
+          
+          defenderResults.push(defResult);
+          return finalCard;
+        }).filter(Boolean);
+
         updatedPoint = await tx.arenaPoint.update({
           where: { id },
           data: {
             lockedUntil: lockedUntilDate,
-            defendingCards: defenderCards.map((c) => {
-              if (point.battleMode === 'HARDCORE') {
-                if (c.currentHp <= 0) return null; // Card dies permanently from defense
-                return { ...c, hp: c.currentHp };
-              } else if (point.battleMode === 'CHIP_DAMAGE') {
-                let newMax = c.maxHp || c.hp;
-                let newPow = c.power;
-                if (Math.random() * 100 < (point.chipDamageChance || 0)) {
-                  newMax = Math.max(1, Math.floor(newMax * 0.95));
-                  newPow = Math.max(1, Math.floor(newPow * 0.95));
-                }
-                return { ...c, maxHp: newMax, power: newPow, hp: newMax };
-              } else {
-                // FULL mode
-                return { ...c, hp: c.maxHp || c.hp };
-              }
-            }).filter(Boolean),
+            defendingCards: updatedDefCards,
           },
         });
       }
@@ -3363,11 +3436,41 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     const updatedDefending = await getDefendingInstances(user.uid);
     const profileWithDefending = { ...updatedUser, defendingInstances: updatedDefending };
 
+    // Надсилаємо сповіщення захиснику
+    if (point.ownerId && point.ownerId !== user.uid) {
+      try {
+        const defenderTitle = attackerWon ? 'Точку захоплено!' : 'Атаку відбито!';
+        const defenderMessage = attackerWon 
+          ? `Гравець ${user.nickname} захопив вашу точку "${point.name}".` 
+          : `Ви успішно відбили атаку гравця ${user.nickname} на точку "${point.name}".`;
+
+        await prisma.notification.create({
+          data: {
+            userId: point.ownerId,
+            type: 'arena_battle',
+            title: defenderTitle,
+            message: defenderMessage,
+            metadata: {
+              pointName: point.name,
+              attackerNickname: user.nickname,
+              attackerWon: attackerWon,
+              defenderResults: defenderResults,
+              battleDate: new Date()
+            }
+          }
+        });
+      } catch (notifyError) {
+        console.error('Помилка створення сповіщення для захисника:', notifyError);
+      }
+    }
+
     res.json({
       success: true,
       attackerWon,
       battleLog,
       initialDefenderCards,
+      attackerResults,
+      defenderResults,
       point: updatedPoint,
       profile: profileWithDefending,
     });

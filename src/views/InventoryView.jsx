@@ -380,7 +380,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
-                        <PerkBadge perk={item.card.perk} position="right" />
+                        <PerkBadge perk={item.card.perk} />
 
                         {item.card.soundUrl && (
                           <button
@@ -584,7 +584,7 @@ export default function InventoryView({
                                   loading="lazy"
                                 />
                               </CardFrame>
-                              <PerkBadge perk={c.perk} position="right" />
+                              <PerkBadge perk={c.perk} />
                             </div>
                           );
                         })}
@@ -674,7 +674,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
-                        <PerkBadge perk={cData.perk} position="right" />
+                        <PerkBadge perk={cData.perk} />
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="bg-red-600 text-white rounded-full p-2">
                             <Trash2 size={20} />
@@ -728,7 +728,7 @@ export default function InventoryView({
                             loading="lazy"
                           />
                         </CardFrame>
-                        <PerkBadge perk={item.card.perk} position="right" />
+                        <PerkBadge perk={item.card.perk} />
                       </div>
                     </div>
                   );

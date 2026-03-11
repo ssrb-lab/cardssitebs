@@ -27,7 +27,7 @@ export default function ListingModal({ listingCard, setListingCard, listOnMarket
               className="w-full h-full object-cover"
               loading="lazy"
             />
-            <PerkBadge perk={listingCard.perk} position="right" />
+            <PerkBadge perk={listingCard.perk} />
           </div>
           <div>
             <h3 className="text-lg font-black text-white leading-tight">{listingCard.name}</h3>
