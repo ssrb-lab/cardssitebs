@@ -372,7 +372,7 @@ export default function InventoryView({
                             x{item.amount}
                           </div>
                         )}
-                        <CardFrame frame={item.card.frame}>
+                        <CardFrame frame={item.card.frame} effect={item.card.effect}>
                           <img
                             src={item.card.image}
                             alt={item.card.name}
@@ -381,9 +381,6 @@ export default function InventoryView({
                           />
                         </CardFrame>
                         <PerkBadge perk={item.card.perk} position="right" />
-                        {item.card.effect && (
-                          <div className={`${item.card.effect} pointer-events-none z-10`} />
-                        )}
 
                         {item.card.soundUrl && (
                           <button
@@ -579,7 +576,7 @@ export default function InventoryView({
                               key={i}
                               className="inline-block h-12 w-8 rounded border border-neutral-700 bg-neutral-950 overflow-hidden"
                             >
-                              <CardFrame frame={c.frame}>
+                              <CardFrame frame={c.frame} effect={c.effect}>
                                 <img
                                   src={c.image}
                                   alt="m"
@@ -588,9 +585,6 @@ export default function InventoryView({
                                 />
                               </CardFrame>
                               <PerkBadge perk={c.perk} position="right" />
-                              {c.effect && (
-                                <div className={`${c.effect} pointer-events-none z-10`} />
-                              )}
                             </div>
                           );
                         })}
@@ -672,7 +666,7 @@ export default function InventoryView({
                       <div
                         className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass}`}
                       >
-                        <CardFrame frame={cData.frame}>
+                        <CardFrame frame={cData.frame} effect={cData.effect}>
                           <img
                             src={cData.image}
                             alt={cData.name}
@@ -681,9 +675,6 @@ export default function InventoryView({
                           />
                         </CardFrame>
                         <PerkBadge perk={cData.perk} position="right" />
-                        {cData.effect && (
-                          <div className={`${cData.effect} pointer-events-none z-10`} />
-                        )}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="bg-red-600 text-white rounded-full p-2">
                             <Trash2 size={20} />
@@ -729,7 +720,7 @@ export default function InventoryView({
                         </div>
                       )}
                       <div className="w-full h-full relative group">
-                        <CardFrame frame={item.card.frame}>
+                        <CardFrame frame={item.card.frame} effect={item.card.effect}>
                           <img
                             src={item.card.image}
                             alt={item.card.name}
@@ -738,9 +729,6 @@ export default function InventoryView({
                           />
                         </CardFrame>
                         <PerkBadge perk={item.card.perk} position="right" />
-                        {item.card.effect && (
-                          <div className={`${item.card.effect} pointer-events-none z-10`} />
-                        )}
                       </div>
                     </div>
                   );
@@ -987,12 +975,9 @@ export default function InventoryView({
                               x{pSafe.count}
                             </div>
                           )}
-                          <CardFrame frame={pSafe.card.frame}>
+                          <CardFrame frame={pSafe.card.frame} effect={pSafe.card.effect}>
                             <img src={pSafe.card.image} alt="card" className="w-full h-full object-cover" />
                           </CardFrame>
-                          {pSafe.card.effect && (
-                            <div className={`${pSafe.card.effect} pointer-events-none z-10`} />
-                          )}
                         </div>
                         {pSafe.isGameCard && (
                           <div className="mt-1 flex justify-center gap-2 text-[10px] bg-neutral-900 rounded p-1">

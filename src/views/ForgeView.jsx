@@ -140,16 +140,13 @@ export default function ForgeView({
                     <div
                       className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${style.border} ${effectClass}`}
                     >
-                      <CardFrame frame={selectedCard.card.frame}>
+                      <CardFrame frame={selectedCard.card.frame} effect={selectedCard.card.effect}>
                         <img
                           src={selectedCard.card.image}
                           alt={selectedCard.card.name}
                           className="w-full h-full object-cover transform-gpu will-change-transform"
                         />
                       </CardFrame>
-                      {selectedCard.card.effect && (
-                        <div className={`${selectedCard.card.effect} pointer-events-none z-10`} />
-                      )}
                     </div>
                   );
                 })()}
@@ -317,7 +314,7 @@ export default function ForgeView({
                 <div
                   className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} ${effectClass} hover:border-neutral-400`}`}
                 >
-                  <CardFrame frame={item.card.frame}>
+                  <CardFrame frame={item.card.frame} effect={item.card.effect}>
                     <img
                       src={item.card.image}
                       alt={item.card.name}
@@ -325,9 +322,6 @@ export default function ForgeView({
                       loading="lazy"
                     />
                   </CardFrame>
-                  {item.card.effect && (
-                    <div className={`${item.card.effect} pointer-events-none z-10`} />
-                  )}
                   {isSelected && (
                     <div className="absolute inset-0 bg-orange-500/10 pointer-events-none z-20" />
                   )}

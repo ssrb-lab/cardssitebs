@@ -125,7 +125,7 @@ export default function ShopView({
                   key={i}
                   className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass} transform-gpu will-change-transform`}
                 >
-                  <CardFrame frame={item.frame}>
+                  <CardFrame frame={item.frame} effect={item.effect}>
                     <img
                       src={item.image}
                       alt="card"
@@ -134,7 +134,6 @@ export default function ShopView({
                     />
                   </CardFrame>
                   <PerkBadge perk={item.perk} position="right" />
-                  {item.effect && <div className={`${item.effect} pointer-events-none z-10`} />}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur text-center py-1.5 border-t border-neutral-800 z-10">
                     <span
                       className={`text-[10px] font-black uppercase tracking-widest ${style.text}`}
@@ -210,7 +209,7 @@ export default function ShopView({
                 <div
                   className={`w-28 sm:w-40 md:w-56 aspect-[2/3] rounded-xl sm:rounded-2xl border-2 sm:border-4 overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.6)] sm:shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-2 sm:mb-4 ${effectClass} transform-gpu will-change-transform`}
                 >
-                  <CardFrame frame={card.frame}>
+                  <CardFrame frame={card.frame} effect={card.effect}>
                     <img
                       src={card.image}
                       alt={card.name}
@@ -219,7 +218,6 @@ export default function ShopView({
                     />
                   </CardFrame>
                   <PerkBadge perk={card.perk} position="right" />
-                  {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   {Number(card.maxSupply) > 0 && (
                     <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
                       {cardStats[card.id] || 0} / {card.maxSupply}
@@ -463,7 +461,7 @@ export default function ShopView({
                   <div
                     className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? 'group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]' : ''} ${style.border} ${effectClass} transform-gpu will-change-transform`}
                   >
-                    <CardFrame frame={card.frame}>
+                    <CardFrame frame={card.frame} effect={card.effect}>
                       <img
                         src={card.image}
                         alt={card.name}
@@ -472,7 +470,6 @@ export default function ShopView({
                       />
                     </CardFrame>
                     <PerkBadge perk={card.perk} position="right" />
-                    {card.effect && <div className={`${card.effect} z-10 pointer-events-none`} />}
                     {maxSup > 0 && (
                       <div className="absolute top-1 right-1 bg-black/90 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 font-bold z-10">
                         {isSoldOut

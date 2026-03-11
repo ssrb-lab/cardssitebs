@@ -1635,7 +1635,7 @@ export default function AdminView({
                           className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass} cursor-pointer transition-transform hover:-translate-y-1`}
                           onClick={() => setViewingCard({ card: c, amount: invItem.amount })}
                         >
-                          <CardFrame frame={c.frame}>
+                          <CardFrame frame={c.frame} effect={c.effect}>
                             {isGif ? (
                               <canvas
                                 className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"
@@ -3396,7 +3396,7 @@ export default function AdminView({
                       cardForm.effect ? `effect-${cardForm.effect}` : ''
                     }`}
                   >
-                    <CardFrame frame={cardForm.frame || 'normal'}>
+                    <CardFrame frame={cardForm.frame || 'normal'} effect={cardForm.effect}>
                       <img
                         src={cardPreviewUrl}
                         alt="Preview"
@@ -3507,7 +3507,7 @@ export default function AdminView({
                 >
                   {/* ВЕРХНЯ ЧАСТИНА (Картинка та кнопки) */}
                   <div className={`aspect-[2/3] w-full relative shrink-0 ${effectClass}`}>
-                    <CardFrame frame={card.frame}>
+                    <CardFrame frame={card.frame} effect={card.effect}>
                       <img
                         src={card.image}
                         alt={card.name}

@@ -65,10 +65,10 @@ export default function EffectsPreview() {
                 <div className="w-full aspect-[2/3] mb-4">
                   <TiltWrapper isEnabled={isTiltEnabled}>
                     <CardFrame 
+                      effect={effect.id}
                       className={`w-full h-full shadow-2xl effect-${effect.id}`}
                     >
                       <img src={sampleImage} alt={effect.name} className="w-full h-full object-cover" />
-                      {effect.id && <div className={`${effect.id} pointer-events-none absolute inset-0 z-10`} />}
                     </CardFrame>
                   </TiltWrapper>
                 </div>
@@ -100,10 +100,10 @@ export default function EffectsPreview() {
                     <TiltWrapper isEnabled={isTiltEnabled}>
                       <CardFrame 
                         frame={combo.f}
+                        effect={combo.e}
                         className={`w-full h-full shadow-2xl effect-${combo.e}`}
                       >
                         <img src={sampleImage} alt={combo.n} className="w-full h-full object-cover" />
-                        <div className={`${combo.e} pointer-events-none absolute inset-0 z-10`} />
                       </CardFrame>
                     </TiltWrapper>
                   </div>

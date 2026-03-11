@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function CardFrame({ frame = 'normal', children, className = '' }) {
+export default function CardFrame({ frame = 'normal', children, className = '', effect = '' }) {
   // Базові класи, які мають бути завжди
   const baseContainer = 'relative w-full h-full overflow-hidden';
   const containerClass = `${baseContainer} ${className}`;
@@ -9,6 +9,18 @@ export default function CardFrame({ frame = 'normal', children, className = '' }
     return (
       <div className={containerClass}>
         {children}
+        {effect === 'ember' && (
+          <div className="ember absolute inset-0 pointer-events-none z-10"></div>
+        )}
+        {effect === 'electric' && (
+          <>
+            <div className="electric absolute inset-0 pointer-events-none z-10"></div>
+            <div className="electric-bolt-extra absolute inset-0 pointer-events-none z-10"></div>
+          </>
+        )}
+        {effect === 'glitch' && (
+          <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
+        )}
       </div>
     );
   }
@@ -31,6 +43,20 @@ export default function CardFrame({ frame = 'normal', children, className = '' }
     >
       {/* Картинка / контент картки */}
       <div className="absolute inset-0 z-0">{children}</div>
+
+      {/* Ефекти, що потребують внутрішніх елементів */}
+      {effect === 'ember' && (
+        <div className="ember absolute inset-0 pointer-events-none z-10"></div>
+      )}
+      {effect === 'electric' && (
+        <>
+          <div className="electric absolute inset-0 pointer-events-none z-10"></div>
+          <div className="electric-bolt-extra absolute inset-0 pointer-events-none z-10"></div>
+        </>
+      )}
+      {effect === 'glitch' && (
+        <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
+      )}
 
       {/* Сама рамка (накладається зверху поверх картинки) */}
       <div className={frameStyles[frame] || ''}></div>

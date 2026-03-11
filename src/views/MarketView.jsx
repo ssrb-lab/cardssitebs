@@ -102,7 +102,7 @@ export default function MarketView({
                   className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 cursor-pointer transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${style.border} ${effectClass}`}
                 >
                   <div className="w-full h-full overflow-hidden relative">
-                    <CardFrame frame={card.frame}>
+                    <CardFrame frame={card.frame} effect={card.effect}>
                       <img
                         src={card.image}
                         alt={card.name}
@@ -111,7 +111,6 @@ export default function MarketView({
                       />
                     </CardFrame>
                     <PerkBadge perk={card.perk} position="right" />
-                    {card.effect && <div className={`${card.effect} pointer-events-none z-10`} />}
                   </div>
                   {card.soundUrl && (
                     <button

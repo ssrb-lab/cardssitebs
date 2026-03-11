@@ -69,6 +69,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
         >
           <CardFrame
             frame={card.frame}
+            effect={card.effect}
             className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] bg-neutral-900 ${
               !card.frame || card.frame === 'normal' ? `border-4 ${style.border}` : ''
             } ${effectClass}`}
@@ -79,9 +80,6 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
               className="w-full h-full object-cover transform-gpu will-change-transform"
               loading="lazy"
             />
-
-            {/* Оверлей ефекту, якщо він потребує окремого div (як .glitch для сканованих ліній) */}
-            {card.effect && <div className={`${card.effect} pointer-events-none absolute inset-0 z-10`} />}
 
             {/* Відблиск світла при нахилі (поверх всього, z-30) */}
             {isHovering && (

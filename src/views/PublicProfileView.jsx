@@ -268,7 +268,7 @@ export default function PublicProfileView({
                     <div
                       className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} transition-transform group-hover:-translate-y-2 transform-gpu will-change-transform`}
                     >
-                      <CardFrame frame={c.frame}>
+                      <CardFrame frame={c.frame} effect={c.effect}>
                         <img
                           src={c.image}
                           alt={c.name}
@@ -276,7 +276,6 @@ export default function PublicProfileView({
                           loading="lazy"
                         />
                       </CardFrame>
-                      {c.effect && <div className={`${c.effect} pointer-events-none z-10`} />}
                     </div>
                   </div>
                 );
@@ -451,7 +450,7 @@ export default function PublicProfileView({
                     x{item.amount}
                   </div>
                 )}
-                <CardFrame frame={item.card.frame}>
+                <CardFrame frame={item.card.frame} effect={item.card.effect}>
                   <img
                     src={item.card.image}
                     alt={item.card.name}
@@ -459,9 +458,6 @@ export default function PublicProfileView({
                     loading="lazy"
                   />
                 </CardFrame>
-                {item.card.effect && (
-                  <div className={`${item.card.effect} pointer-events-none z-10`} />
-                )}
                 {item.card.soundUrl && (
                   <button
                     onClick={(e) => {
