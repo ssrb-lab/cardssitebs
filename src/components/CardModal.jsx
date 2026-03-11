@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { getCardStyle } from '../utils/helpers';
 import CardFrame from './CardFrame';
@@ -11,6 +11,24 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
   const { card } = viewingCard;
   const style = getCardStyle(card.rarity, rarities);
   const effectClass = card.effect ? `effect-${card.effect}` : '';
+
+  // Стабільний контент картки, який не перерендериться при зміні tiltStyle
+  const cardContent = useMemo(() => (
+    <CardFrame
+      frame={card.frame}
+      effect={card.effect}
+      className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] bg-neutral-900 ${
+        !card.frame || card.frame === 'normal' ? `border-4 ${style.border}` : ''
+      } ${effectClass}`}
+    >
+      <img
+        src={card.image}
+        alt={card.name}
+        className="w-full h-full object-cover transform-gpu will-change-transform"
+        loading="lazy"
+      />
+    </CardFrame>
+  ), [card.id, card.frame, card.effect, card.image, style.border, effectClass]);
 
   const handleMouseMove = (e) => {
     const el = e.currentTarget;
@@ -67,25 +85,12 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
           onTouchEnd={handleMouseLeave}
           style={tiltStyle}
         >
-          <CardFrame
-            frame={card.frame}
-            effect={card.effect}
-            className={`w-full aspect-[2/3] rounded-3xl overflow-hidden relative group shadow-[0_20px_70px_rgba(0,0,0,0.8)] bg-neutral-900 ${
-              !card.frame || card.frame === 'normal' ? `border-4 ${style.border}` : ''
-            } ${effectClass}`}
-          >
-            <img
-              src={card.image}
-              alt={card.name}
-              className="w-full h-full object-cover transform-gpu will-change-transform"
-              loading="lazy"
-            />
-
-            {/* Відблиск світла при нахилі (поверх всього, z-30) */}
-            {isHovering && (
-              <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-tr from-white/0 via-white to-white/0 z-30" />
-            )}
-          </CardFrame>
+          {cardContent}
+          
+          {/* Відблиск світла при нахилі (тепер винесений окремо) */}
+          {isHovering && (
+            <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-tr from-white/0 via-white to-white/0 z-30 rounded-3xl" />
+          )}
         </div>
 
         <div className="mt-8 flex flex-col items-center text-center w-full">
