@@ -154,11 +154,11 @@ export default function PremiumShopView({
                     <img
                       src={item.type === 'banner' ? item.image : (cDef ? cDef.image : '')}
                       alt="item"
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover transition-opacity duration-300 ${isOwnedBanner ? 'opacity-40 grayscale-[0.3]' : 'opacity-100'}`}
                       loading="lazy"
                     />
                     {isOwnedBanner && (
-                      <div className="absolute top-4 -right-10 transform rotate-45 bg-yellow-500 text-yellow-950 font-black py-1 w-40 text-center shadow-lg z-30 tracking-wider text-xs">
+                      <div className="absolute top-6 -right-12 transform rotate-45 bg-yellow-500 text-yellow-950 font-black py-1.5 w-44 text-center shadow-lg z-30 tracking-widest text-[10px] flex items-center justify-center leading-none">
                         ПРИДБАНО
                       </div>
                     )}
