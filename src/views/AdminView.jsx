@@ -26,6 +26,8 @@ import {
   Zap,
   Trophy,
   Mail,
+  Play,
+  Volume2,
 } from 'lucide-react';
 import {
   fetchPromosRequest,
@@ -171,6 +173,14 @@ export default function AdminView({
       setCardPreviewUrl(cardForm.image || '/logo.png');
     }
   }, [cardImageFile, cardForm.image]);
+
+  const playCardSound = () => {
+    if (!cardForm.soundUrl) return;
+    const audio = new Audio(cardForm.soundUrl);
+    audio.volume = cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5;
+    audio.play().catch((e) => console.error('Error playing sound:', e));
+  };
+
   const [packImageFile, setPackImageFile] = useState(null);
 
   const [allAchievements, setAllAchievements] = useState([]);
@@ -3435,6 +3445,16 @@ export default function AdminView({
                   <div className="mt-2 text-[10px] text-fuchsia-400/70 uppercase tracking-widest">
                     Ефект: {EFFECT_OPTIONS.find(e => e.id === cardForm.effect)?.name || cardForm.effect}
                   </div>
+                )}
+
+                {cardForm.soundUrl && (
+                  <button
+                    type="button"
+                    onClick={playCardSound}
+                    className="mt-4 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 px-4 py-2 rounded-xl border border-purple-900/50 flex items-center justify-center gap-2 mx-auto transition-colors w-full"
+                  >
+                    <Volume2 size={16} /> Послухати звук
+                  </button>
                 )}
               </div>
             </div>
