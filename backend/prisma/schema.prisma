@@ -235,6 +235,7 @@ model ArenaPoint {
   ownerId            String?
   ownerNickname      String?
   capturedAt         DateTime?
+  lockedUntil        DateTime? // Added for battle lock duration
   crystalsLastClaimedAt DateTime?
   defendingCards     Json      @default("[]")
   areaPolygon        Json?     @default("[]")

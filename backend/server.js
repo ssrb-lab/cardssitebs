@@ -782,14 +782,30 @@ app.post('/api/profile/change-password', authenticate, async (req, res) => {
   }
 });
 
+// Helper to get visible card IDs for unique cards counting
+const getVisibleCardIds = async () => {
+  const packs = await prisma.packCatalog.findMany({ where: { isHidden: false } });
+  const packIds = packs.map(p => p.id);
+  const cards = await prisma.cardCatalog.findMany({ where: { packId: { in: packIds } } });
+  return cards.map(c => c.id);
+};
+
 app.get('/api/profile', authenticate, async (req, res) => {
   try {
+    const visibleCardIds = await getVisibleCardIds();
+
     let user = await prisma.user.findUnique({
       where: { uid: req.user.uid },
       include: {
         inventory: true,
         showcases: true,
-        _count: { select: { inventory: true } }, // Рахуємо картки гравця
+        _count: { 
+          select: { 
+            inventory: {
+              where: { cardId: { in: visibleCardIds } }
+            } 
+          } 
+        }, // Рахуємо картки гравця
       },
     });
 
@@ -877,6 +893,8 @@ app.get('/api/profile/public/:identifier', async (req, res) => {
     // Check if it's a UUID (standard length 36)
     const isUid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
 
+    const visibleCardIds = await getVisibleCardIds();
+
     let user = await prisma.user.findUnique({
       where: isUid ? { uid: identifier } : { nickname: identifier },
       select: {
@@ -901,7 +919,13 @@ app.get('/api/profile/public/:identifier', async (req, res) => {
         isSuperAdmin: true,
         inventory: true,
         showcases: true,
-        _count: { select: { inventory: true } }, // Динамічно рахуємо унікальні картки
+        _count: { 
+          select: { 
+            inventory: {
+              where: { cardId: { in: visibleCardIds } }
+            } 
+          } 
+        }, // Динамічно рахуємо унікальні картки з відкритих паків
       },
     });
 
@@ -2978,6 +3002,10 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       return res.status(400).json({ error: 'Точка ще під захистом (Кулдаун).' });
     }
 
+    if (point.lockedUntil && Date.now() < new Date(point.lockedUntil).getTime()) {
+      return res.status(400).json({ error: 'Точка зараз під атакою іншого гравця. Зачекайте завершення бою!' });
+    }
+
     // Симуляція бою (Perk-aware)
     const attackerCards = validatedCards;
     const defenderCards = (point.defendingCards || []).map((c) => {
@@ -3177,6 +3205,14 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     }
     let updatedPoint = point;
 
+    // Calculate animation time to lock point for other players
+    const animationTimeMs = Math.min(120000, battleLog.reduce((acc, step) => {
+      if (step.note) return acc;
+      const events = step.events || [];
+      return acc + (events.includes('dodge') ? 600 : 800) + 250;
+    }, 0) + 1500);
+    const lockedUntilDate = new Date(Date.now() + animationTimeMs);
+
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { uid: user.uid },
@@ -3282,6 +3318,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             ownerId: user.uid,
             ownerNickname: user.nickname,
             capturedAt: new Date(),
+            lockedUntil: lockedUntilDate,
             crystalsLastClaimedAt: new Date(),
             defendingCards: attackerCards.filter(c => !c._isDestroyed).map((c) => ({
               ...c,
@@ -3295,6 +3332,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         updatedPoint = await tx.arenaPoint.update({
           where: { id },
           data: {
+            lockedUntil: lockedUntilDate,
             defendingCards: defenderCards.map((c) => {
               if (point.battleMode === 'HARDCORE') {
                 if (c.currentHp <= 0) return null; // Card dies permanently from defense
@@ -3987,6 +4025,8 @@ app.post('/api/game/daily-claim', authenticate, async (req, res) => {
 // ----------------------------------------
 app.get('/api/game/leaderboard', async (req, res) => {
   try {
+    const visibleCardIds = await getVisibleCardIds();
+
     const users = await prisma.user.findMany({
       select: {
         uid: true,
@@ -4000,9 +4040,13 @@ app.get('/api/game/leaderboard', async (req, res) => {
         isPremium: true, // <-- ДОДАНО
         premiumUntil: true, // <-- ДОДАНО
         lastIp: true, // <-- ДОДАНО для адмінів
-        // Рахуємо кількість унікальних записів в інвентарі гравця
+        // Рахуємо кількість унікальних записів в інвентарі гравця (лише з відкритих паків)
         _count: {
-          select: { inventory: true },
+          select: { 
+            inventory: {
+              where: { cardId: { in: visibleCardIds } }
+            } 
+          },
         },
       },
     });
@@ -5384,7 +5428,9 @@ app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Недостатньо монет для кування!' });
     }
 
-    const generatePower = (rarity, cardObj) => {
+    const pack = await prisma.packCatalog.findUnique({ where: { id: invItem.card.packId } });
+
+    const generatePower = (rarity, cardObj, packObj) => {
       let min = 0,
         max = 0;
 
@@ -5392,35 +5438,58 @@ app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
         min = cardObj.minPower;
         max = cardObj.maxPower;
       } else {
-        switch (rarity) {
-          case 'Унікальна':
-            min = 100;
-            max = 150;
-            break;
-          case 'Легендарна':
-            min = 50;
-            max = 125;
-            break;
-          case 'Епічна':
-            min = 25;
-            max = 100;
-            break;
-          case 'Рідкісна':
-            min = 10;
-            max = 80;
-            break;
-          case 'Звичайна':
-            min = 5;
-            max = 50;
-            break;
-          default:
-            return null;
+        let ranges;
+        if (packObj && packObj.statsRanges) {
+          if (typeof packObj.statsRanges === 'string') {
+            try {
+              ranges = JSON.parse(packObj.statsRanges);
+            } catch (e) {}
+          } else {
+            ranges = packObj.statsRanges;
+          }
+        }
+        
+        if (
+          ranges &&
+          ranges[rarity] &&
+          ranges[rarity].minPower !== undefined &&
+          ranges[rarity].maxPower !== undefined &&
+          ranges[rarity].minPower !== '' &&
+          ranges[rarity].maxPower !== ''
+        ) {
+          min = Number(ranges[rarity].minPower);
+          max = Number(ranges[rarity].maxPower);
+        } else {
+          switch (rarity) {
+            case 'Унікальна':
+              min = 100;
+              max = 150;
+              break;
+            case 'Легендарна':
+              min = 50;
+              max = 125;
+              break;
+            case 'Епічна':
+              min = 25;
+              max = 100;
+              break;
+            case 'Рідкісна':
+              min = 10;
+              max = 80;
+              break;
+            case 'Звичайна':
+              min = 5;
+              max = 50;
+              break;
+            default:
+              return null;
+          }
         }
       }
       return Math.floor(Math.random() * (max - min + 1)) + min;
     };
 
-    const generateHp = (rarity, cardObj) => {
+    const generateHp = (rarity, cardObj, packObj) => {
       let min = 0,
         max = 0;
 
@@ -5428,36 +5497,59 @@ app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
         min = cardObj.minHp;
         max = cardObj.maxHp;
       } else {
-        switch (rarity) {
-          case 'Унікальна':
-            min = 300;
-            max = 500;
-            break;
-          case 'Легендарна':
-            min = 200;
-            max = 400;
-            break;
-          case 'Епічна':
-            min = 150;
-            max = 300;
-            break;
-          case 'Рідкісна':
-            min = 100;
-            max = 200;
-            break;
-          case 'Звичайна':
-            min = 50;
-            max = 100;
-            break;
-          default:
-            return null;
+        let ranges;
+        if (packObj && packObj.statsRanges) {
+          if (typeof packObj.statsRanges === 'string') {
+            try {
+              ranges = JSON.parse(packObj.statsRanges);
+            } catch (e) {}
+          } else {
+            ranges = packObj.statsRanges;
+          }
+        }
+
+        if (
+          ranges &&
+          ranges[rarity] &&
+          ranges[rarity].minHp !== undefined &&
+          ranges[rarity].maxHp !== undefined &&
+          ranges[rarity].minHp !== '' &&
+          ranges[rarity].maxHp !== ''
+        ) {
+          min = Number(ranges[rarity].minHp);
+          max = Number(ranges[rarity].maxHp);
+        } else {
+          switch (rarity) {
+            case 'Унікальна':
+              min = 300;
+              max = 500;
+              break;
+            case 'Легендарна':
+              min = 200;
+              max = 400;
+              break;
+            case 'Епічна':
+              min = 150;
+              max = 300;
+              break;
+            case 'Рідкісна':
+              min = 100;
+              max = 200;
+              break;
+            case 'Звичайна':
+              min = 50;
+              max = 100;
+              break;
+            default:
+              return null;
+          }
         }
       }
       return Math.floor(Math.random() * (max - min + 1)) + min;
     };
 
-    const newPower = generatePower(invItem.card.rarity, invItem.card) || parsedPower;
-    const newHp = generateHp(invItem.card.rarity, invItem.card) || parsedHp || 50;
+    const newPower = generatePower(invItem.card.rarity, invItem.card, pack) || parsedPower;
+    const newHp = generateHp(invItem.card.rarity, invItem.card, pack) || parsedHp || 50;
     const newStats = { power: newPower, hp: newHp };
 
     // Define index map for splice and push

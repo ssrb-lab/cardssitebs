@@ -852,22 +852,22 @@ export const deleteArenaPointRequest = async (token, pointId) => {
   return data;
 };
 
-export const captureArenaPointRequest = async (token, pointId, cards = []) => {
+export const captureArenaPointRequest = async (token, pointId, cards = [], expectedOwnerId = null) => {
   const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/capture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ cards }),
+    body: JSON.stringify({ cards, expectedOwnerId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
   return data;
 };
 
-export const battleArenaPointRequest = async (token, pointId, cards = []) => {
+export const battleArenaPointRequest = async (token, pointId, cards = [], expectedOwnerId = null) => {
   const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/battle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ cards }),
+    body: JSON.stringify({ cards, expectedOwnerId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
