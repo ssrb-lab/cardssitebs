@@ -1,7 +1,7 @@
-import React, { useId } from 'react';
+import React, { useId, memo } from 'react';
 import Particles from '@tsparticles/react';
 
-export default function PlexusEffect() {
+const PlexusEffect = memo(() => {
   const particlesId = useId();
 
   const particlesConfig = {
@@ -57,4 +57,6 @@ export default function PlexusEffect() {
       />
     </div>
   );
-}
+});
+
+export default PlexusEffect;
