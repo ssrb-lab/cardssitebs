@@ -16,7 +16,7 @@ export default function PlexusEffect() {
         distance: 120,
         enable: true,
         opacity: 0.4,
-        width: 1,
+        width: 1.5,
       },
       move: {
         direction: 'none',
@@ -30,9 +30,10 @@ export default function PlexusEffect() {
       },
       number: {
         density: {
-          enable: false,
+          enable: true,
+          area: 250, // Налаштування площі для збереження масштабу
         },
-        value: 20,
+        value: 15, // Базова кількість точок на одиницю площі
       },
       opacity: {
         value: 0.5,
