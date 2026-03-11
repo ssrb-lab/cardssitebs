@@ -508,6 +508,18 @@ export default function AdminView({
     }
   };
 
+  const resetFarmLimit = async () => {
+    if (!window.confirm(`Скинути денний ліміт фарму для ${viewingUser.nickname}?`)) return;
+    try {
+      const data = await adminUserActionRequest(getToken(), 'resetFarmLimit', viewingUser.uid);
+      showToast(`Ліміт фарму скинуто для ${viewingUser.nickname}!`, 'success');
+      setViewingUser(data.profile);
+      loadUsers();
+    } catch {
+      showToast('Помилка скидання ліміту.', 'error');
+    }
+  };
+
   const savePlayerStats = async () => {
     try {
       const payload = {};
@@ -1522,6 +1534,13 @@ export default function AdminView({
                       <Zap size={20} className="mx-auto" />
                     </button>
                   </div>
+                  <button
+                    onClick={resetFarmLimit}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg transition-colors w-full text-sm flex items-center justify-center gap-2"
+                    title="Скинути денний ліміт фарму 500к"
+                  >
+                    Скинути ліміт фарму ({((viewingUser.dailyFarmAmount || 0) / 1000).toFixed(0)}к / 500к)
+                  </button>
                 </div>
 
                 <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col gap-3">

@@ -4425,6 +4425,12 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
         });
         await prisma.farmState.deleteMany({ where: { userId: targetUid } }); // Скидаємо поточного боса
         break;
+      case 'resetFarmLimit':
+        updatedUser = await prisma.user.update({
+          where: { uid: targetUid },
+          data: { dailyFarmAmount: 0 },
+        });
+        break;
       case 'premium':
         if (payload.revoke) {
           updatedUser = await prisma.user.update({
