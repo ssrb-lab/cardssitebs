@@ -365,7 +365,7 @@
   box-shadow: 0 0 10px #00ffff;
   clip-path: polygon(50% 0, 51% 0, 45% 30%, 55% 35%, 40% 70%, 50% 75%, 30% 100%, 29% 100%, 48% 75%, 38% 70%, 53% 35%, 43% 30%);
   opacity: 0;
-  animation: electric-strike-v3 4.3s infinite step-end 1.5s;
+  animation: electric-strike-v3 4.3s infinite step-end 0.1s;
   z-index: 21;
 }
 
