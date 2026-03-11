@@ -28,3 +28,5 @@ dist-ssr
 stop-server.bat
 start-server.bat
 .agents
+start-project.bat
+stop-project.bat
