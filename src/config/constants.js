@@ -51,6 +51,7 @@ export const EFFECT_OPTIONS = [
   { id: 'ghost', name: 'Примарний (Ghost)' },
   { id: 'electric', name: 'Електричний розряд (Electric)' },
   { id: 'old-film', name: 'Стара плівка (Old Film)' },
+  { id: 'plexus', name: 'Сузір’я (Plexus)' },
 ];
 
 export const FRAME_OPTIONS = [

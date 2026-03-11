@@ -91,6 +91,7 @@ export default function EffectsPreview() {
               { f: 'gold', e: 'liquid-gold', n: 'Royal Gold', r: 'Легендарна' },
               { f: 'neon', e: 'glitch', n: 'Cyber Glitch', r: 'Унікальна' },
               { f: 'silver', e: 'cosmos', n: 'Star Voyager', r: 'Епічна' },
+              { f: 'gold', e: 'plexus', n: 'Galaxy Network', r: 'Легендарна' },
               { f: 'bronze', e: 'ember', n: 'Ancient Fire', r: 'Рідкісна' },
             ].map((combo, idx) => {
               const style = COLOR_PRESETS[DEFAULT_RARITIES.find(x => x.name === combo.r)?.color || 'gray'];
