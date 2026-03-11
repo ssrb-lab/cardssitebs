@@ -32,6 +32,8 @@ model User {
   isPremium            Boolean  @default(false)
   premiumUntil         DateTime?
   avatarUrl            String?  @db.Text
+  profileBannerUrl     String?  @db.Text
+  ownedBanners         Json?    @default("[]")
   mainShowcaseId       String?
   lastIp               String?
   autoSoundEnabled     Boolean  @default(true)

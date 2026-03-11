@@ -412,6 +412,31 @@ export const uploadAvatarRequest = async (token, file) => {
   return data;
 };
 
+export const uploadBannerRequest = async (token, file) => {
+  const formData = new FormData();
+  formData.append('banner', file);
+
+  const res = await safeFetch(`${API_URL}/admin/upload-banner`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const equipBannerRequest = async (token, bannerUrl) => {
+  const res = await safeFetch(`${API_URL}/profile/equip-banner`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ bannerUrl }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 export const fetchLeaderboard = async () => {
   const res = await safeFetch(`${API_URL}/game/leaderboard`);
   const data = await res.json();

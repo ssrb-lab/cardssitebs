@@ -46,9 +46,9 @@ import {
   fetchAdminLogsRequest,
   clearAdminLogsRequest,
   fetchAdminAchievements,
-  saveAchievementSettingsRequest,
   deleteAchievementSettingsRequest,
   sendAdminNotification,
+  uploadBannerRequest,
 } from '../config/api';
 import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
@@ -221,7 +221,9 @@ export default function AdminView({
     type: 'card',
     itemId: '',
     price: 500,
+    currency: 'coins',
     description: '',
+    imageFile: null,
   });
 
   const updatePackStatsRange = (rarity, field, value) => {
@@ -827,11 +829,26 @@ export default function AdminView({
   const addPremiumShopItem = async (e) => {
     e.preventDefault();
     try {
+      let finalImage = undefined;
+      let finalItemId = shopItemForm.itemId;
+
+      if (shopItemForm.type === 'banner') {
+        if (!shopItemForm.imageFile) {
+          return showToast('Будь ласка, завантажте зображення банера.', 'error');
+        }
+        showToast('Завантаження банера...', 'success');
+        const res = await uploadBannerRequest(getToken(), shopItemForm.imageFile);
+        finalImage = res.url;
+        finalItemId = `banner_${Date.now()}`;
+      }
+
       const newItem = {
         id: 'si_' + Date.now(),
         type: shopItemForm.type,
-        itemId: shopItemForm.itemId,
+        itemId: finalItemId,
+        image: finalImage,
         price: Number(shopItemForm.price),
+        currency: shopItemForm.currency || 'coins',
         description: shopItemForm.description,
       };
       const newSettings = getFullSettings();
@@ -839,7 +856,7 @@ export default function AdminView({
       await saveSettingsRequest(getToken(), newSettings);
       await reloadSettings();
       showToast('Товар додано!', 'success');
-      setShopItemForm({ type: 'card', itemId: '', price: 500, description: '' });
+      setShopItemForm({ type: 'card', itemId: '', price: 500, currency: 'coins', description: '', imageFile: null });
     } catch {
       showToast('Помилка додавання товару.', 'error');
     }
@@ -2149,39 +2166,78 @@ export default function AdminView({
             <h3 className="text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2">
               <Gem /> Додати товар у Прем. Магазин
             </h3>
+            
+            <div className="mb-4">
+              <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
+                Тип товару:
+              </label>
+              <select
+                value={shopItemForm.type}
+                onChange={(e) => setShopItemForm({ ...shopItemForm, type: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500"
+              >
+                <option value="card">Ексклюзивна картка</option>
+                <option value="banner">Банер для профілю</option>
+              </select>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              {shopItemForm.type === 'card' ? (
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
+                    Оберіть картку (ексклюзив):
+                  </label>
+                  <select
+                    value={shopItemForm.itemId}
+                    onChange={(e) => setShopItemForm({ ...shopItemForm, itemId: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500"
+                    required
+                  >
+                    <option value="" disabled>Оберіть...</option>
+                    {filteredCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.rarity})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
+                    Зображення банера:
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setShopItemForm({ ...shopItemForm, imageFile: e.target.files[0] })}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-neutral-400 outline-none focus:border-fuchsia-500"
+                    required
+                  />
+                </div>
+              )}
+              
               <div>
                 <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
-                  Оберіть картку (ексклюзив):
+                  Ціна:
                 </label>
-                <select
-                  value={shopItemForm.itemId}
-                  onChange={(e) => setShopItemForm({ ...shopItemForm, itemId: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500"
-                  required
-                >
-                  <option value="" disabled>
-                    Оберіть...
-                  </option>
-                  {filteredCards.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.rarity})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
-                  Ціна (Монети):
-                </label>
-                <input
-                  type="number"
-                  value={shopItemForm.price}
-                  onChange={(e) => setShopItemForm({ ...shopItemForm, price: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500"
-                  min="1"
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={shopItemForm.price}
+                    onChange={(e) => setShopItemForm({ ...shopItemForm, price: e.target.value })}
+                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500"
+                    min="1"
+                    required
+                  />
+                  <select
+                    value={shopItemForm.currency}
+                    onChange={(e) => setShopItemForm({ ...shopItemForm, currency: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-3 text-white outline-none focus:border-fuchsia-500"
+                  >
+                    <option value="coins">Монети</option>
+                    <option value="crystals">Кристали</option>
+                  </select>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-bold text-neutral-400 uppercase mb-1 block">
@@ -2189,7 +2245,7 @@ export default function AdminView({
                 </label>
                 <input
                   type="text"
-                  placeholder="Наприклад: Легендарна лімітована картка тільки для преміум-гравців!"
+                  placeholder={shopItemForm.type === 'card' ? "Наприклад: Легендарна лімітована картка тільки для преміум-гравців!" : "Наприклад: Новий унікальний банер на ваш профіль!"}
                   value={shopItemForm.description}
                   onChange={(e) =>
                     setShopItemForm({ ...shopItemForm, description: e.target.value })
@@ -2209,7 +2265,8 @@ export default function AdminView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {premiumShopItems.map((item) => {
-              const cDef = cardsCatalog.find((c) => c.id === item.itemId);
+              const cDef = item.type === 'card' ? cardsCatalog.find((c) => c.id === item.itemId) : null;
+              const isBanner = item.type === 'banner';
               return (
                 <div
                   key={item.id}
@@ -2217,13 +2274,13 @@ export default function AdminView({
                 >
                   <button
                     onClick={() => deletePremiumShopItem(item.id)}
-                    className="absolute top-2 right-2 text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"
+                    className="absolute top-2 right-2 text-red-500 hover:bg-red-900/30 p-1.5 rounded-lg transition-colors z-10"
                   >
                     <Trash2 size={16} />
                   </button>
-                  <div className="w-16 h-24 bg-neutral-950 border border-neutral-700 rounded-md shrink-0 overflow-hidden">
+                  <div className={`flex-shrink-0 bg-neutral-950 border border-neutral-700 rounded-md overflow-hidden ${isBanner ? 'w-24 h-16' : 'w-16 h-24'}`}>
                     <img
-                      src={cDef?.image}
+                      src={isBanner ? item.image : cDef?.image}
                       className="w-full h-full object-cover"
                       alt=""
                       loading="lazy"
@@ -2231,17 +2288,19 @@ export default function AdminView({
                   </div>
                   <div className="flex-1 min-w-0 pr-6">
                     <div className="text-[10px] text-fuchsia-400 font-bold uppercase tracking-widest mb-1">
-                      Картка
+                      {isBanner ? 'Банер' : 'Картка'}
                     </div>
                     <div className="font-bold text-white text-sm truncate">
-                      {cDef?.name || 'Невідомо'}
+                      {isBanner ? (item.description || 'Банер') : (cDef?.name || 'Невідомо')}
                     </div>
-                    <div className="text-xs text-yellow-500 font-bold mt-1 mb-2">
-                      {item.price} <Coins size={10} className="inline" />
+                    <div className={`text-xs font-bold mt-1 mb-2 ${item.currency === 'crystals' ? 'text-fuchsia-400' : 'text-yellow-500'}`}>
+                      {item.price} {item.currency === 'crystals' ? <Gem size={10} className="inline" /> : <Coins size={10} className="inline" />}
                     </div>
-                    <div className="text-[10px] text-neutral-500 line-clamp-2 leading-tight">
-                      {item.description}
-                    </div>
+                    {!isBanner && (
+                      <div className="text-[10px] text-neutral-500 line-clamp-2 leading-tight">
+                        {item.description}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

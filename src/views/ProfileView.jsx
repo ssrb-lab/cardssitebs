@@ -34,6 +34,7 @@ import {
   getToken,
   fetchPublicProfileRequest,
   changePasswordRequest,
+  equipBannerRequest,
 } from '../config/api';
 import CardFrame from '../components/CardFrame';
 import AchievementIcon from '../components/AchievementIcon';
@@ -239,6 +240,22 @@ export default function ProfileView({
       setConfirmPassword('');
     } catch (e) {
       showToast(e.message || 'Помилка зміни пароля', 'error');
+    } finally {
+      actionLock.current = false;
+      setIsProcessing(false);
+    }
+  };
+
+  const handleEquipBanner = async (bannerUrl) => {
+    if (actionLock.current || isProcessing) return;
+    actionLock.current = true;
+    setIsProcessing(true);
+    try {
+      await equipBannerRequest(getToken(), bannerUrl);
+      setProfile((prev) => ({ ...prev, profileBannerUrl: bannerUrl }));
+      showToast('Банер успішно встановлено!', 'success');
+    } catch (e) {
+      showToast(e.message || 'Помилка встановлення банера', 'error');
     } finally {
       actionLock.current = false;
       setIsProcessing(false);
@@ -499,6 +516,30 @@ export default function ProfileView({
                 </form>
               </div>
             </div>
+
+            {/* ПРОФІЛЬНІ БАНЕРИ */}
+            {profile?.ownedBanners && (Array.isArray(profile.ownedBanners) ? profile.ownedBanners : (typeof profile.ownedBanners === 'string' ? JSON.parse(profile.ownedBanners) : [])).length > 0 && (
+              <div className="bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50 mt-2">
+                <label className="block text-sm font-bold text-neutral-400 mb-3">
+                  Мої Банери
+                </label>
+                <div className="flex flex-wrap gap-4">
+                   <div 
+                     onClick={() => handleEquipBanner('')} 
+                     className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.profileBannerUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
+                   >Стандартний</div>
+                   {(Array.isArray(profile.ownedBanners) ? profile.ownedBanners : (typeof profile.ownedBanners === 'string' ? JSON.parse(profile.ownedBanners) : [])).map((bUrl, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => handleEquipBanner(bUrl)} 
+                        className={`w-32 h-16 rounded-lg bg-cover bg-center cursor-pointer border-2 transition-colors ${profile.profileBannerUrl === bUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                        style={{ backgroundImage: `url(${bUrl})` }}
+                      ></div>
+                   ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end mt-2 pt-4 border-t border-neutral-800">
               <button
                 onClick={handleLogout}
@@ -516,9 +557,20 @@ export default function ProfileView({
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
       <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
-        <div
-          className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? 'from-orange-900/40' : profile?.isAdmin ? 'from-purple-900/40' : isPremiumActive ? 'from-fuchsia-900/30' : 'from-blue-900/20'} to-transparent`}
-        ></div>
+        {profile?.profileBannerUrl ? (
+          <div 
+            className="absolute top-0 left-0 w-full h-48 bg-cover bg-center opacity-60 pointer-events-none"
+            style={{ 
+              backgroundImage: `url(${profile.profileBannerUrl})`, 
+              maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', 
+              WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' 
+            }}
+          ></div>
+        ) : (
+          <div
+            className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${profile?.isSuperAdmin ? 'from-orange-900/40' : profile?.isAdmin ? 'from-purple-900/40' : isPremiumActive ? 'from-fuchsia-900/30' : 'from-blue-900/20'} to-transparent`}
+          ></div>
+        )}
 
         <div className="relative w-24 h-24 mx-auto mb-4 z-10">
           <PlayerAvatar

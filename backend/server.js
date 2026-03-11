@@ -59,6 +59,28 @@ const cardsStorage = multer.diskStorage({
 
 const uploadCard = multer({
   storage: cardsStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Дозволені лише зображення'));
+  },
+});
+
+// Налаштування Multer для збереження банерів
+const bannersStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, 'uploads', 'banners');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `banner-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+  },
+});
+
+const uploadBanner = multer({
+  storage: bannersStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
@@ -3499,7 +3521,17 @@ app.get('/api/notifications/stream', authenticate, (req, res) => {
     }
   });
 
-  // Heartbeat endpoint updates lastActivity for this client too
+  // Heartbeat endpoint updates lastActivity for this client  }
+});
+
+// Завантаження банерів для преміум магазину (Адмін)
+app.post('/api/admin/upload-banner', authenticate, checkAdmin, uploadBanner.single('banner'), validateImageSignature, async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Будь ласка, завантажте зображення.' });
+  }
+
+  const fileUrl = `/api/uploads/banners/${req.file.filename}`;
+  res.json({ success: true, url: fileUrl });
 });
 
 app.get('/api/games/status', async (req, res) => {
@@ -4546,6 +4578,7 @@ app.post(
 // Запуск сервера
 const PORT = process.env.PORT || 5000;
 
+
 // Зміна нікнейму (Преміум магазин)
 app.post('/api/profile/change-nickname', authenticate, async (req, res) => {
   const { newNickname } = req.body;
@@ -4583,27 +4616,63 @@ app.post('/api/game/premium-shop/buy', authenticate, async (req, res) => {
     // БЕЗПЕКА: Дістаємо ціну з бази даних, а не довіряємо клієнту
     const settings = await prisma.gameSettings.findUnique({ where: { id: 'main' } });
     const premiumItems = settings?.data?.premiumShopItems || [];
-    const realItem = premiumItems.find((i) => i.id === item.itemId);
+    const realItem = premiumItems.find((i) => i.id === item.id);
 
     if (!realItem) {
       return res.status(404).json({ error: 'Товар не знайдено в магазині!' });
     }
 
     const realPrice = Number(realItem.price);
+    const currency = realItem.currency || 'coins';
 
-    if (user.coins < realPrice) return res.status(400).json({ error: 'Недостатньо монет!' });
+    if (currency === 'crystals') {
+      if (user.crystals < realPrice) return res.status(400).json({ error: 'Недостатньо кристалів!' });
+    } else {
+      if (user.coins < realPrice) return res.status(400).json({ error: 'Недостатньо монет!' });
+    }
 
     await prisma.$transaction(async (tx) => {
+      let dataToUpdate = currency === 'crystals'
+        ? { crystals: { decrement: realPrice } }
+        : { coins: { decrement: realPrice } };
+      
+      // Додаємо +1 карту тільки якщо це дійсно карта
+      if (realItem.type === 'card') {
+        dataToUpdate.totalCards = { increment: 1 };
+      }
+
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { decrement: realPrice }, totalCards: { increment: 1 } },
+        data: dataToUpdate,
       });
+
       if (realItem.type === 'card') {
         await tx.inventoryItem.upsert({
           where: { userId_cardId: { userId: user.uid, cardId: realItem.id } },
           update: { amount: { increment: 1 } },
           create: { userId: user.uid, cardId: realItem.id, amount: 1 },
         });
+      } else if (realItem.type === 'banner') {
+         // Логіка для банерів
+         let owned = [];
+         if (user.ownedBanners) {
+           if (typeof user.ownedBanners === 'string') {
+             try { owned = JSON.parse(user.ownedBanners); } catch(e){}
+           } else {
+             owned = user.ownedBanners;
+           }
+         }
+         
+         if (!owned.includes(realItem.image)) {
+           owned.push(realItem.image);
+           await tx.user.update({
+             where: { uid: user.uid },
+             data: { 
+               ownedBanners: owned,
+               profileBannerUrl: realItem.image // Відразу екіпіруємо після покупки
+             }
+           });
+         }
       }
     });
 
