@@ -656,14 +656,6 @@ export default function FarmView({
     );
   }
 
-  if (isLoading)
-    return (
-      <div className="text-center py-20 text-neutral-500">
-        <Loader2 className="animate-spin mx-auto w-10 h-10 mb-4" /> Підготовка Арени...
-      </div>
-    );
-  if (!currentBoss || !bossCard)
-    return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
 
   if (activeGame === 'arena') {
     return (
@@ -749,6 +741,15 @@ export default function FarmView({
       />
     );
   }
+
+  if (isLoading)
+    return (
+      <div className="text-center py-20 text-neutral-500">
+        <Loader2 className="animate-spin mx-auto w-10 h-10 mb-4" /> Підготовка Арени...
+      </div>
+    );
+  if (!currentBoss || !bossCard)
+    return <div className="text-center py-20 text-neutral-500">Боси ще формують свої ряди...</div>;
 
   if (cooldownEnd) {
     return (
