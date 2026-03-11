@@ -154,9 +154,16 @@ export default function PublicProfileView({
       </button>
 
       <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
-        <div
-          className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${playerInfo.isSuperAdmin ? 'from-orange-900/40' : playerInfo.isAdmin ? 'from-purple-900/40' : isPremiumActive ? 'from-fuchsia-900/30' : 'from-blue-900/20'} to-transparent`}
-        ></div>
+        {playerInfo.profileBannerUrl ? (
+          <div 
+            className="absolute inset-0 w-full h-full bg-cover bg-center opacity-40 pointer-events-none"
+            style={{ backgroundImage: `url(${playerInfo.profileBannerUrl})` }}
+          ></div>
+        ) : (
+          <div
+            className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-b ${playerInfo.isSuperAdmin ? 'from-orange-900/40' : playerInfo.isAdmin ? 'from-purple-900/40' : isPremiumActive ? 'from-fuchsia-900/30' : 'from-blue-900/20'} to-transparent`}
+          ></div>
+        )}
 
         <div className="relative w-24 h-24 mx-auto mb-4 z-10">
           <PlayerAvatar
@@ -184,14 +191,15 @@ export default function PublicProfileView({
           )}
           {playerInfo.isBanned && <Ban size={18} className="text-red-500" title="Забанений" />}
         </h2>
-        <div className="text-neutral-500 text-sm flex justify-center gap-4 mt-2 mb-6 relative z-10">
-          <span className="flex items-center gap-1">
-            <CalendarDays size={14} /> З нами від: {formatDate(playerInfo.createdAt)}
-          </span>
+        <div className="flex justify-center mt-2 mb-6 relative z-10">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 inline-flex items-center gap-2 text-neutral-400 text-sm font-medium shadow-sm">
+            <CalendarDays size={16} className="text-neutral-500" />
+            <span>З нами від: {formatDate(playerInfo.createdAt)}</span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-8">
-          <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-8 relative z-10">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <Coins className="text-yellow-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
               {playerInfo.coins || 0}
@@ -200,7 +208,7 @@ export default function PublicProfileView({
               Баланс
             </span>
           </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <Layers className="text-blue-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
               {playerInfo.uniqueCardsCount || 0}
@@ -209,7 +217,7 @@ export default function PublicProfileView({
               Унікальних
             </span>
           </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <PackageOpen className="text-purple-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
               {playerInfo.packsOpened || 0}
@@ -218,7 +226,7 @@ export default function PublicProfileView({
               Відкрито паків
             </span>
           </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <TrendingDown className="text-red-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
               {playerInfo.coinsSpentOnPacks || 0}
@@ -227,7 +235,7 @@ export default function PublicProfileView({
               Витрачено
             </span>
           </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center shadow-md">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <TrendingUp className="text-green-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
               {playerInfo.coinsEarnedFromPacks || 0}

@@ -901,6 +901,7 @@ app.get('/api/profile/public/:identifier', async (req, res) => {
         uid: true,
         nickname: true,
         avatarUrl: true,
+        profileBannerUrl: true,
         coins: true,
         totalCards: true,
         packsOpened: true,

@@ -578,12 +578,8 @@ export default function ProfileView({
       <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
         {profile?.profileBannerUrl ? (
           <div 
-            className="absolute top-0 left-0 w-full h-48 bg-cover bg-center opacity-60 pointer-events-none"
-            style={{ 
-              backgroundImage: `url(${profile.profileBannerUrl})`, 
-              maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', 
-              WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' 
-            }}
+            className="absolute inset-0 w-full h-full bg-cover bg-center opacity-40 pointer-events-none"
+            style={{ backgroundImage: `url(${profile.profileBannerUrl})` }}
           ></div>
         ) : (
           <div
@@ -616,19 +612,20 @@ export default function ProfileView({
             <Gem size={18} className="text-fuchsia-400 fill-fuchsia-400" title="Преміум Гравець" />
           )}
         </h2>
-        <div className="text-neutral-500 text-sm flex justify-center gap-4 mt-2 mb-6">
-          <span className="flex items-center gap-1">
-            <CalendarDays size={14} /> З нами від: {formatDate(profile?.createdAt)}
-          </span>
+        <div className="flex justify-center mt-2 mb-6 relative z-10">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 inline-flex items-center gap-2 text-neutral-400 text-sm font-medium shadow-sm">
+            <CalendarDays size={16} className="text-neutral-500" />
+            <span>З нами від: {formatDate(profile?.createdAt)}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 relative z-10 max-w-2xl mx-auto">
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-all">
             <Coins className="text-yellow-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">{profile?.coins || 0}</span>
             <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Монети</span>
           </div>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-all">
             <LayoutGrid className="text-blue-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">
               {liveStats?.uniqueCardsCount ?? profile?.uniqueCardsCount ?? inventoryCount ?? 0}
@@ -637,7 +634,7 @@ export default function ProfileView({
               Унікальних
             </span>
           </div>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-all">
             <PackageOpen className="text-purple-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">
               {liveStats?.packsOpened ?? profile?.packsOpened ?? 0}
@@ -646,14 +643,14 @@ export default function ProfileView({
               Відкрито паків
             </span>
           </div>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-all">
             <Zap className="text-red-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">
               {liveStats?.coinsSpentOnPacks ?? profile?.coinsSpentOnPacks ?? 0}
             </span>
             <span className="text-[10px] text-neutral-500 font-bold uppercase mt-1">Витрачено</span>
           </div>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 flex flex-col items-center sm:col-span-1 col-span-2">
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-all sm:col-span-1 col-span-2">
             <Star className="text-green-500 mb-2 w-6 h-6" />
             <span className="text-xl font-black text-white">
               {liveStats?.coinsEarnedFromPacks ?? profile?.coinsEarnedFromPacks ?? 0}
