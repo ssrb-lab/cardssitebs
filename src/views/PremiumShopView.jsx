@@ -29,6 +29,19 @@ export default function PremiumShopView({
 }) {
   const [newNickname, setNewNickname] = useState('');
 
+  let userBanners = [];
+  try {
+    if (profile?.ownedBanners) {
+      if (Array.isArray(profile.ownedBanners)) {
+        userBanners = profile.ownedBanners;
+      } else if (typeof profile.ownedBanners === 'string') {
+        userBanners = JSON.parse(profile.ownedBanners);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse ownedBanners', e);
+  }
+
   // БРОНЬОВАНИЙ ЗАМОК ВІД АВТОКЛІКЕРІВ
   const actionLock = useRef(false);
 
@@ -114,6 +127,8 @@ export default function PremiumShopView({
                 cDef = cardsCatalog.find((c) => c.id === item.itemId);
               }
 
+              const isOwnedBanner = item.type === 'banner' && userBanners.includes(item.image);
+
               return (
                 <div
                   key={idx}
@@ -142,6 +157,11 @@ export default function PremiumShopView({
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />
+                    {isOwnedBanner && (
+                      <div className="absolute top-4 -right-10 transform rotate-45 bg-yellow-500 text-yellow-950 font-black py-1 w-40 text-center shadow-lg z-30 tracking-wider text-xs">
+                        ПРИДБАНО
+                      </div>
+                    )}
                     {cDef && (
                       <button
                         onClick={() => setViewingCard({ card: cDef, amount: 1 })}
@@ -158,12 +178,21 @@ export default function PremiumShopView({
                     </div>
                   )}
 
-                  <button
-                    onClick={() => buyItem(item)}
-                    className="w-full py-3 rounded-xl font-black text-white bg-blue-600 hover:bg-blue-500 flex items-center justify-center gap-2 transition-all"
-                  >
-                    Купити за {item.price} {item.currency === 'crystals' ? <Gem size={16} className="text-fuchsia-400" /> : <Coins size={16} />}
-                  </button>
+                  {isOwnedBanner ? (
+                    <button
+                      disabled
+                      className="w-full py-3 rounded-xl font-black text-neutral-500 bg-neutral-800 border border-neutral-700 cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      Придбано
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => buyItem(item)}
+                      className="w-full py-3 rounded-xl font-black text-white bg-blue-600 hover:bg-blue-500 flex items-center justify-center gap-2 transition-all"
+                    >
+                      Купити за {item.price} {item.currency === 'crystals' ? <Gem size={16} className="text-fuchsia-400" /> : <Coins size={16} />}
+                    </button>
+                  )}
                 </div>
               );
             })}
