@@ -6,27 +6,43 @@
     <title>Card Effects Preview (Live from Code)</title>
     <!-- Tailwind CDN для базових стилів -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- tsParticles CDN для ефекту Plexus -->
+    <!-- tsParticles CDN для ефектів Plexus та Ember -->
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js"></script>
     <style>
         /* Підключаємо твій реальний CSS файл */
         @import url("./src/index.css");
         
-        /* Фолбек для змінних, які Tailwind може не підтягнути з файлу */
         body { background-color: black; color: white; font-family: sans-serif; }
         .card-container { width: 200px; height: 300px; border-radius: 12px; position: relative; overflow: hidden; background: #1a1a1a; }
         .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2rem; padding: 2rem; }
         
-        /* Емуляція CardFrame.jsx стилів, щоб вони були як у коді */
         .frame-bronze { border: 4px solid #cd7f32; box-shadow: 0 0 15px rgba(205, 127, 50, 0.4); }
         .frame-silver { border: 4px solid #c0c0c0; box-shadow: 0 0 15px rgba(192, 192, 192, 0.4); }
-        .frame-gold { 
-            border: 4px solid #eab308; 
-            animation: gold-pulse 2s infinite ease-in-out;
+        .frame-gold { border: 4px solid #eab308; animation: gold-pulse 2s infinite ease-in-out; }
+        .frame-neon { border: 4px solid #d946ef; animation: neon-pulse 2s infinite ease-in-out; }
+
+        .canvas-container { 
+            position: absolute; 
+            inset: 0; 
+            pointer-events: none; 
+            z-index: 10; 
+            border-radius: inherit;
+            mix-blend-mode: screen; /* Робить чорний колір прозорим */
         }
-        .frame-neon {
-            border: 4px solid #d946ef;
-            animation: neon-pulse 2s infinite ease-in-out;
+
+        .effect-electric-pulse { animation: electric-pulse 0.4s infinite alternate !important; }
+        .effect-ember-pulse { 
+            animation: ember-pulse 2.5s infinite alternate !important;
+            background: linear-gradient(to top, rgba(255, 50, 0, 0.1), transparent);
+        }
+
+        @keyframes electric-pulse {
+          0% { box-shadow: inset 0 0 8px rgba(0, 255, 255, 0.4); }
+          100% { box-shadow: inset 0 0 25px rgba(0, 255, 255, 0.8); }
+        }
+        @keyframes ember-pulse {
+          0% { box-shadow: inset 0 -5px 15px rgba(255, 50, 0, 0.2); }
+          100% { box-shadow: inset 0 -15px 30px rgba(255, 50, 0, 0.5); }
         }
     </style>
 </head>
@@ -37,11 +53,12 @@
         </h1>
         <p class="text-neutral-500 mb-10 italic">
             Цей файл бере стилі безпосередньо з <b>src/index.css</b>. <br>
-            Будь-які зміни в CSS файлі відобразяться тут після оновлення сторінки (F5).
+            Ефекти <b>Plexus</b> та <b>Ember (Sparks)</b> тепер використовують одну бібліотеку частинок.
         </p>
 
         <h2 class="text-2xl font-bold mb-6 border-l-4 border-yellow-500 pl-4 uppercase">Рамки (Frames)</h2>
         <div class="preview-grid mb-12">
+            <!-- Frames section same as before -->
             <div class="text-center">
                 <div class="card-container frame-bronze mx-auto">
                     <img src="https://placehold.co/200x300/222/555?text=BRONZE" class="w-full h-full object-cover">
@@ -71,9 +88,7 @@
         </div>
 
         <h2 class="text-2xl font-bold mb-6 border-l-4 border-purple-500 pl-4 uppercase">Ефекти (Effects)</h2>
-        <div id="effects-grid" class="preview-grid">
-            <!-- JS згенерує картки для кожного ефекту -->
-        </div>
+        <div id="effects-grid" class="preview-grid"></div>
     </div>
 
     <script>
@@ -82,11 +97,11 @@
             { id: 'foil', name: 'Foil Glint' },
             { id: 'glow', name: 'Inner Glow' },
             { id: 'glitch', name: 'Cyber Glitch' },
-            { id: 'ember', name: 'Ember Sparks' },
+            { id: 'ember', name: 'Ember (Sparks)' },
             { id: 'liquid-gold', name: 'Liquid Gold' },
             { id: 'prismatic', name: 'Prismatic' },
             { id: 'cosmos', name: 'Cosmic Stars' },
-            { id: 'electric', name: 'Electric' },
+            { id: 'electric', name: 'Electric (Canvas)' },
             { id: 'old-film', name: 'Old Film' },
             { id: 'ghost', name: 'Ghostly' },
             { id: 'plexus', name: 'Plexus (Constellation)' }
@@ -96,10 +111,14 @@
         effects.forEach(eff => {
             const div = document.createElement('div');
             div.className = 'text-center';
+            let pulseClass = '';
+            if (eff.id === 'ember') pulseClass = 'effect-ember-pulse';
+            if (eff.id === 'electric') pulseClass = 'effect-electric-pulse';
+
             div.innerHTML = `
                 <div class="card-container effect-${eff.id} mx-auto" id="card-${eff.id}">
                     <img src="https://placehold.co/200x300/111/444?text=${eff.id.toUpperCase()}" class="w-full h-full object-cover">
-                    <div class="${eff.id} absolute inset-0 pointer-events-none z-10" id="container-${eff.id}"></div>
+                    <div class="canvas-container ${pulseClass}" id="container-${eff.id}"></div>
                 </div>
                 <p class="mt-2 text-sm font-mono text-neutral-400">.effect-${eff.id}</p>
                 <p class="font-bold">${eff.name}</p>
@@ -109,35 +128,102 @@
             if (eff.id === 'plexus') {
                 tsParticles.load("container-plexus", {
                     fullScreen: { enable: false },
-                    fpsLimit: 60,
                     particles: {
                         color: { value: "#ffffff" },
-                        links: {
-                            color: "#ffffff",
-                            distance: 120,
-                            enable: true,
-                            opacity: 0.4,
-                            width: 1
-                        },
+                        links: { color: "#ffffff", distance: 120, enable: true, opacity: 0.4, width: 1 },
+                        move: { enable: true, speed: 1.5, outModes: { default: "out" } },
+                        number: { value: 20 },
+                        opacity: { value: 0.5 },
+                        size: { value: { min: 1, max: 2.5 } }
+                    }
+                });
+            }
+
+            if (eff.id === 'ember') {
+                tsParticles.load("container-ember", {
+                    fullScreen: { enable: false },
+                    particles: {
+                        number: { value: 40 },
+                        color: { value: ["#ff4500", "#ff8c00", "#ff0000", "#ffffff"] },
+                        shape: { type: "circle" },
+                        opacity: { value: { min: 0.1, max: 0.8 }, animation: { enable: true, speed: 1 } },
+                        size: { value: { min: 1, max: 3 } },
                         move: {
                             enable: true,
-                            speed: 1.5,
-                            outModes: { default: "out" }
+                            speed: { min: 1, max: 4 },
+                            direction: "top",
+                            random: true,
+                            outModes: { default: "out" },
+                            wobble: { enable: true, distance: 5, speed: 10 }
                         },
-                        number: {
-                            density: { enable: false },
-                            value: 20
-                        },
-                        opacity: { value: 0.5 },
-                        shape: { type: "circle" },
-                        size: { value: { min: 1, max: 2.5 } }
-                    },
-                    detectRetina: true
+                        shadow: { enable: true, color: "#ff4500", blur: 5 }
+                    }
                 });
+            }
+
+            if (eff.id === 'electric') {
+                initElectricEffect("container-electric");
             }
         });
 
-        // Емуляція 3D нахилу для перевірки ефектів
+        function initElectricEffect(containerId) {
+            const container = document.getElementById(containerId);
+            const canvas = document.createElement('canvas');
+            container.appendChild(canvas);
+            const ctx = canvas.getContext('2d');
+            let bolts = [];
+            function resize() {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            function createBolt() {
+                const startX = Math.random() * canvas.width;
+                const destX = startX + (Math.random() - 0.5) * canvas.width;
+                const path = [{ x: startX, y: 0 }];
+                
+                for (let i = 1; i < 8; i++) {
+                    path.push({
+                        x: startX + ((destX - startX) * (i / 8)) + (Math.random() - 0.5) * 40,
+                        y: (canvas.height / 8) * i
+                    });
+                }
+                path.push({ x: destX, y: canvas.height }); // Досягаємо дна картки
+                return { path, alpha: 1, thickness: 2 };
+            }
+
+            function animate() {
+                ctx.shadowBlur = 0;
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Повне очищення без накопичення білого
+                
+                if (Math.random() < 0.05) bolts.push(createBolt());
+                
+                bolts.forEach((bolt, i) => {
+                    ctx.beginPath();
+                    ctx.moveTo(bolt.path[0].x, bolt.path[0].y);
+                    bolt.path.forEach(p => ctx.lineTo(p.x, p.y));
+                    
+                    ctx.strokeStyle = `rgba(100, 200, 255, ${bolt.alpha})`;
+                    ctx.lineWidth = bolt.thickness;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#00ffff';
+                    ctx.stroke();
+                    
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${bolt.alpha * 1.5})`;
+                    ctx.lineWidth = bolt.thickness * 0.4;
+                    ctx.shadowBlur = 5;
+                    ctx.stroke();
+
+                    bolt.alpha -= 0.05;
+                    if (bolt.alpha <= 0) bolts.splice(i, 1);
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
         document.querySelectorAll('.card-container').forEach(card => {
             card.addEventListener('mousemove', e => {
                 const rect = card.getBoundingClientRect();
@@ -146,11 +232,9 @@
                 const rX = (y - rect.height/2) / 10 * -1;
                 const rY = (x - rect.width/2) / 10;
                 card.style.transform = `perspective(500px) rotateX(${rX}deg) rotateY(${rY}deg) scale(1.05)`;
-                card.style.transition = 'none';
             });
             card.addEventListener('mouseleave', () => {
                 card.style.transform = 'perspective(500px) rotateX(0) rotateY(0) scale(1)';
-                card.style.transition = 'transform 0.5s ease';
             });
         });
     </script>

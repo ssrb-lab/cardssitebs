@@ -1,5 +1,7 @@
 import React from 'react';
 import PlexusEffect from './effects/PlexusEffect';
+import ElectricEffect from './effects/ElectricEffect';
+import EmberEffect from './effects/EmberEffect';
 
 export default function CardFrame({ frame = 'normal', children, className = '', effect = '' }) {
   // Базові класи, які мають бути завжди
@@ -10,15 +12,8 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
     return (
       <div className={containerClass}>
         {children}
-        {effect === 'ember' && (
-          <div className="ember absolute inset-0 pointer-events-none z-10"></div>
-        )}
-        {effect === 'electric' && (
-          <>
-            <div className="electric absolute inset-0 pointer-events-none z-10"></div>
-            <div className="electric-bolt-extra absolute inset-0 pointer-events-none z-10"></div>
-          </>
-        )}
+        {effect === 'ember' && <EmberEffect />}
+        {effect === 'electric' && <ElectricEffect />}
         {effect === 'glitch' && (
           <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
         )}
@@ -47,15 +42,8 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
       <div className="absolute inset-0 z-0">{children}</div>
 
       {/* Ефекти, що потребують внутрішніх елементів */}
-      {effect === 'ember' && (
-        <div className="ember absolute inset-0 pointer-events-none z-10"></div>
-      )}
-      {effect === 'electric' && (
-        <>
-          <div className="electric absolute inset-0 pointer-events-none z-10"></div>
-          <div className="electric-bolt-extra absolute inset-0 pointer-events-none z-10"></div>
-        </>
-      )}
+      {effect === 'ember' && <EmberEffect />}
+      {effect === 'electric' && <ElectricEffect />}
       {effect === 'glitch' && (
         <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
       )}
