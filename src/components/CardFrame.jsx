@@ -36,7 +36,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden rounded-xl bg-neutral-900 ${className}`}
+      className={`relative w-full h-full overflow-hidden rounded-xl ${className}`}
     >
       {/* Картинка / контент картки */}
       <div className="absolute inset-0 z-0">{children}</div>

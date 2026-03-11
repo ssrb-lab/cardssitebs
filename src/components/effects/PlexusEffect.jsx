@@ -60,7 +60,7 @@ const PlexusEffect = memo(() => {
   }, []);
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-10 overflow-hidden mix-blend-screen">
       {options && (
         <Particles
           id={particlesId}

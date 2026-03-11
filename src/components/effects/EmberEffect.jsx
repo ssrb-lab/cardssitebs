@@ -64,7 +64,7 @@ export default function EmberEffect() {
 
   return (
     <div 
-      className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-[inherit] animate-[ember-glow_2.5s_infinite_alternate]"
+      className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-[inherit] mix-blend-screen animate-[ember-glow_2.5s_infinite_alternate]"
       style={{
         background: 'linear-gradient(to top, rgba(255, 50, 0, 0.1), transparent)'
       }}
