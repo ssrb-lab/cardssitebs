@@ -13,7 +13,7 @@ const PlexusEffect = memo(() => {
       },
       links: {
         color: '#ffffff',
-        distance: 25, // 25% від розміру картки - тепер масштаб завжди однаковий!
+        distance: "25%", // Тепер з символом %, щоб масштаб був відносним
         enable: true,
         opacity: 0.5,
         width: 1.5,
@@ -30,9 +30,9 @@ const PlexusEffect = memo(() => {
       },
       number: {
         density: {
-          enable: false, // Вимикаємо залежність від пікселів
+          enable: false,
         },
-        value: 20, // Фіксована кількість часточок
+        value: 20,
       },
       opacity: {
         value: 0.5,
@@ -41,7 +41,7 @@ const PlexusEffect = memo(() => {
         type: 'circle',
       },
       size: {
-        value: { min: 0.5, max: 1.5 }, // Розмір тепер теж відносний (у відсотках)
+        value: { min: 1, max: 3 }, // Повертаємо нормальний видимий розмір
       },
     },
     detectRetina: true,
