@@ -65,10 +65,9 @@ export default function ElectricEffect() {
 
       // Випадкове створення нової блискавки (шанс 4% на кадр)
       if (Math.random() < 0.04) {
-        // Починаємо зверху або збоку
-        const isTop = Math.random() > 0.5;
-        const startX = isTop ? Math.random() * width : (Math.random() > 0.5 ? 0 : width);
-        const startY = isTop ? 0 : Math.random() * height;
+        // Завжди починаємо з верхнього краю (y = 0)
+        const startX = Math.random() * width;
+        const startY = 0;
         
         const destX = startX + (Math.random() - 0.5) * width;
         const destY = height;
