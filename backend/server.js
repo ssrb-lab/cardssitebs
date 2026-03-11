@@ -2574,7 +2574,7 @@ app.get('/api/game/arena/points', authenticate, async (req, res) => {
       return pointToReturn;
     });
 
-    res.json(maskedPoints);
+    res.json({ points: maskedPoints, serverTime: new Date() });
   } catch (error) {
     console.error('Points fetch error:', error);
     res.status(500).json({ error: 'Помилка завантаження точок Арени.' });
