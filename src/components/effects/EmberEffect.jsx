@@ -3,6 +3,9 @@ import Particles from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 
 export default function EmberEffect() {
+  // Генеруємо унікальний ID для кожного екземпляра ефекту
+  const instanceId = React.useId().replace(/:/g, "");
+  
   const particlesInit = useCallback(async (engine) => {
     await loadSlim(engine);
   }, []);
@@ -12,7 +15,7 @@ export default function EmberEffect() {
     fpsLimit: 60,
     particles: {
       number: {
-        value: 20, // Зменшено кількість для чистоти
+        value: 20,
         density: { enable: false }
       },
       color: {
@@ -22,7 +25,7 @@ export default function EmberEffect() {
         type: "circle"
       },
       opacity: {
-        value: { min: 0.2, max: 0.9 }, // Трохи яскравіші
+        value: { min: 0.2, max: 0.9 },
         animation: {
           enable: true,
           speed: 1,
@@ -30,7 +33,7 @@ export default function EmberEffect() {
         }
       },
       size: {
-        value: { min: 1.5, max: 3.5 } // Трохи більші для видимості світіння
+        value: { min: 0.5, max: 2 } // Зменшено розмір іскор
       },
       move: {
         enable: true,
@@ -47,11 +50,10 @@ export default function EmberEffect() {
           speed: 8
         }
       },
-      // Посилене світіння навколо кожної жаринки
       shadow: {
         enable: true,
         color: "#ff4500",
-        blur: 8 // Збільшено розмиття для м'якого світла
+        blur: 6 // Трохи зменшено світіння відповідно до розміру
       }
     },
     detectRetina: true,
@@ -74,7 +76,7 @@ export default function EmberEffect() {
         }
       `}</style>
       <Particles
-        id="tsparticles-ember"
+        id={`tsparticles-ember-${instanceId}`}
         init={particlesInit}
         options={options}
         className="w-full h-full"
