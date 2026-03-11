@@ -3034,278 +3034,304 @@ export default function AdminView({
               onSubmit={saveCard}
               className="flex-1 bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
             >
-            <h3 className="text-xl font-bold mb-4 text-purple-400">
+            <h3 className="text-xl font-bold mb-6 text-purple-400 border-b border-purple-900/30 pb-2">
               {editingCard ? `Редагування Картки` : 'Додати Картку'}
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <input
-                type="text"
-                placeholder="Назва картки"
-                value={cardForm.name}
-                onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                required
-              />
-              <select
-                value={cardForm.packId}
-                onChange={(e) => setCardForm({ ...cardForm, packId: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                required
-              >
-                <option value="" disabled>
-                  Оберіть пак...
-                </option>
-                {packsCatalog.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={cardForm.rarity}
-                onChange={(e) => setCardForm({ ...cardForm, rarity: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-              >
-                {rarities.map((r) => (
-                  <option key={r.name} value={r.name}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Ліміт (0=Безлім)"
-                value={cardForm.maxSupply}
-                onChange={(e) => setCardForm({ ...cardForm, maxSupply: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-              />
 
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Шанс випадіння картки (в %)"
-                value={cardForm.weight}
-                onChange={(e) => {
-                  const val = e.target.value.replace(',', '.');
-                  setCardForm({ ...cardForm, weight: val });
-                }}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white"
-                title="Вкажіть точний відсоток або вагу випадіння цієї картки з паку. Ігнорує зашиті в код ймовірності рідкості."
-              />
-              <input
-                type="number"
-                placeholder="Ціна продажу (замовч. 15)"
-                value={cardForm.sellPrice}
-                onChange={(e) => setCardForm({ ...cardForm, sellPrice: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white text-green-400"
-                title="Скільки монет отримає гравець за дублікат"
-              />
-
-              <select
-                value={cardForm.dropAnim || ''}
-                onChange={(e) => setCardForm({ ...cardForm, dropAnim: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-yellow-500 font-bold"
-                title="Анімація появи після відкриття паку"
-              >
-                {DROP_ANIMATIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={cardForm.frame || 'normal'}
-                onChange={(e) => setCardForm({ ...cardForm, frame: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white font-bold text-amber-500 md:col-span-1"
-              >
-                <option value="normal">Звичайна рамка</option>
-                <option value="bronze">Бронзова</option>
-                <option value="silver">Срібна</option>
-                <option value="gold">Золота сяюча</option>
-                <option value="neon">Неонова пульсуюча</option>
-              </select>
-
-              <select
-                value={cardForm.effect}
-                onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })}
-                className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white md:col-span-1 text-purple-400 font-bold"
-              >
-                {EFFECT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.name}
-                  </option>
-                ))}
-              </select>
-
-              <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2 flex flex-col gap-2 md:col-span-4">
-                <input
-                  type="text"
-                  placeholder="URL Картинки (або файл)"
-                  value={cardForm.image}
-                  onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })}
-                  className="bg-transparent text-white outline-none w-full text-sm"
-                  required={!cardImageFile && !cardForm.image}
-                />
-                <div className="h-px bg-neutral-800 w-full" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setCardImageFile(e.target.files[0])}
-                  className="text-xs text-neutral-400 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-900 file:text-purple-300 hover:file:bg-purple-800"
-                />
+            {/* --- СЕКЦІЯ 1: ОСНОВНЕ --- */}
+            <div className="mb-8">
+              <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="w-8 h-px bg-neutral-800"></span> Основна інформація
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Назва картки</label>
+                  <input
+                    type="text"
+                    placeholder="Введіть назву..."
+                    value={cardForm.name}
+                    onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Пакет (Колекція)</label>
+                  <select
+                    value={cardForm.packId}
+                    onChange={(e) => setCardForm({ ...cardForm, packId: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors"
+                    required
+                  >
+                    <option value="" disabled>Оберіть пак...</option>
+                    {packsCatalog.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Рідкість</label>
+                  <select
+                    value={cardForm.rarity}
+                    onChange={(e) => setCardForm({ ...cardForm, rarity: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors font-bold"
+                  >
+                    {rarities.map((r) => (
+                      <option key={r.name} value={r.name}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+            </div>
 
-              <div className="md:col-span-4 flex flex-col sm:flex-row gap-4 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3">
-                <input
-                  type="text"
-                  placeholder="URL Звуку (mp3/wav) необов'язково"
-                  value={cardForm.soundUrl || ''}
-                  onChange={(e) => setCardForm({ ...cardForm, soundUrl: e.target.value })}
-                  className="flex-1 bg-transparent text-white outline-none"
-                />
-                {cardForm.soundUrl && (
-                  <div className="w-full sm:w-40 flex flex-col justify-center sm:border-l sm:border-neutral-800 sm:pl-4 pt-2 sm:pt-0 border-t border-neutral-800 sm:border-t-0 mt-2 sm:mt-0">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase mb-1">
-                      Гучність: {cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5}
-                    </label>
+            {/* --- СЕКЦІЯ 2: ЕКОНОМІКА --- */}
+            <div className="mb-8">
+              <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="w-8 h-px bg-neutral-800"></span> Економіка та шанси
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Ліміт копій (0 = Безлім)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={cardForm.maxSupply}
+                    onChange={(e) => setCardForm({ ...cardForm, maxSupply: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Шанс випадіння (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Авто"
+                    value={cardForm.weight}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(',', '.');
+                      setCardForm({ ...cardForm, weight: val });
+                    }}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors"
+                    title="Ігнорує стандартні шанси рідкості, якщо вказано."
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Ціна продажу (Coins)</label>
+                  <input
+                    type="number"
+                    placeholder="15"
+                    value={cardForm.sellPrice}
+                    onChange={(e) => setCardForm({ ...cardForm, sellPrice: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-green-400 focus:border-green-500 outline-none transition-colors font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* --- СЕКЦІЯ 3: ВІЗУАЛ ТА МЕДІА --- */}
+            <div className="mb-8 p-4 bg-neutral-950/30 border border-neutral-800 rounded-2xl">
+              <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="w-8 h-px bg-neutral-800"></span> Зовнішній вигляд та медіа
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Зображення картки</label>
+                  <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 flex flex-col gap-2">
                     <input
-                      type="range"
-                      min="0.1"
-                      max="1"
-                      step="0.1"
-                      value={cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5}
-                      onChange={(e) =>
-                        setCardForm({ ...cardForm, soundVolume: parseFloat(e.target.value) })
-                      }
-                      className="accent-purple-500 w-full"
+                      type="text"
+                      placeholder="URL зображення..."
+                      value={cardForm.image}
+                      onChange={(e) => setCardForm({ ...cardForm, image: e.target.value })}
+                      className="bg-transparent text-white outline-none w-full text-sm"
+                      required={!cardImageFile && !cardForm.image}
+                    />
+                    <div className="h-px bg-neutral-800 w-full" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setCardImageFile(e.target.files[0])}
+                      className="text-xs text-neutral-500 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-900/50 file:text-purple-300 hover:file:bg-purple-800/50 cursor-pointer"
                     />
                   </div>
-                )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Звуковий супровід</label>
+                  <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 flex flex-col gap-2">
+                    <input
+                      type="text"
+                      placeholder="URL звуку (mp3)..."
+                      value={cardForm.soundUrl || ''}
+                      onChange={(e) => setCardForm({ ...cardForm, soundUrl: e.target.value })}
+                      className="bg-transparent text-white outline-none w-full text-sm"
+                    />
+                    {cardForm.soundUrl && (
+                      <div className="flex items-center gap-3 mt-1 pt-2 border-t border-neutral-800">
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase shrink-0">Гучність</span>
+                        <input
+                          type="range" min="0.1" max="1" step="0.1"
+                          value={cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5}
+                          onChange={(e) => setCardForm({ ...cardForm, soundVolume: parseFloat(e.target.value) })}
+                          className="accent-purple-500 flex-1 h-1.5"
+                        />
+                        <span className="text-[10px] font-mono text-purple-400 w-6 text-right">
+                          {Math.round((cardForm.soundVolume || 0.5) * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="md:col-span-4 mt-4 mb-2">
-                <label className="inline-flex items-center gap-3 text-sm text-green-300 font-medium cursor-pointer hover:bg-green-900/20 bg-green-950/10 px-4 py-3 rounded-lg border border-green-900/30 transition-colors w-full sm:w-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Рамка картки</label>
+                  <select
+                    value={cardForm.frame || 'normal'}
+                    onChange={(e) => setCardForm({ ...cardForm, frame: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-amber-500 focus:border-amber-500 outline-none transition-colors font-bold"
+                  >
+                    <option value="normal">Стандартна</option>
+                    <option value="bronze">Бронзова</option>
+                    <option value="silver">Срібна</option>
+                    <option value="gold">Золота</option>
+                    <option value="neon">Неонова</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Візуальний ефект</label>
+                  <select
+                    value={cardForm.effect}
+                    onChange={(e) => setCardForm({ ...cardForm, effect: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-purple-400 focus:border-purple-400 outline-none transition-colors font-bold"
+                  >
+                    {EFFECT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Анімація випадіння</label>
+                  <select
+                    value={cardForm.dropAnim || ''}
+                    onChange={(e) => setCardForm({ ...cardForm, dropAnim: e.target.value })}
+                    className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-yellow-500 focus:border-yellow-500 outline-none transition-colors font-bold"
+                  >
+                    {DROP_ANIMATIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* --- СЕКЦІЯ 4: ІГРОВІ ПАРАМЕТРИ --- */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-8 h-px bg-neutral-800"></span> Ігрові параметри
+                </h4>
+                <label className="inline-flex items-center gap-2 text-xs text-green-400 font-bold cursor-pointer bg-green-900/10 px-3 py-1.5 rounded-lg border border-green-900/30 hover:bg-green-900/20 transition-colors">
                   <input
                     type="checkbox"
                     checked={cardForm.isGame || false}
                     onChange={(e) => setCardForm({ ...cardForm, isGame: e.target.checked })}
-                    className="w-4 h-4 accent-green-500 rounded"
+                    className="w-3.5 h-3.5 accent-green-500 rounded"
                   />
-                  Ігрова картка (Отримує силу при випадінні)
+                  Активувати ігрову логіку
                 </label>
               </div>
 
-              <div className="md:col-span-4 mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-neutral-900/50 p-4 border border-neutral-800 rounded-xl">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
-                    Min Сила (Опц.)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Паку"
-                    value={cardForm.minPower ?? ''}
-                    onChange={(e) => setCardForm({ ...cardForm, minPower: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition-colors"
-                  />
+              <div className={`transition-all duration-300 ${cardForm.isGame ? 'opacity-100' : 'opacity-40 grayscale pointer-events-none'}`}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Мін. Сила</label>
+                    <input
+                      type="number" placeholder="Авто"
+                      value={cardForm.minPower ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, minPower: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-blue-400 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. Сила</label>
+                    <input
+                      type="number" placeholder="Авто"
+                      value={cardForm.maxPower ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-blue-400 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Мін. HP</label>
+                    <input
+                      type="number" placeholder="Авто"
+                      value={cardForm.minHp ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, minHp: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-red-400 focus:border-red-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. HP</label>
+                    <input
+                      type="number" placeholder="Авто"
+                      value={cardForm.maxHp ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-red-400 focus:border-red-500 outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
-                    Max Сила (Опц.)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Паку"
-                    value={cardForm.maxPower ?? ''}
-                    onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-blue-500 focus:outline-none transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
-                    Min HP (Опц.)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Паку"
-                    value={cardForm.minHp ?? ''}
-                    onChange={(e) => setCardForm({ ...cardForm, minHp: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-red-500 focus:outline-none transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wide">
-                    Max HP (Опц.)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Паку"
-                    value={cardForm.maxHp ?? ''}
-                    onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-red-500 focus:outline-none transition-colors"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-purple-950/10 border border-purple-900/20 rounded-2xl">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-purple-400 uppercase ml-1">Здібність (Перк)</label>
+                    <select
+                      value={cardForm.perk || ''}
+                      onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none"
+                    >
+                      <option value="">Без здібності</option>
+                      <optgroup label="⚔️ Атакувальні">
+                        <option value="crit">Крит (2× шкоди)</option>
+                        <option value="cleave">Сплеск (по сусідах)</option>
+                        <option value="poison">Отрута (3 ходи)</option>
+                        <option value="lifesteal">Вампіризм (ліфстіл)</option>
+                      </optgroup>
+                      <optgroup label="🛡️ Захисні">
+                        <option value="dodge">Ухилення</option>
+                        <option value="thorns">Шипи (повернення шкоди)</option>
+                        <option value="armor">Броня (зниження шкоди)</option>
+                        <option value="laststand">Виживання (1 HP)</option>
+                      </optgroup>
+                      <optgroup label="🎯 Тактичні">
+                        <option value="taunt">Провокація (таунт)</option>
+                        <option value="healer">Цілитель</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-purple-400 uppercase ml-1">Ефективність (%)</label>
+                    <input
+                      type="number" min="1" max="100"
+                      placeholder={cardForm.perk === 'taunt' || cardForm.perk === 'laststand' ? 'Авто' : 'Напр: 25'}
+                      disabled={!cardForm.perk || cardForm.perk === 'taunt' || cardForm.perk === 'laststand'}
+                      value={cardForm.perkValue ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, perkValue: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none disabled:opacity-30"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Perk (Здібність) */}
-            <div className="md:col-span-4 mt-2 grid grid-cols-2 gap-3 bg-purple-950/20 p-4 border border-purple-900/30 rounded-xl">
-              <div>
-                <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
-                  Перк (Здібність)
-                </label>
-                <select
-                  value={cardForm.perk || ''}
-                  onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors"
-                >
-                  <option value="">Без перку</option>
-                  <optgroup label="⚔️ Атакувальні">
-                    <option value="crit">Крит (2× шкоди)</option>
-                    <option value="cleave">Сплеск (по сусідах)</option>
-                    <option value="poison">Отрута (3 ходи)</option>
-                    <option value="lifesteal">Вампіризм (ліфстіл)</option>
-                  </optgroup>
-                  <optgroup label="🛡️ Захисні">
-                    <option value="dodge">Ухилення</option>
-                    <option value="thorns">Шипи (повернення шкоди)</option>
-                    <option value="armor">Броня (зниження шкоди)</option>
-                    <option value="laststand">Виживання (1 HP)</option>
-                  </optgroup>
-                  <optgroup label="🎯 Тактичні">
-                    <option value="taunt">Провокація (таунт)</option>
-                    <option value="healer">Цілитель</option>
-                  </optgroup>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-purple-300 mb-2 uppercase tracking-wide">
-                  Значення перку (%)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  placeholder={cardForm.perk === 'taunt' || cardForm.perk === 'laststand' ? 'Не потрібно' : 'Напр. 25'}
-                  disabled={!cardForm.perk || cardForm.perk === 'taunt' || cardForm.perk === 'laststand'}
-                  value={cardForm.perkValue ?? ''}
-                  onChange={(e) => setCardForm({ ...cardForm, perkValue: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-700 text-white text-sm rounded-lg px-3 py-2.5 focus:border-purple-500 focus:outline-none transition-colors disabled:opacity-40"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
+            <div className="flex gap-4 pt-4 border-t border-neutral-800">
               <button
                 type="submit"
                 disabled={!cardForm.packId}
-                className="flex-1 bg-purple-600 disabled:bg-neutral-700 text-white font-bold py-3 rounded-xl"
+                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-neutral-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-purple-900/20 transition-all transform active:scale-[0.98]"
               >
-                Зберегти картку
+                {editingCard ? 'ЗБЕРЕГТИ ЗМІНИ' : 'СТВОРИТИ КАРТКУ'}
               </button>
               {editingCard && (
                 <button
