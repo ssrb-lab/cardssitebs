@@ -51,7 +51,7 @@ export default function ElectricEffect() {
         const deviation = (Math.random() - 0.5) * (width * 0.25);
         
         currentX = targetX + deviation;
-        currentY = targetY + deviation;
+        currentY = targetY;
         bolt.push({ x: currentX, y: currentY });
       }
       bolt.push({ x: destX, y: destY });
