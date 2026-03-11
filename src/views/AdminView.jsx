@@ -2362,13 +2362,17 @@ export default function AdminView({
                       <Trash2 size={18} />
                     </button>
                   </div>
-                  <div className={`bg-neutral-950 border border-neutral-700 rounded-lg overflow-hidden mb-2 ${isMedia ? 'w-full aspect-[2/1]' : 'w-20 aspect-[2/3]'}`}>
+                  <div 
+                    className={`bg-black/20 border border-neutral-700 rounded-lg overflow-hidden mb-2 relative mx-auto group ${isPlate ? 'w-full aspect-[5/1]' : isMedia ? 'w-full aspect-[2/1]' : 'w-20 aspect-[2/3]'}`}
+                    onMouseEnter={(e) => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
+                    onMouseLeave={(e) => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 0; } }}
+                  >
                     {isVideo ? (
-                      <video src={item.image} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                      <video src={item.image} className={`absolute inset-0 w-full h-full object-cover ${isPlate ? 'object-[right_30%]' : 'object-center'}`} muted loop playsInline />
                     ) : (
                       <img
                         src={isMedia ? item.image : cDef?.image}
-                        className="w-full h-full object-cover"
+                        className={`absolute inset-0 w-full h-full object-cover ${isPlate ? 'object-[right_30%]' : 'object-center'}`}
                         alt=""
                         loading="lazy"
                       />

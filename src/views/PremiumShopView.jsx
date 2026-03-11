@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Gem, CheckCircle2, Edit2, Coins, Star, Eye, Trash2 } from 'lucide-react';
+import { Gem, CheckCircle2, Edit2, Coins, Star, Eye, Trash2, X, Swords, Ban } from 'lucide-react';
+import PlayerAvatar from '../components/PlayerAvatar';
 import {
   buyPremiumRequest,
   getToken,
@@ -29,6 +30,7 @@ export default function PremiumShopView({
 }) {
   const [newNickname, setNewNickname] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [previewBadge, setPreviewBadge] = useState(null);
 
   let userBanners = [];
   try {
@@ -229,6 +231,15 @@ export default function PremiumShopView({
                         <Eye className="text-white w-8 h-8" />
                       </button>
                     )}
+                    {isPlate && (
+                      <button
+                        onClick={() => setPreviewBadge(item)}
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10"
+                        title="Попередній перегляд"
+                      >
+                        <Eye className="text-white w-8 h-8" />
+                      </button>
+                    )}
                   </div>
 
                   {!isMedia && (
@@ -366,6 +377,96 @@ export default function PremiumShopView({
       </div>
 
 
+      {/* МОДАЛКА ПЕРЕГЛЯДУ БЕЙДЖА */}
+      {previewBadge && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setPreviewBadge(null)}
+          />
+          <div className="relative bg-neutral-900 border border-fuchsia-500/50 rounded-3xl p-6 sm:p-8 w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setPreviewBadge(null)}
+              className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+            <h3 className="text-2xl font-black text-white text-center mb-2 uppercase tracking-widest">
+              Прев'ю Бейджа
+            </h3>
+            <p className="text-neutral-400 text-center mb-8 text-sm">
+              Ось так виглядатиме ваш профіль у Залі Слави:
+            </p>
+
+            {/* МАКЕТ РЯДКА ЛІДЕРБОРДУ */}
+            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-xl max-w-4xl mx-auto">
+              <div className="flex items-center justify-between p-2 sm:p-4 border-l-4 border-l-yellow-500 relative overflow-hidden group">
+                {/* Бейдж — фон */}
+                {previewBadge.image && previewBadge.image.match(/\.(mp4|webm|mov)$/i) ? (
+                  <video
+                    src={previewBadge.image}
+                    className="absolute left-[47%] top-0 h-full w-auto opacity-40 pointer-events-none z-0"
+                    muted autoPlay loop playsInline
+                  />
+                ) : (
+                  <img
+                    src={previewBadge.image}
+                    className="absolute left-[47%] top-0 h-full w-auto opacity-40 pointer-events-none z-0"
+                    alt=""
+                  />
+                )}
+
+                <div className="flex items-center gap-2 sm:gap-4 overflow-hidden relative z-[1]">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center font-black text-sm sm:text-lg rounded-xl border bg-yellow-500 text-yellow-950 border-yellow-400 shrink-0">
+                    1
+                  </div>
+                  <PlayerAvatar
+                    profile={profile}
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full shrink-0"
+                    iconSize={16}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-white flex items-center gap-1 sm:gap-2 text-sm sm:text-lg">
+                      <span className="truncate">{profile.nickname}</span>
+                      {isPremiumActive && (
+                        <Gem
+                          size={14}
+                          className="text-fuchsia-400 fill-fuchsia-400 shrink-0 sm:w-4 sm:h-4"
+                          title="Преміум"
+                        />
+                      )}
+                      <span className="bg-red-900/40 text-red-400 text-[10px] sm:text-xs px-1 sm:px-2 py-0.5 rounded-lg border border-red-800 flex items-center gap-1 shrink-0">
+                        <Swords size={12} /> {profile.farmLevel || 1}
+                      </span>
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full shrink-0 hidden sm:inline-block">
+                        ВИ
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right flex flex-col items-end gap-1 relative z-[1]">
+                  <div className="text-[10px] sm:text-xs font-bold text-neutral-500 uppercase tracking-widest hidden sm:block">
+                    Унікальні Карти
+                  </div>
+                  <div className="font-black text-xl sm:text-2xl text-blue-400 flex items-center gap-1 sm:gap-2 justify-end">
+                    <span>123</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-center">
+               <button
+                 onClick={() => setPreviewBadge(null)}
+                 className="px-8 py-3 rounded-xl font-bold text-white bg-neutral-800 hover:bg-neutral-700 transition-colors"
+               >
+                 Закрити
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

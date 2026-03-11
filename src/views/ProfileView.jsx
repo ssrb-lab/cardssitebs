@@ -587,7 +587,7 @@ export default function ProfileView({
                     <div className="flex flex-wrap gap-4">
                        <div 
                          onClick={() => handleEquipPlate('')} 
-                         className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.activePlateUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
+                         className={`w-full max-w-[240px] aspect-[5/1] rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold bg-neutral-900 ${!profile.activePlateUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
                        >Без бейджа</div>
                        {userPlates.map((pUrl, i) => {
                          const isVideo = pUrl && pUrl.match(/\.(mp4|webm|mov)$/i);
@@ -595,12 +595,14 @@ export default function ProfileView({
                            <div 
                              key={i} 
                              onClick={() => handleEquipPlate(pUrl)} 
-                             className={`w-32 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-colors relative ${profile.activePlateUrl === pUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                             className={`w-full max-w-[240px] aspect-[5/1] rounded-lg overflow-hidden cursor-pointer border-2 transition-colors relative bg-black/20 group ${profile.activePlateUrl === pUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                             onMouseEnter={(e) => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
+                             onMouseLeave={(e) => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 0; } }}
                            >
                              {isVideo ? (
-                               <video src={pUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                               <video src={pUrl} className="absolute inset-0 w-full h-full object-cover object-[right_30%]" muted loop playsInline />
                              ) : (
-                               <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${pUrl})` }}></div>
+                               <img src={pUrl} className="absolute inset-0 w-full h-full object-cover object-[right_30%]" alt="" />
                              )}
                            </div>
                          );
