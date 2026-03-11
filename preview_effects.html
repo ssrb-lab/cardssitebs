@@ -6,6 +6,8 @@
     <title>Card Effects Preview (Live from Code)</title>
     <!-- Tailwind CDN для базових стилів -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- tsParticles CDN для ефекту Plexus -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js"></script>
     <style>
         /* Підключаємо твій реальний CSS файл */
         @import url("./src/index.css");
@@ -86,7 +88,8 @@
             { id: 'cosmos', name: 'Cosmic Stars' },
             { id: 'electric', name: 'Electric' },
             { id: 'old-film', name: 'Old Film' },
-            { id: 'ghost', name: 'Ghostly' }
+            { id: 'ghost', name: 'Ghostly' },
+            { id: 'plexus', name: 'Plexus (Constellation)' }
         ];
 
         const grid = document.getElementById('effects-grid');
@@ -94,14 +97,44 @@
             const div = document.createElement('div');
             div.className = 'text-center';
             div.innerHTML = `
-                <div class="card-container effect-${eff.id} mx-auto">
+                <div class="card-container effect-${eff.id} mx-auto" id="card-${eff.id}">
                     <img src="https://placehold.co/200x300/111/444?text=${eff.id.toUpperCase()}" class="w-full h-full object-cover">
-                    <div class="${eff.id} absolute inset-0 pointer-events-none z-10"></div>
+                    <div class="${eff.id} absolute inset-0 pointer-events-none z-10" id="container-${eff.id}"></div>
                 </div>
                 <p class="mt-2 text-sm font-mono text-neutral-400">.effect-${eff.id}</p>
                 <p class="font-bold">${eff.name}</p>
             `;
             grid.appendChild(div);
+
+            if (eff.id === 'plexus') {
+                tsParticles.load("container-plexus", {
+                    fullScreen: { enable: false },
+                    fpsLimit: 60,
+                    particles: {
+                        color: { value: "#ffffff" },
+                        links: {
+                            color: "#ffffff",
+                            distance: 120,
+                            enable: true,
+                            opacity: 0.4,
+                            width: 1
+                        },
+                        move: {
+                            enable: true,
+                            speed: 1.5,
+                            outModes: { default: "out" }
+                        },
+                        number: {
+                            density: { enable: false },
+                            value: 20
+                        },
+                        opacity: { value: 0.5 },
+                        shape: { type: "circle" },
+                        size: { value: { min: 1, max: 2.5 } }
+                    },
+                    detectRetina: true
+                });
+            }
         });
 
         // Емуляція 3D нахилу для перевірки ефектів

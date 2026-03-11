@@ -1,4 +1,5 @@
 import React from 'react';
+import PlexusEffect from './effects/PlexusEffect';
 
 export default function CardFrame({ frame = 'normal', children, className = '', effect = '' }) {
   // Базові класи, які мають бути завжди
@@ -21,6 +22,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
         {effect === 'glitch' && (
           <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
         )}
+        {effect === 'plexus' && <PlexusEffect />}
       </div>
     );
   }
@@ -57,6 +59,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
       {effect === 'glitch' && (
         <div className="glitch absolute inset-0 pointer-events-none z-10"></div>
       )}
+      {effect === 'plexus' && <PlexusEffect />}
 
       {/* Сама рамка (накладається зверху поверх картинки) */}
       <div className={frameStyles[frame] || ''}></div>
