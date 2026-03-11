@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Gift,
   Ticket,
@@ -56,6 +57,7 @@ export default function ProfileView({
   achievementsCatalog = [],
   packsCatalog = [],
 }) {
+  const navigate = useNavigate();
   const [avatarInput, setAvatarInput] = useState('');
   const [promoInput, setPromoInput] = useState('');
   const [oldPassword, setOldPassword] = useState('');
@@ -518,27 +520,44 @@ export default function ProfileView({
             </div>
 
             {/* ПРОФІЛЬНІ БАНЕРИ */}
-            {profile?.ownedBanners && (Array.isArray(profile.ownedBanners) ? profile.ownedBanners : (typeof profile.ownedBanners === 'string' ? JSON.parse(profile.ownedBanners) : [])).length > 0 && (
-              <div className="bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50 mt-2">
-                <label className="block text-sm font-bold text-neutral-400 mb-3">
-                  Мої Банери
-                </label>
-                <div className="flex flex-wrap gap-4">
-                   <div 
-                     onClick={() => handleEquipBanner('')} 
-                     className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.profileBannerUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
-                   >Стандартний</div>
-                   {(Array.isArray(profile.ownedBanners) ? profile.ownedBanners : (typeof profile.ownedBanners === 'string' ? JSON.parse(profile.ownedBanners) : [])).map((bUrl, i) => (
-                      <div 
-                        key={i} 
-                        onClick={() => handleEquipBanner(bUrl)} 
-                        className={`w-32 h-16 rounded-lg bg-cover bg-center cursor-pointer border-2 transition-colors ${profile.profileBannerUrl === bUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
-                        style={{ backgroundImage: `url(${bUrl})` }}
-                      ></div>
-                   ))}
+            {(() => {
+              const userBanners = profile?.ownedBanners 
+                ? (Array.isArray(profile.ownedBanners) ? profile.ownedBanners : (typeof profile.ownedBanners === 'string' ? JSON.parse(profile.ownedBanners) : [])) 
+                : [];
+              return (
+                <div className="bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50 mt-2">
+                  <label className="block text-sm font-bold text-neutral-400 mb-3">
+                    Мої Банери
+                  </label>
+                  {userBanners.length > 0 ? (
+                    <div className="flex flex-wrap gap-4">
+                       <div 
+                         onClick={() => handleEquipBanner('')} 
+                         className={`w-32 h-16 rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold ${!profile.profileBannerUrl ? 'border-blue-500' : 'border-neutral-700 hover:border-neutral-500'}`}
+                       >Стандартний</div>
+                       {userBanners.map((bUrl, i) => (
+                          <div 
+                            key={i} 
+                            onClick={() => handleEquipBanner(bUrl)} 
+                            className={`w-32 h-16 rounded-lg bg-cover bg-center cursor-pointer border-2 transition-colors ${profile.profileBannerUrl === bUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                            style={{ backgroundImage: `url(${bUrl})` }}
+                          ></div>
+                       ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center p-4 bg-neutral-900/50 rounded-xl border border-neutral-800/50">
+                      <p className="text-neutral-400 text-sm mb-4">У вас ще немає ексклюзивних банерів</p>
+                      <button
+                        onClick={() => navigate('/premium')}
+                        className="bg-fuchsia-600/20 text-fuchsia-400 hover:bg-fuchsia-600 hover:text-white border border-fuchsia-500/30 px-6 py-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm"
+                      >
+                        <Gem size={16} /> Придбати в Преміумі
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="flex justify-end mt-2 pt-4 border-t border-neutral-800">
               <button
