@@ -603,7 +603,7 @@ export default function ProfileView({
         <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
           {profile?.nickname}
           <span
-            className="bg-red-600/20 text-red-400 text-sm px-2 py-1 rounded-xl border border-red-500/50 flex items-center gap-1"
+            className="bg-red-600/20 backdrop-blur-md text-red-400 text-sm px-3 py-1 rounded-xl border border-red-500/40 flex items-center gap-1.5 shadow-sm"
             title="Ваш рівень Фарму"
           >
             <Swords size={16} /> {profile?.farmLevel || 1}
