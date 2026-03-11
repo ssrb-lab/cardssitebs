@@ -3520,6 +3520,14 @@ export default function AdminView({
                         {card.maxSupply - (card.pulledCount || 0)}/{card.maxSupply}
                       </div>
                     )}
+                    {card.soundUrl && (
+                      <div 
+                        className="absolute top-1 right-1 bg-purple-600/80 text-white p-1 rounded-full z-10 shadow-lg border border-purple-400/50"
+                        title="Ця картка має звуковий супровід"
+                      >
+                        <Volume2 size={10} />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20">
                       <button
                         onClick={() => {
@@ -3577,7 +3585,7 @@ export default function AdminView({
                         {card.name}
                       </div>
 
-                      {/* 3. Ціна та Ефект */}
+                      {/* 3. Ціна та Ефект / Звук */}
                       <div className="flex justify-between items-center w-full px-1 mb-1">
                         <span
                           className="text-[10px] text-green-400 font-bold flex items-center gap-0.5"
@@ -3585,16 +3593,20 @@ export default function AdminView({
                         >
                           {card.sellPrice || 15} <Coins size={10} />
                         </span>
-                        {card.effect && (
-                          <span
-                            className="text-[8px] text-purple-400 bg-purple-900/40 px-1 rounded border border-purple-800/50 uppercase tracking-wider"
-                            title="Візуальний ефект"
-                          >
-                            {card.effect}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {card.soundUrl && (
+                            <Volume2 size={10} className="text-purple-400" title="Має звук" />
+                          )}
+                          {card.effect && (
+                            <span
+                              className="text-[8px] text-purple-400 bg-purple-900/40 px-1 rounded border border-purple-800/50 uppercase tracking-wider"
+                              title="Візуальний ефект"
+                            >
+                              {card.effect}
+                            </span>
+                          )}
+                        </div>
                       </div>
-
                       {/* 4. Назва паку */}
                       <div className="text-[9px] text-neutral-500 truncate bg-neutral-950 rounded py-0.5 px-1 inline-block w-full">
                         {packInfo ? packInfo.name : 'Без паку!'}
