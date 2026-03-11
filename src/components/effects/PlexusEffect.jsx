@@ -13,16 +13,16 @@ const PlexusEffect = memo(() => {
       },
       links: {
         color: '#ffffff',
-        distance: 150, // Збільшена дистанція для кращих зв'язків
+        distance: 25, // 25% від розміру картки - тепер масштаб завжди однаковий!
         enable: true,
-        opacity: 0.6, // Більш помітні лінії
+        opacity: 0.5,
         width: 1.5,
       },
       move: {
         direction: 'none',
         enable: true,
         outModes: {
-          default: 'out', // Часточки вилітають і з'являються з іншого боку
+          default: 'out',
         },
         random: false,
         speed: 1.2,
@@ -30,10 +30,9 @@ const PlexusEffect = memo(() => {
       },
       number: {
         density: {
-          enable: true,
-          area: 800, // Стандартний знаменник площі
+          enable: false, // Вимикаємо залежність від пікселів
         },
-        value: 180, // Це дасть ~20 часточок на маленькій картці та ~80 на великій
+        value: 20, // Фіксована кількість часточок
       },
       opacity: {
         value: 0.5,
@@ -42,7 +41,7 @@ const PlexusEffect = memo(() => {
         type: 'circle',
       },
       size: {
-        value: { min: 1, max: 3 },
+        value: { min: 0.5, max: 1.5 }, // Розмір тепер теж відносний (у відсотках)
       },
     },
     detectRetina: true,
