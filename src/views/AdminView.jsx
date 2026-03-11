@@ -160,6 +160,17 @@ export default function AdminView({
   });
 
   const [cardImageFile, setCardImageFile] = useState(null);
+  const [cardPreviewUrl, setCardPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (cardImageFile) {
+      const url = URL.createObjectURL(cardImageFile);
+      setCardPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setCardPreviewUrl(cardForm.image || '/logo.png');
+    }
+  }, [cardImageFile, cardForm.image]);
   const [packImageFile, setPackImageFile] = useState(null);
 
   const [allAchievements, setAllAchievements] = useState([]);
@@ -3018,10 +3029,11 @@ export default function AdminView({
       {/* --- Вкладка: КАРТКИ --- */}
       {activeTab === 'cards' && (
         <div className="space-y-6 animate-in fade-in">
-          <form
-            onSubmit={saveCard}
-            className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
-          >
+          <div className="flex flex-col xl:flex-row gap-6">
+            <form
+              onSubmit={saveCard}
+              className="flex-1 bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
+            >
             <h3 className="text-xl font-bold mb-4 text-purple-400">
               {editingCard ? `Редагування Картки` : 'Додати Картку'}
             </h3>
@@ -3331,6 +3343,77 @@ export default function AdminView({
               )}
             </div>
           </form>
+
+          {/* ПРЕВ'Ю (справа) */}
+          <div className="w-full xl:w-80 shrink-0">
+            <div className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl sticky top-6">
+              <h3 className="text-xl font-bold mb-4 text-purple-400 text-center">Прев'ю</h3>
+              
+              <div className="flex justify-center">
+                <div
+                  className={`w-48 bg-neutral-900 rounded-xl overflow-hidden border-2 ${
+                    getCardStyle(cardForm.rarity || 'Звичайна', rarities).border
+                  } group relative flex flex-col`}
+                >
+                  <div
+                    className={`aspect-[2/3] w-full relative shrink-0 ${
+                      cardForm.effect ? `effect-${cardForm.effect}` : ''
+                    }`}
+                  >
+                    <CardFrame frame={cardForm.frame || 'normal'}>
+                      <img
+                        src={cardPreviewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </CardFrame>
+                    {cardForm.maxSupply > 0 && (
+                      <div className="absolute top-1 left-1 bg-black/80 text-white text-[8px] px-1.5 py-0.5 rounded border border-neutral-700 z-10">
+                        {editingCard ? (editingCard.maxSupply - (editingCard.pulledCount || 0)) : cardForm.maxSupply}/{cardForm.maxSupply}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 text-center">
+                <p className="font-bold text-lg text-white break-words">
+                  {cardForm.name || 'Без назви'}
+                </p>
+                <p className={`text-sm font-bold uppercase tracking-wider mt-1 ${getCardStyle(cardForm.rarity || 'Звичайна', rarities).text}`}>
+                  {cardForm.rarity || 'Звичайна'}
+                </p>
+                {cardForm.packId && (
+                  <p className="text-xs text-neutral-500 mt-2 bg-neutral-950 rounded py-1 px-2 inline-block border border-neutral-800">
+                    {packsCatalog.find((p) => p.id === cardForm.packId)?.name || cardForm.packId}
+                  </p>
+                )}
+                
+                {cardForm.isGame && (
+                  <div className="mt-3 text-xs bg-green-900/20 text-green-400 px-3 py-2 rounded-lg border border-green-900/30 flex flex-col gap-1 w-full text-center">
+                    <span className="font-bold uppercase tracking-widest text-[10px] text-green-500">Ігрова Картка</span>
+                    <div>
+                      ⚔️ Сила: {cardForm.minPower || '?'} - {cardForm.maxPower || cardForm.minPower || '?'}
+                    </div>
+                    <div>
+                      ❤️ HP: {cardForm.minHp || '?'} - {cardForm.maxHp || cardForm.minHp || '?'}
+                    </div>
+                  </div>
+                )}
+                {cardForm.perk && (
+                  <div className="mt-2 text-xs bg-purple-900/20 text-purple-400 px-3 py-1.5 rounded-lg border border-purple-900/30 inline-block">
+                    <span className="font-bold">Перк:</span> {cardForm.perk} {cardForm.perkValue ? `(${cardForm.perkValue}%)` : ''}
+                  </div>
+                )}
+                {cardForm.effect && (
+                  <div className="mt-2 text-[10px] text-fuchsia-400/70 uppercase tracking-widest">
+                    Ефект: {EFFECT_OPTIONS.find(e => e.id === cardForm.effect)?.name || cardForm.effect}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          </div>
 
           {/* Фільтри Карток */}
           <div className="flex flex-col sm:flex-row gap-3 mb-4">
