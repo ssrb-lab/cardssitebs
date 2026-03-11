@@ -12,7 +12,7 @@ export default function EmberEffect() {
     fpsLimit: 60,
     particles: {
       number: {
-        value: 40,
+        value: 20, // Зменшено кількість для чистоти
         density: { enable: false }
       },
       color: {
@@ -22,7 +22,7 @@ export default function EmberEffect() {
         type: "circle"
       },
       opacity: {
-        value: { min: 0.1, max: 0.8 },
+        value: { min: 0.2, max: 0.9 }, // Трохи яскравіші
         animation: {
           enable: true,
           speed: 1,
@@ -30,29 +30,28 @@ export default function EmberEffect() {
         }
       },
       size: {
-        value: { min: 1, max: 3 }
+        value: { min: 1.5, max: 3.5 } // Трохи більші для видимості світіння
       },
       move: {
         enable: true,
-        speed: { min: 1, max: 4 },
+        speed: { min: 1, max: 3 },
         direction: "top",
         random: true,
         straight: false,
         outModes: {
           default: "out"
         },
-        // Ефект "хаосу" та погойдування
         wobble: {
           enable: true,
           distance: 5,
-          speed: 10
+          speed: 8
         }
       },
-      // Світіння навколо жаринок
+      // Посилене світіння навколо кожної жаринки
       shadow: {
         enable: true,
         color: "#ff4500",
-        blur: 5
+        blur: 8 // Збільшено розмиття для м'якого світла
       }
     },
     detectRetina: true,
@@ -70,8 +69,8 @@ export default function EmberEffect() {
     >
       <style>{`
         @keyframes ember-glow {
-          0% { box-shadow: inset 0 -10px 20px rgba(255, 50, 0, 0.3); }
-          100% { box-shadow: inset 0 -15px 30px rgba(255, 50, 0, 0.5); }
+          0% { box-shadow: inset 0 -5px 15px rgba(255, 50, 0, 0.15); }
+          100% { box-shadow: inset 0 -20px 45px rgba(255, 50, 0, 0.6); }
         }
       `}</style>
       <Particles
