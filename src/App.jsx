@@ -20,6 +20,7 @@ import {
   Volume2,
   VolumeX,
   Hammer,
+  Heart,
 } from 'lucide-react';
 
 import {
@@ -47,6 +48,7 @@ import {
   safeFetch,
 } from './config/api';
 import NotificationsModal from './components/NotificationsModal';
+import DonateModal from './components/DonateModal';
 import { GoogleLogin } from '@react-oauth/google';
 import { isToday, getCardWeight } from './utils/helpers';
 import { DEFAULT_PACKS, DEFAULT_BOSSES, DEFAULT_RARITIES, SELL_PRICE } from './config/constants';
@@ -74,6 +76,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 export default function App() {
   const [user, setUser] = useState(undefined);
   const [profile, setProfile] = useState(null);
+  const [showDonateModal, setShowDonateModal] = useState(false);
   const [dbInventory, setDbInventory] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
   const [showcases, setShowcases] = useState([]);
@@ -1261,6 +1264,14 @@ export default function App() {
             <span className="hidden sm:block">Card Game</span>
           </div>
 
+          <button 
+            onClick={() => setShowDonateModal(true)}
+            className="flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-colors mx-auto bg-pink-500/10 px-4 py-2 rounded-xl border border-pink-500/20"
+          >
+            <Heart size={18} />
+            <span className="hidden sm:block font-bold">Підтримати</span>
+          </button>
+
           <div className="flex items-center gap-3 sm:gap-6">
             <button
               onClick={() => navigate('/profile')}
@@ -1683,6 +1694,8 @@ export default function App() {
           showToast={showToast}
         />
       )}
+
+      <DonateModal isOpen={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
       <nav className="fixed bottom-0 w-full bg-neutral-900 border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
         <div className="min-w-max mx-auto flex justify-center sm:gap-2">
