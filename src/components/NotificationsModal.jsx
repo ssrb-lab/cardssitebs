@@ -45,20 +45,28 @@ function BattleReportModal({ report, onClose }) {
             const isWeakened = res.status === 'weakened';
             
             return (
-              <div key={idx} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${isDestroyed ? 'bg-red-950/20 border-red-500/50 grayscale' : isWeakened ? 'bg-amber-950/20 border-amber-500/40' : 'bg-neutral-800/50 border-neutral-700/50'}`}>
+              <div key={idx} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${isDestroyed ? 'bg-red-950/20 border-red-500/50' : isWeakened ? 'bg-amber-950/20 border-amber-500/40' : 'bg-neutral-800/50 border-neutral-700/50'}`}>
                 <div className="w-12 h-16 shrink-0 rounded-lg overflow-hidden border-2 border-neutral-700 shadow-lg relative">
-                  <img src={res.image} className="w-full h-full object-cover" />
+                  {res.image ? (
+                    <img src={res.image} className={`w-full h-full object-cover ${isDestroyed ? 'grayscale brightness-50' : ''}`} />
+                  ) : (
+                    <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+                      <Skull size={20} className="text-neutral-600" />
+                    </div>
+                  )}
                   {isDestroyed && (
-                    <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
-                      <Skull size={18} className="text-white" />
+                    <div className="absolute inset-0 bg-red-900/50 flex items-center justify-center">
+                      <Skull size={20} className="text-red-400 drop-shadow-lg" />
                     </div>
                   )}
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <div className="font-black text-white truncate text-xs uppercase tracking-tight">{res.name}</div>
-                    <div className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm border ${isDestroyed ? 'bg-red-600 text-white border-red-400' : isWeakened ? 'bg-amber-500 text-black border-amber-300' : 'bg-green-600 text-white border-green-400'}`}>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className={`font-black truncate text-xs uppercase tracking-tight ${isDestroyed ? 'text-red-300' : 'text-white'}`}>
+                      {res.name || '—'}
+                    </div>
+                    <div className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm border ${isDestroyed ? 'bg-red-600 text-white border-red-400' : isWeakened ? 'bg-amber-500 text-black border-amber-300' : 'bg-green-600 text-white border-green-400'}`}>
                       {isDestroyed ? 'Знищена' : isWeakened ? 'Ослаблена' : 'Вціліла'}
                     </div>
                   </div>
@@ -88,7 +96,12 @@ function BattleReportModal({ report, onClose }) {
                         </div>
                       </div>
                     )}
-                    {isDestroyed && <span className="text-red-400 text-[10px] font-bold">Карту назавжди втрачено</span>}
+                    {isDestroyed && (
+                      <span className="text-red-400 text-[10px] font-bold flex items-center gap-1">
+                        <Skull size={10} />
+                        Картку назавжди втрачено
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
