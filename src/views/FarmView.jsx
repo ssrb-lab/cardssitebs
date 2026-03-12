@@ -620,36 +620,64 @@ export default function FarmView({
             )}
           </div>
 
+        </div>
+
+        {/* Горизонтальний сепаратор */}
+        <div className="w-full h-px bg-neutral-800 my-8 px-2"></div>
+
+        {/* Битва з Босом (Виділена окремо внизу) */}
+        <div className="mb-8 px-2 w-full">
           <div
-            onClick={() => (isBlocked('boss') ? null : setActiveGame('boss'))}
-            className={`bg-neutral-900 border ${isBlocked('boss') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-red-900/50 hover:border-red-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-gradient-to-r ${isBlocked('boss') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-red-900/40 to-orange-900/40 border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.15)] group hover:border-red-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
           >
-            <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
+            <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
               <Swords
-                size={120}
-                className={isBlocked('boss') ? 'text-neutral-500' : 'text-red-500'}
+                size={200}
+                className={isBlocked('boss') ? 'text-neutral-500' : 'text-red-400'}
               />
             </div>
-            <h3
-              className={`text-2xl font-black mb-2 flex items-center gap-2 relative z-10 ${isBlocked('boss') ? 'text-neutral-500' : 'text-white'}`}
-            >
-              <Swords
-                className={isBlocked('boss') ? 'text-neutral-500' : 'text-red-500'}
-              />{' '}
-              Битва з Босом
-            </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
-              Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.
-            </p>
-            {isBlocked('boss') ? (
-              <div className="text-red-400 font-bold py-2 bg-red-900/20 rounded-xl text-center flex items-center justify-center gap-2">
-                <Lock size={16} /> Тимчасово недоступна
+
+            <div className="relative z-10 flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className={`p-3 rounded-2xl border flex-shrink-0 ${isBlocked('boss') ? 'bg-neutral-800 border-neutral-700' : 'bg-red-500/20 border-red-500/30'}`}
+                >
+                  <Swords
+                    size={32}
+                    className={
+                      isBlocked('boss') ? 'text-neutral-500' : 'text-red-400'
+                    }
+                  />
+                </div>
+                <h3
+                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('boss') ? 'text-neutral-500' : 'text-white'}`}
+                >
+                  Битва з Босом
+                </h3>
               </div>
-            ) : (
-              <button className="bg-red-600/20 text-red-400 group-hover:bg-red-600 group-hover:text-white font-bold py-2 px-6 rounded-xl transition-colors relative z-10 w-full sm:w-auto">
-                Грати
-              </button>
-            )}
+              <p
+                className={`${isBlocked('boss') ? 'text-neutral-600' : 'text-red-200'} text-sm sm:text-base max-w-xl leading-relaxed`}
+              >
+                Клікайте, завдавайте шкоди та отримуйте монети! Чим вищий рівень, тим більша нагорода.
+              </p>
+            </div>
+
+            <div className="relative z-10 w-full md:w-auto">
+              <div className="bg-neutral-950/80 backdrop-blur-md border border-neutral-800 rounded-2xl p-4 text-center">
+                {isBlocked('boss') ? (
+                  <div className="w-full text-red-400 font-bold py-3 px-8 rounded-xl bg-red-900/20 text-center flex items-center justify-center gap-2">
+                    <Lock size={20} /> Тимчасово недоступна
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setActiveGame('boss')}
+                    className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-xl uppercase tracking-wider text-sm transition-colors shadow-[0_0_15px_rgba(220,38,38,0.5)] flex items-center justify-center gap-2"
+                  >
+                    Вступити в бій
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
