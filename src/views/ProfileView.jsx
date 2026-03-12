@@ -327,7 +327,7 @@ export default function ProfileView({
                               loading="lazy"
                             />
                           </CardFrame>
-                          <PerkBadge perk={item.card.perk} position="right" />
+                          <PerkBadge perk={item.card.perk} />
                         </div>
                       )}
                       <div>

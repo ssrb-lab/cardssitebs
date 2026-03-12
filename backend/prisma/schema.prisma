@@ -208,7 +208,7 @@ model AdminLog {
 
 model Notification {
   id                 String   @id @default(uuid())
-  type               String   // 'punishment', 'update', 'sale', 'admin_action', 'gift'
+  type               String   // 'punishment', 'update', 'sale', 'admin_action', 'gift', 'arena_battle'
   title              String
   message            String   @db.Text
   isRead             Boolean  @default(false)
@@ -219,6 +219,9 @@ model Notification {
   attachedCardId     String?
   attachedCardAmount Int?     @default(0)
   isClaimed          Boolean  @default(false)
+
+  // Extra data for specialized notifications (e.g. battle reports)
+  metadata           Json?    
 
   userId             String
   user               User     @relation(fields: [userId], references: [uid], onDelete: Cascade)

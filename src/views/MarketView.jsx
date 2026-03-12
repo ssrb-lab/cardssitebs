@@ -110,7 +110,7 @@ export default function MarketView({
                         loading="lazy"
                       />
                     </CardFrame>
-                    <PerkBadge perk={card.perk} position="right" />
+                    <PerkBadge perk={card.perk} />
                   </div>
                   {card.soundUrl && (
                     <button

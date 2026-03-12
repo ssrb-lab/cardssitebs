@@ -415,6 +415,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       );
     }
 
+    if (point.lockedUntil && Date.now() < new Date(point.lockedUntil).getTime()) {
+      return showToast('На цій точці вже ведеться бій іншим гравцем. Зачекайте...', 'error');
+    }
+
     if (!window.confirm(`Захопити цю точку? Це коштуватиме ${point.entryFee} монет.`)) return;
 
     try {
@@ -450,6 +454,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     const cdUntil = capturedTime + selectedPoint.cooldownMinutes * 60 * 1000;
     if (Date.now() < cdUntil) {
       return showToast('Точка ще під захистом.', 'error');
+    }
+
+    if (selectedPoint.lockedUntil && Date.now() < new Date(selectedPoint.lockedUntil).getTime()) {
+      return showToast('На цій точці вже ведеться бій іншим гравцем. Зачекайте...', 'error');
     }
 
     // Enter battle view!
@@ -528,6 +536,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const runBattleAnimation = async (log, initialAttackers, initialDefenders, won, pointUpdate) => {
     let currentAttackers = [...initialAttackers];
     let currentDefenders = [...initialDefenders];
+    let finalNote = null;
 
     // Reveal hidden cards before starting animation
     setIsRevealed(true);
@@ -535,7 +544,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
     for (let i = 0; i < log.length; i++) {
       const step = log[i];
-      if (step.note) continue; // Skip notes
+      if (step.note) {
+        finalNote = step.note;
+        continue; // Skip notes
+      }
 
       const events = step.events || [];
       const targetSide = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
@@ -571,6 +583,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         if (events.includes('laststand') && defTeam[step.targetIndex].currentHp <= 0) {
           defTeam[step.targetIndex].currentHp = 1;
         }
+        
+        // Strict sync with backend
+        if (step.isTargetDead) {
+          defTeam[step.targetIndex].currentHp = 0;
+        } else if (defTeam[step.targetIndex].currentHp <= 0) {
+          defTeam[step.targetIndex].currentHp = 1;
+        }
+
         if (defTeam[step.targetIndex].currentHp < 0) defTeam[step.targetIndex].currentHp = 0;
 
         // Lifesteal heal
@@ -603,7 +623,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
     setTimeout(() => {
       setIsBattleAnimating(false);
-      setBattleResult({ won });
+      setBattleResult({ won, attackerResults: pointUpdate.attackerResults, defenderResults: pointUpdate.defenderResults, note: finalNote });
       setPoints((points) => points.map((p) => (p.id === pointUpdate.id ? pointUpdate : p)));
       setDeck([]);
     }, 1500);
@@ -639,7 +659,11 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         attackerCards,
         defenderCards,
         data.attackerWon,
-        data.point
+        {
+          ...data.point,
+          attackerResults: data.attackerResults,
+          defenderResults: data.defenderResults
+        }
       );
     } catch (error) {
       setIsBattleAnimating(false);
@@ -768,7 +792,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         <img src={card.image} className="w-full h-full object-cover" />
                       </div>
 
-                      <PerkBadge perk={card.perk} position="right" />
+                      <PerkBadge perk={card.perk} />
 
                       {/* Scale stats to prevent overflowing width */}
                       <div className="absolute -bottom-2 inset-x-0 w-[110%] -ml-[5%] mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[8px] sm:text-[10px] xl:text-xs px-1 py-0.5 rounded-full z-10 flex items-center justify-center gap-0.5 shadow-md whitespace-nowrap">
@@ -824,8 +848,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                               Захищає
                             </div>
                           )}
-                          <PerkBadge perk={card.perk} position="right" />
-                          <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
+                          <PerkBadge perk={card.perk} />
+                          <div className={`absolute top-1 ${card.perk ? 'left-7' : 'left-1'} bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md`}>
                             <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{card.power}</span></div>
                             <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{card.hp || card.power || 50}</span></div>
                           </div>
@@ -1482,9 +1506,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                           key={idx}
                           className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-950 ${isHidden ? 'border-neutral-800' : getCardStyle(defCard.rarity).border}`}
                         >
-                          {!isHidden && <PerkBadge perk={defCard.perk} position="right" />}
+                          {!isHidden && <PerkBadge perk={defCard.perk} />}
                           {!isHidden && (
-                            <div className="absolute top-1 left-1 bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md">
+                            <div className={`absolute top-1 ${defCard.perk ? 'left-7' : 'left-1'} bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md`}>
                               <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{defCard.power}</span></div>
                               <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{defCard.hp || defCard.power || 50}</span></div>
                             </div>
@@ -1650,7 +1674,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
                           {/* Face Up (Лицьова сторона) */}
                           <div className={`card-back w-full h-full rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} ${hasTaunt ? 'ring-2 ring-red-500/60 animate-pulse' : ''}`}>
-                            <PerkBadge perk={card.perk} position="right" />
+                            <PerkBadge perk={card.perk} />
                             <div className="absolute -bottom-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-red-500 shadow-lg">
                               <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
                               <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
@@ -1740,7 +1764,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         className={`relative w-28 sm:w-36 md:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''}`}
                         style={!isAttacking && !isHit ? { animationDelay: `${idx * 100}ms` } : {}}
                       >
-                        <PerkBadge perk={card.perk} position="right" />
+                        <PerkBadge perk={card.perk} />
                         <div className="absolute -top-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-indigo-500 shadow-lg">
                           <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
                           <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
@@ -1803,34 +1827,137 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
               {/* BATTLE RESULT MODAL */}
               {battleResult && (
-                <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in zoom-in-50 duration-500 p-4">
-                  <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-8 max-w-md w-full text-center flex flex-col items-center shadow-2xl">
-                    {battleResult.won ? (
-                      <>
-                        <Trophy size={64} className="text-yellow-400 animate-bounce mb-4" />
-                        <h2 className="text-4xl font-black text-white uppercase mb-2">Перемога!</h2>
-                        <p className="text-neutral-400 mb-6">
-                          Ви успішно захопили точку. Відтепер вона приноситиме вам кристали.
+                <div className="absolute inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in-50 duration-500 p-4">
+                  <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 sm:p-8 max-w-xl w-full flex flex-col shadow-2xl max-h-[90vh] overflow-hidden">
+                    <div className="flex flex-col items-center mb-6 shrink-0">
+                      {battleResult.won ? (
+                        <>
+                          <div className="relative">
+                            <Trophy size={64} className="text-yellow-400 animate-bounce mb-2" />
+                            <div className="absolute -inset-4 bg-yellow-400/20 blur-2xl rounded-full -z-10 animate-pulse"></div>
+                          </div>
+                          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Перемога!</h2>
+                          <p className="text-indigo-400 font-bold text-sm">Точку захоплено під ваш прапор</p>
+                        </>
+                      ) : (
+                        <>
+                          <X size={64} className="text-red-500 mb-2" />
+                          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Поразка</h2>
+                          <p className="text-red-400/70 font-bold text-sm">Атаку відбито захисниками</p>
+                        </>
+                      )}
+                    </div>
+
+                    {battleResult.note && (
+                      <div className="mb-6 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-center shadow-inner animate-in fade-in slide-in-from-top-2 duration-700">
+                        <div className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-center gap-2">
+                          <Info size={12} /> Системне повідомлення
+                        </div>
+                        <p className="text-white text-sm font-medium leading-relaxed italic">
+                          {battleResult.note}
                         </p>
-                      </>
-                    ) : (
-                      <>
-                        <X size={64} className="text-red-500 mb-4" />
-                        <h2 className="text-4xl font-black text-white uppercase mb-2">Поразка</h2>
-                        <p className="text-neutral-400 mb-6">
-                          Ваша колода була розбита у бою. Спробуйте зібрати сильніші карти!
-                        </p>
-                      </>
+                      </div>
                     )}
-                    <button
-                      onClick={() => {
-                        setBattleResult(null);
-                        setBattleState(null);
-                      }}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-colors"
-                    >
-                      Повернутися до карти
-                    </button>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-6">
+                      <h3 className="text-xs uppercase font-black text-neutral-500 mb-3 tracking-widest flex items-center gap-2">
+                        <Swords size={14} /> Звіт про стан ваших карт
+                      </h3>
+                      
+                      <div className="flex flex-col gap-3">
+                        {battleResult.attackerResults?.map((res, idx) => {
+                          const isDestroyed = res.status === 'destroyed';
+                          const isWeakened = res.status === 'weakened';
+                          
+                          return (
+                            <div key={idx} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${isDestroyed ? 'bg-red-950/20 border-red-500/50 grayscale' : isWeakened ? 'bg-amber-950/20 border-amber-500/40' : 'bg-neutral-800/50 border-neutral-700/50'}`}>
+                              <div className="w-16 h-20 shrink-0 rounded-lg overflow-hidden border-2 border-neutral-700 shadow-lg relative">
+                                <img src={res.image} className="w-full h-full object-cover" />
+                                {isDestroyed && (
+                                  <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
+                                    <Skull size={24} className="text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start">
+                                  <div className="font-black text-white truncate text-sm uppercase tracking-tight">{res.name}</div>
+                                  <div className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm border ${isDestroyed ? 'bg-red-600 text-white border-red-400' : isWeakened ? 'bg-amber-500 text-black border-amber-300' : 'bg-green-600 text-white border-green-400'}`}>
+                                    {isDestroyed ? 'Знищена' : isWeakened ? 'Ослаблена' : 'Вціліла'}
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-2 flex items-center gap-4">
+                                  {isDestroyed ? (
+                                    <p className="text-red-400 text-[11px] font-bold leading-tight">Цю карту було назавжди втрачено в режимі Хардкор.</p>
+                                  ) : (
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex flex-col">
+                                        <span className="text-[9px] text-neutral-500 uppercase font-black">Сила</span>
+                                        <div className="flex items-center gap-1">
+                                          <Zap size={10} className="text-yellow-500" />
+                                          <span className="text-xs font-black text-white">{res.newPower || res.oldPower}</span>
+                                          {isWeakened && res.newPower < res.oldPower && (
+                                            <span className="text-[9px] text-red-500 font-bold">-{res.oldPower - res.newPower}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-[9px] text-neutral-500 uppercase font-black">HP Max</span>
+                                        <div className="flex items-center gap-1">
+                                          <Heart size={10} className="text-red-500" />
+                                          <span className="text-xs font-black text-white">{res.newMaxHp || res.oldMaxHp}</span>
+                                          {isWeakened && res.newMaxHp < res.oldMaxHp && (
+                                            <span className="text-[9px] text-red-500 font-bold">-{res.oldMaxHp - res.newMaxHp}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {battleResult.won && battleResult.defenderResults?.length > 0 && (
+                        <div className="mt-6 border-t border-neutral-800 pt-4">
+                          <h3 className="text-xs uppercase font-black text-neutral-500 mb-3 tracking-widest flex items-center gap-2">
+                             Втрати захисників
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                             {battleResult.defenderResults.map((dr, i) => (
+                               <div key={i} className="flex items-center gap-2 bg-neutral-950/50 px-2 py-1 rounded-lg border border-neutral-800" title={dr.name}>
+                                 <img src={dr.image} className="w-5 h-7 object-cover rounded shadow-sm grayscale" />
+                                 <span className="text-[10px] text-neutral-500 font-bold truncate max-w-[80px]">{dr.name}</span>
+                                 <Skull size={10} className="text-red-900" />
+                               </div>
+                             ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-auto shrink-0 flex flex-col gap-3">
+                      {(battleResult.attackerResults?.some(r => r.status === 'destroyed' || r.status === 'weakened')) && (
+                         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-3">
+                            <ShieldAlert size={20} className="text-red-500 shrink-0" />
+                            <p className="text-[11px] text-red-400 font-medium">Ваші карти отримали незворотні зміни через налаштування цієї точки Арени.</p>
+                         </div>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          setBattleResult(null);
+                          setBattleState(null);
+                        }}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(79,70,229,0.2)] hover:shadow-[0_15px_25px_rgba(79,70,229,0.3)] hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-sm"
+                      >
+                        Завершити місію
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
