@@ -30,6 +30,7 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
 
   const sortedProfiles = [...allProfiles].sort((a, b) => {
     if (ratingSort === 'coins') return (b.coins || 0) - (a.coins || 0);
+    if (ratingSort === 'tetris') return (b.tetrisBestScore || 0) - (a.tetrisBestScore || 0);
     return (b.uniqueCardsCount || 0) - (a.uniqueCardsCount || 0);
   });
 
@@ -79,18 +80,24 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
           />
         </div>
 
-        <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-md mx-auto">
+        <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-lg mx-auto overflow-x-auto no-scrollbar">
           <button
             onClick={() => setRatingSort('cards')}
-            className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${ratingSort === 'cards' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-[10px] sm:text-xs transition-colors flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${ratingSort === 'cards' ? 'bg-blue-600 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
           >
-            <LayoutGrid size={16} /> За Колекцією
+            <LayoutGrid size={14} /> Карти
           </button>
           <button
             onClick={() => setRatingSort('coins')}
-            className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${ratingSort === 'coins' ? 'bg-yellow-600 text-white' : 'text-neutral-400 hover:text-white'}`}
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-[10px] sm:text-xs transition-colors flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${ratingSort === 'coins' ? 'bg-yellow-600 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
           >
-            <Coins size={16} /> За Монетами
+            <Coins size={14} /> Монети
+          </button>
+          <button
+            onClick={() => setRatingSort('tetris')}
+            className={`flex-1 py-2 px-3 rounded-lg font-bold text-[10px] sm:text-xs transition-colors flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${ratingSort === 'tetris' ? 'bg-purple-600 text-white shadow-lg' : 'text-neutral-400 hover:text-white'}`}
+          >
+            <Trophy size={14} /> Тетріс
           </button>
         </div>
       </div>
@@ -185,12 +192,12 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
               <div className="flex items-center gap-2 sm:gap-4 shrink-0 pl-2 relative z-[1]">
                 <div className="text-right">
                   <div className="text-[10px] sm:text-xs text-neutral-500 font-bold uppercase">
-                    {ratingSort === 'cards' ? 'Унікальні карти' : 'Монети'}
+                    {ratingSort === 'cards' ? 'Унікальні карти' : ratingSort === 'coins' ? 'Монети' : 'Тетріс (Max)'}
                   </div>
                   <div
-                    className={`text-base sm:text-xl font-black ${ratingSort === 'cards' ? 'text-blue-400' : 'text-yellow-500'}`}
+                    className={`text-base sm:text-xl font-black ${ratingSort === 'cards' ? 'text-blue-400' : ratingSort === 'coins' ? 'text-yellow-500' : 'text-purple-400'}`}
                   >
-                    {ratingSort === 'cards' ? leader.uniqueCardsCount || 0 : leader.coins || 0}
+                    {ratingSort === 'cards' ? leader.uniqueCardsCount || 0 : ratingSort === 'coins' ? leader.coins || 0 : leader.tetrisBestScore || 0}
                   </div>
                 </div>
                 <ArrowLeft

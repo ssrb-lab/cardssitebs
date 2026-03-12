@@ -93,6 +93,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   const [timeElapsed, setTimeElapsed] = useState(0); // in seconds
 
   const [currentPiece, setCurrentPiece] = useState(null);
+  const [nextPiece, setNextPiece] = useState(null);
 
   const requestRef = useRef();
   const lastTimeRef = useRef();
@@ -107,12 +108,14 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
           board: sBoard,
           score: sScore,
           currentPiece: sPiece,
+          nextPiece: sNextPiece,
           gameOver: sGameOver,
           timeElapsed: sTimeElapsed,
         } = JSON.parse(saved);
         setBoard(sBoard);
         setScore(sScore);
         setCurrentPiece(sPiece);
+        setNextPiece(sNextPiece || getRandomPiece());
         setGameOver(sGameOver);
         setTimeElapsed(sTimeElapsed || 0);
         setIsInitialized(true);
@@ -132,10 +135,10 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
     if (isInitialized && !gameOver) {
       localStorage.setItem(
         'tetris_state',
-        JSON.stringify({ board, score, currentPiece, gameOver, timeElapsed })
+        JSON.stringify({ board, score, currentPiece, nextPiece, gameOver, timeElapsed })
       );
     }
-  }, [board, score, currentPiece, gameOver, isInitialized, timeElapsed]);
+  }, [board, score, currentPiece, nextPiece, gameOver, isInitialized, timeElapsed]);
 
   const startGame = async () => {
     setIsProcessing(true);
@@ -146,7 +149,10 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       setGameOver(false);
       setIsPaused(false);
       setTimeElapsed(0);
-      spawnPiece();
+      const first = getRandomPiece();
+      const second = getRandomPiece();
+      setCurrentPiece(first);
+      setNextPiece(second);
       setDropSpeed(800);
       localStorage.removeItem('tetris_state');
       setIsInitialized(true);
@@ -169,9 +175,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   };
 
   const spawnPiece = () => {
-    // If not passed existing, we'll get a real random piece.
-    // Usually handled correctly by setState func.
-    setCurrentPiece(getRandomPiece());
+    // This is handled in mergePiece now
   };
 
   const checkCollision = (piece, boardData, moveX = 0, moveY = 0) => {
@@ -264,17 +268,21 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
 
     setBoard(newBoard);
     setScore(newScore);
-    setCurrentPiece(getRandomPiece());
+
+    // Current becomes next, next becomes random
+    const pieceToSpawn = nextPiece;
+    const futurePiece = getRandomPiece();
+
+    setNextPiece(futurePiece);
 
     // Check if new piece immediately collides (Game Over)
-    const nextPiece = getRandomPiece();
-    if (checkCollision(nextPiece, newBoard)) {
+    if (checkCollision(pieceToSpawn, newBoard)) {
       setGameOver(true);
-      setCurrentPiece(nextPiece); // Just for render
+      setCurrentPiece(pieceToSpawn); // Just for render
     } else {
-      setCurrentPiece(nextPiece);
+      setCurrentPiece(pieceToSpawn);
     }
-  }, [board, currentPiece, score]);
+  }, [board, currentPiece, nextPiece, score, getRandomPiece]);
 
   const moveDown = useCallback(() => {
     if (gameOver || isPaused || !currentPiece) return;
@@ -512,7 +520,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         </div>
       </div>
 
-      <div className="flex justify-center w-full">
+      <div className="flex justify-center w-full gap-2 sm:gap-6 items-start">
         <div className="bg-neutral-950 p-1 sm:p-4 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-neutral-800 shadow-[0_0_30px_rgba(0,0,0,0.8)] relative overflow-hidden shrink-0">
           <div className="relative">
             {/* Grid background styling using actual grid to ensure alignment */}
@@ -534,8 +542,8 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
               style={{
                 gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
                 gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
-                width: 'min(28dvh, 70vw, 300px)',
-                height: 'min(56dvh, 140vw, 600px)', // aspect ratio 1:2
+                width: 'min(28dvh, 50vw, 300px)',
+                height: 'min(56dvh, 100vw, 600px)', // aspect ratio 1:2
                 gap: '1px', // This gap perfectly aligns with the background grid
               }}
             >
@@ -569,6 +577,35 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Next Piece Preview */}
+        <div className="flex flex-col gap-2 shrink-0">
+          <div className="bg-neutral-900 border border-neutral-800 p-2 sm:p-4 rounded-xl sm:rounded-2xl flex flex-col items-center">
+            <div className="text-[8px] sm:text-xs text-neutral-500 uppercase font-black mb-2 sm:mb-4 tracking-tighter sm:tracking-widest">Далі</div>
+            <div 
+              className="grid gap-0.5 sm:gap-1 bg-black/30 p-1 sm:p-2 rounded-lg border border-neutral-800/50"
+              style={{
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gridTemplateRows: 'repeat(4, 1fr)',
+                width: 'min(8dvh, 15vw, 80px)',
+                height: 'min(8dvh, 15vw, 80px)',
+              }}
+            >
+              {nextPiece && SHAPES[nextPiece.colorId].map((row, y) => 
+                row.map((cell, x) => (
+                  <div 
+                    key={`next-${y}-${x}`}
+                    className={`w-full h-full rounded-[1px] sm:rounded-sm ${cell ? `bg-${COLORS[nextPiece.colorId]} ${NEON_GLOW[nextPiece.colorId]} border border-white/10` : 'bg-transparent'}`}
+                    style={{
+                      gridColumnStart: x + 1,
+                      gridRowStart: y + 1
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

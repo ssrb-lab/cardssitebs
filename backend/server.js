@@ -1971,12 +1971,28 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
-    // Курс: 1 поїнт рахунку = 6 монети (було 3)
-    let coinsToGive = score * 6;
+    // ANTI-CHEAT: cap score based on elapsed play time.
+    // Max realistically achievable ≈ 25 points/sec (4 lines/sec * 1500pts / 60s... actually capping at ~1500pts/min)
+    const MAX_POINTS_PER_SECOND = 25;
+    const startTime = minigame.startTime ? new Date(minigame.startTime) : null;
+    let claimedScore = Math.round(Number(score));
+    if (startTime) {
+      const elapsedSeconds = Math.max(0, (now.getTime() - startTime.getTime()) / 1000);
+      const maxAllowedScore = Math.ceil(elapsedSeconds * MAX_POINTS_PER_SECOND);
+      if (claimedScore > maxAllowedScore) {
+        claimedScore = maxAllowedScore;
+      }
+    }
+
+    // Курс: 1 поїнт рахунку = 6 монет
+    let coinsToGive = claimedScore * 6;
 
     if (currentDailyFarm + coinsToGive > 500000) {
       coinsToGive = 500000 - currentDailyFarm;
     }
+
+    // Update best score if this game is a new record
+    const newBest = claimedScore > (user.tetrisBestScore || 0) ? claimedScore : undefined;
 
     const updatedUser = await prisma.user.update({
       where: { uid: req.user.uid },
@@ -1985,6 +2001,7 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
         dailyFarmAmount: currentDailyFarm + coinsToGive,
         lastFarmDate: now,
         activeMinigame: null,
+        ...(newBest !== undefined ? { tetrisBestScore: newBest } : {}),
       },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
@@ -4301,12 +4318,13 @@ app.get('/api/game/leaderboard', async (req, res) => {
         farmLevel: true,
         isBanned: true,
         avatarUrl: true,
-        isAdmin: true, // <-- ДОДАНО
-        isSuperAdmin: true, // <-- ДОДАНО
-        isPremium: true, // <-- ДОДАНО
-        premiumUntil: true, // <-- ДОДАНО
-        lastIp: true, // <-- ДОДАНО для адмінів
-        activePlateUrl: true, // <-- ДОДАНО для плашок
+        isAdmin: true,
+        isSuperAdmin: true,
+        isPremium: true,
+        premiumUntil: true,
+        lastIp: true,
+        activePlateUrl: true,
+        tetrisBestScore: true,
         // Рахуємо кількість унікальних записів в інвентарі гравця (лише з відкритих паків)
         _count: {
           select: { 
@@ -4326,13 +4344,14 @@ app.get('/api/game/leaderboard', async (req, res) => {
       farmLevel: user.farmLevel,
       isBanned: user.isBanned,
       avatarUrl: user.avatarUrl,
-      isAdmin: user.isAdmin, // <-- ДОДАНО
-      isSuperAdmin: user.isSuperAdmin, // <-- ДОДАНО
-      isPremium: user.isPremium, // <-- ДОДАНО
-      premiumUntil: user.premiumUntil, // <-- ДОДАНО
-      lastIp: user.lastIp, // <-- ДОДАНО
-      activePlateUrl: user.activePlateUrl, // <-- ДОДАНО для плашок
+      isAdmin: user.isAdmin,
+      isSuperAdmin: user.isSuperAdmin,
+      isPremium: user.isPremium,
+      premiumUntil: user.premiumUntil,
+      lastIp: user.lastIp,
+      activePlateUrl: user.activePlateUrl,
       uniqueCardsCount: user._count.inventory,
+      tetrisBestScore: user.tetrisBestScore || 0,
     }));
 
     res.json(formattedUsers);

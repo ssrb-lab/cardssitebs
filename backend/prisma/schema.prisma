@@ -46,6 +46,7 @@ model User {
   last2048PlayDate     DateTime?
   dailyTetrisAttempts  Int      @default(0)
   lastTetrisPlayDate   DateTime?
+  tetrisBestScore      Int      @default(0)
   dailyFuseAttempts    Int      @default(0)
   lastFusePlayDate     DateTime?
   fuseLevel            Int      @default(1)
