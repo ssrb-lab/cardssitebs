@@ -536,6 +536,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const runBattleAnimation = async (log, initialAttackers, initialDefenders, won, pointUpdate) => {
     let currentAttackers = [...initialAttackers];
     let currentDefenders = [...initialDefenders];
+    let finalNote = null;
 
     // Reveal hidden cards before starting animation
     setIsRevealed(true);
@@ -543,7 +544,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
     for (let i = 0; i < log.length; i++) {
       const step = log[i];
-      if (step.note) continue; // Skip notes
+      if (step.note) {
+        finalNote = step.note;
+        continue; // Skip notes
+      }
 
       const events = step.events || [];
       const targetSide = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
@@ -579,6 +583,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         if (events.includes('laststand') && defTeam[step.targetIndex].currentHp <= 0) {
           defTeam[step.targetIndex].currentHp = 1;
         }
+        
+        // Strict sync with backend
+        if (step.isTargetDead) {
+          defTeam[step.targetIndex].currentHp = 0;
+        } else if (defTeam[step.targetIndex].currentHp <= 0) {
+          defTeam[step.targetIndex].currentHp = 1;
+        }
+
         if (defTeam[step.targetIndex].currentHp < 0) defTeam[step.targetIndex].currentHp = 0;
 
         // Lifesteal heal
@@ -611,7 +623,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
     setTimeout(() => {
       setIsBattleAnimating(false);
-      setBattleResult({ won, attackerResults: pointUpdate.attackerResults, defenderResults: pointUpdate.defenderResults });
+      setBattleResult({ won, attackerResults: pointUpdate.attackerResults, defenderResults: pointUpdate.defenderResults, note: finalNote });
       setPoints((points) => points.map((p) => (p.id === pointUpdate.id ? pointUpdate : p)));
       setDeck([]);
     }, 1500);
@@ -1835,6 +1847,17 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         </>
                       )}
                     </div>
+
+                    {battleResult.note && (
+                      <div className="mb-6 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-center shadow-inner animate-in fade-in slide-in-from-top-2 duration-700">
+                        <div className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-center gap-2">
+                          <Info size={12} /> Системне повідомлення
+                        </div>
+                        <p className="text-white text-sm font-medium leading-relaxed italic">
+                          {battleResult.note}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-6">
                       <h3 className="text-xs uppercase font-black text-neutral-500 mb-3 tracking-widest flex items-center gap-2">
