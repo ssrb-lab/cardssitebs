@@ -233,7 +233,7 @@ export default function App() {
   const reloadSettings = async () => {
     try {
       const settings = await fetchSettings();
-      setBosses(settings.bosses || DEFAULT_BOSSES);
+      setBosses(settings.bosses && settings.bosses.length > 0 ? settings.bosses : DEFAULT_BOSSES);
       setStatsRanges(settings.statsRanges || {});
       setDailyRewards(settings.dailyRewards || [1000, 2000, 3000, 4000, 5000, 6000, 7000]);
       setPremiumDailyRewards(
