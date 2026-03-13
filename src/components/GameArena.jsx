@@ -348,6 +348,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
   const handleTouchStart = (e) => {
     if (isDrawingPolygon) return;
+    // Prevent default browser behavior like scrolling/zooming the whole page
+    if (e.cancelable) e.preventDefault();
+    
     if (e.touches.length === 1) {
       setIsDragging(true);
       setDragStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
@@ -364,6 +367,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
   const handleTouchMove = (e) => {
     if (isDrawingPolygon) return;
+    // Prevent default browser behavior
+    if (e.cancelable) e.preventDefault();
+
     if (e.touches.length === 1 && isDragging) {
       setPan({
         x: e.touches[0].clientX - dragStart.x,
@@ -1306,7 +1312,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           {/* Interactive Map Container */}
           <div
-            className={`w-full h-full relative overflow-hidden flex items-center justify-center ${adminPointData || selectedPoint || isDrawingPolygon ? '' : isAddingPoint ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`w-full h-full relative overflow-hidden flex items-center justify-center touch-none ${adminPointData || selectedPoint || isDrawingPolygon ? '' : isAddingPoint ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
