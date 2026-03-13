@@ -261,6 +261,7 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
   const claimReward = async () => {
     if (score < 1) {
       showToast('Ви не полагодили жодної плати!');
+      localStorage.removeItem('fuseGameSave');
       return goBack();
     }
     setIsProcessing(true);
@@ -272,13 +273,16 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       if (data.earned > 0) {
         showToast(`Ви отримали ${data.earned} монет за ремонт!`, 'success');
       } else {
-        showToast('Ліміт фарму вичерпано, але прогрес гри збережено!', 'success');
+        showToast(data.message || 'Ліміт фарму вичерпано, але прогрес гри збережено!', 'success');
       }
       localStorage.removeItem('fuseGameSave');
       goBack();
     } catch (e) {
       showToast(e.message || 'Помилка отримання нагороди.');
       setIsProcessing(false);
+      if (e.message?.includes('400') || e.message?.includes('легітимно')) {
+        localStorage.removeItem('fuseGameSave');
+      }
     }
   };
 
@@ -496,7 +500,10 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
       {gameOver && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-3xl animate-in fade-in p-6 text-center">
           <button
-            onClick={claimReward}
+            onClick={() => {
+              localStorage.removeItem('fuseGameSave');
+              goBack();
+            }}
             disabled={isProcessing}
             className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors p-2 z-50"
           >

@@ -1880,7 +1880,11 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
     }
 
     if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { activeMinigame: null },
+      });
+      return res.json({ success: true, earned: 0, profile: updatedUser, message: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
     // Курс: 1 поїнт рахунку = 1 монета
@@ -1968,7 +1972,11 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
     }
 
     if (currentDailyFarm >= 500000) {
-      return res.status(400).json({ error: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
+      const updatedUser = await prisma.user.update({
+        where: { uid: req.user.uid },
+        data: { activeMinigame: null },
+      });
+      return res.json({ success: true, earned: 0, profile: updatedUser, message: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
     }
 
     // ANTI-CHEAT: cap score based on elapsed play time.

@@ -454,12 +454,21 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
     try {
       const data = await claimTetrisRewardRequest(getToken(), score);
       setProfile(data.profile);
-      showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
+      if (data.earned > 0) {
+        showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
+      } else {
+        showToast(data.message || 'Ви не отримали монет (ліміт вичерпано або малий рахунок).', 'success');
+      }
       localStorage.removeItem('tetris_state');
       goBack();
     } catch (e) {
       showToast(e.message || 'Помилка отримання нагороди.');
       setIsProcessing(false);
+      // If it's a 400 error, it's likely the game state is invalid in the backend,
+      // so we should clear local state anyway to avoid getting stuck.
+      if (e.message?.includes('400') || e.message?.includes('легітимно')) {
+        localStorage.removeItem('tetris_state');
+      }
     }
   };
 
@@ -656,7 +665,10 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
       {gameOver && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center animate-in fade-in p-6 text-center shadow-[inset_0_0_100px_rgba(255,0,0,0.2)]">
           <button
-            onClick={claimReward}
+            onClick={() => {
+              localStorage.removeItem('tetris_state');
+              goBack();
+            }}
             disabled={isProcessing}
             className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors p-2 z-50"
           >
@@ -694,7 +706,11 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
                 try {
                   const data = await claimTetrisRewardRequest(getToken(), score);
                   setProfile(data.profile);
-                  showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
+                  if (data.earned > 0) {
+                    showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
+                  } else {
+                    showToast(data.message || 'Ви не отримали монет (ліміт вичерпано або малий рахунок).', 'success');
+                  }
                 } catch (e) {
                   showToast(e.message || 'Помилка отримання нагороди.');
                   setIsProcessing(false);
