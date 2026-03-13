@@ -200,6 +200,29 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
+  // Animation frame ref for smooth dragging
+  const requestRef = useRef();
+  const panRef = useRef({ x: 0, y: 0 });
+
+  const updatePanPosition = () => {
+    setPan({ ...panRef.current });
+    requestRef.current = null;
+  };
+
+  const schedulePanUpdate = (newPan) => {
+    panRef.current = newPan;
+    if (!requestRef.current) {
+      requestRef.current = requestAnimationFrame(updatePanPosition);
+    }
+  };
+
+  useEffect(() => {
+    panRef.current = pan;
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, []);
+
   // Admin state
   const [isAddingPoint, setIsAddingPoint] = useState(false);
   const [adminPointData, setAdminPointData] = useState(null); // Holds data while configuring a new point
