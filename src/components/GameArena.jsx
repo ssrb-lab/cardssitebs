@@ -317,7 +317,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     // Prevent default scroll behavior gracefully if needed
     const zoomSensitivity = 0.001;
     let newZoom = zoom - e.deltaY * zoomSensitivity;
-    newZoom = Math.min(Math.max(0.5, newZoom), 5); // Allow zoom between 0.5x and 5x
+    newZoom = Math.min(Math.max(0.4, newZoom), 3); // Allow zoom between 0.4x and 3x
     setZoom(newZoom);
     clampPan(pan, newZoom);
   };
@@ -377,7 +377,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       const zoomSensitivity = 0.005;
       const zoomDelta = (dist - initialPinchDist) * zoomSensitivity;
       let newZoom = initialPinchZoom + zoomDelta;
-      newZoom = Math.min(Math.max(0.5, newZoom), 5);
+      newZoom = Math.min(Math.max(0.4, newZoom), 3);
       setZoom(newZoom);
     }
   };
