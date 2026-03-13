@@ -284,13 +284,31 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   }, []);
 
   const clampPan = (currentPan, currentZoom) => {
-    const maxPan = 800 * currentZoom;
+    if (!mapRef.current) return;
+    
+    // Get actual dimensions of the map container
+    const mapWidth = 1200 * currentZoom;
+    const mapHeight = mapRef.current.offsetHeight * currentZoom; // Approximate or use actual image height
+    
+    // We want to keep at least 20% of the map visible or prevent it from going too far
+    // Based on the current implementation where 800 was a hardcoded magic number
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Calculate limits: currentPan.x is the offset from center/start
+    // Let's use a more robust clamping logic based on zoom
+    const limitX = (mapWidth / 2) + (screenWidth * 0.3);
+    const limitY = (mapWidth * 0.8 / 2) + (screenHeight * 0.3); // Assuming ~0.8 aspect ratio for map
+    
     let newX = currentPan.x;
     let newY = currentPan.y;
-    if (Math.abs(newX) > maxPan) newX = Math.sign(newX) * maxPan;
-    if (Math.abs(newY) > maxPan) newY = Math.sign(newY) * maxPan;
+    
+    if (Math.abs(newX) > limitX) newX = Math.sign(newX) * limitX;
+    if (Math.abs(newY) > limitY) newY = Math.sign(newY) * limitY;
+    
     if (newX !== currentPan.x || newY !== currentPan.y) {
       setPan({ x: newX, y: newY });
+      panRef.current = { x: newX, y: newY };
     }
   };
 
