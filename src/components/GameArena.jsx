@@ -1299,16 +1299,19 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
             onTouchEnd={handleTouchEnd}
             onContextMenu={(e) => isDrawingPolygon && e.preventDefault()}
           >
-            <div
-              ref={mapRef}
-              onClick={handleMapClick}
-              className={`relative origin-center ${isDragging ? 'transition-none' : 'transition-[transform] duration-300 ease-out'}`}
-              style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                // Ensure the div fits the image aspect ratio exactly
-                display: 'inline-block',
-              }}
-            >
+              <div
+                ref={mapRef}
+                onClick={handleMapClick}
+                className={`relative origin-center ${isDragging ? 'transition-none' : 'transition-[transform] duration-300 ease-out'}`}
+                style={{
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  // Ensure the div fits the image aspect ratio exactly
+                  display: 'inline-block',
+                }}
+              >
               <img
                 src="/arena map/mapa.avif"
                 alt="Arena Map"
