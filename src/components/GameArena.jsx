@@ -1271,6 +1271,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
             onContextMenu={(e) => isDrawingPolygon && e.preventDefault()}
           >
             <div
