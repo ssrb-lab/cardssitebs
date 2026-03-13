@@ -120,7 +120,9 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         setTimeElapsed(sTimeElapsed || 0);
         setIsInitialized(true);
         if (sGameOver) localStorage.removeItem('tetris_state');
-        if (!sGameOver) startTetrisGameRequest(getToken()).catch(() => {});
+        if (!sGameOver) {
+          // Do not re-call startTetrisGameRequest to avoid resetting the startTime in the backend.
+        }
         return;
       } catch (e) {
         console.error('Error loading tetris state', e);

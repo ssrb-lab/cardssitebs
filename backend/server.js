@@ -1973,7 +1973,7 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
 
     // ANTI-CHEAT: cap score based on elapsed play time.
     // Max realistically achievable ≈ 25 points/sec (4 lines/sec * 1500pts / 60s... actually capping at ~1500pts/min)
-    const MAX_POINTS_PER_SECOND = 25;
+    const MAX_POINTS_PER_SECOND = 500;
     const startTime = minigame.startTime ? new Date(minigame.startTime) : null;
     let claimedScore = Math.round(Number(score));
     if (startTime) {
