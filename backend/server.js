@@ -957,6 +957,236 @@ app.get('/api/profile/public/:identifier', async (req, res) => {
 // ІГРОВІ ДАНІ ТА АДМІНКА (КАРТКИ ТА ПАКИ)
 // ----------------------------------------
 
+async function getMinStatsForCard(tx, card) {
+  let minP = null, minH = null;
+  if (card.minPower !== null && card.minPower !== undefined) minP = card.minPower;
+  if (card.minHp !== null && card.minHp !== undefined) minH = card.minHp;
+  
+  if (minP === null || minH === null) {
+    const pack = await tx.packCatalog.findUnique({ where: { id: card.packId } });
+    if (pack && pack.statsRanges) {
+       let ranges = null;
+       if (typeof pack.statsRanges === 'string') {
+         try { ranges = JSON.parse(pack.statsRanges); } catch(e) {}
+       } else {
+         ranges = pack.statsRanges;
+       }
+       if (ranges && ranges[card.rarity]) {
+         if (minP === null && ranges[card.rarity].minPower !== undefined) minP = ranges[card.rarity].minPower;
+         if (minH === null && ranges[card.rarity].minHp !== undefined) minH = ranges[card.rarity].minHp;
+       }
+    }
+  }
+  if (minP === null) {
+    const defaultMins = { 'Унікальна': 100, 'Легендарна': 50, 'Епічна': 25, 'Рідкісна': 10, 'Звичайна': 1 };
+    minP = defaultMins[card.rarity] || 1;
+  }
+  if (minH === null) minH = minP * 2;
+  return { power: Number(minP), hp: Number(minH) };
+}
+
+async function handleIsGameStatusChange(tx, cardIds, isGame) {
+  if (!cardIds || cardIds.length === 0) return;
+  if (!isGame) {
+    await tx.inventoryItem.updateMany({
+      where: { cardId: { in: cardIds } },
+      data: { gameStats: [] }
+    });
+    await tx.marketListing.updateMany({
+      where: { cardId: { in: cardIds } },
+      data: { power: null, hp: null }
+    });
+    const points = await tx.arenaPoint.findMany();
+    for (const point of points) {
+      if (point.defendingCards && Array.isArray(point.defendingCards)) {
+        let changed = false;
+        const newCards = point.defendingCards.map(c => {
+          if (cardIds.includes(c.id)) {
+            changed = true;
+            const newC = { ...c };
+            delete newC.power;
+            delete newC.hp;
+            delete newC.maxHp;
+            delete newC.currentHp;
+            delete newC.perk;
+            delete newC.perkValue;
+            return newC;
+          }
+          return c;
+        });
+        if (changed) {
+          await tx.arenaPoint.update({
+            where: { id: point.id },
+            data: { defendingCards: newCards }
+          });
+        }
+      }
+    }
+  } else {
+    const cards = await tx.cardCatalog.findMany({ where: { id: { in: cardIds } } });
+    const statsMap = {};
+    for (const c of cards) {
+      statsMap[c.id] = await getMinStatsForCard(tx, c);
+      statsMap[c.id].perk = c.perk;
+      statsMap[c.id].perkValue = c.perkValue;
+    }
+    
+    const items = await tx.inventoryItem.findMany({ where: { cardId: { in: cardIds } } });
+    for (const item of items) {
+      if (item.amount > 0) {
+        const s = statsMap[item.cardId];
+        if (s) {
+          const newStats = Array.from({ length: item.amount }, () => ({ power: s.power, hp: s.hp }));
+          await tx.inventoryItem.update({
+            where: { id: item.id },
+            data: { gameStats: newStats }
+          });
+        }
+      }
+    }
+    
+    const listings = await tx.marketListing.findMany({ where: { cardId: { in: cardIds } } });
+    for (const listing of listings) {
+      const s = statsMap[listing.cardId];
+      if (s) {
+        await tx.marketListing.update({
+          where: { id: listing.id },
+          data: { power: s.power, hp: s.hp }
+        });
+      }
+    }
+    
+    const points = await tx.arenaPoint.findMany();
+    for (const point of points) {
+      if (point.defendingCards && Array.isArray(point.defendingCards)) {
+        let changed = false;
+        const newCards = point.defendingCards.map(c => {
+          if (cardIds.includes(c.id)) {
+            changed = true;
+            const s = statsMap[c.id];
+            return {
+              ...c,
+              power: s.power,
+              hp: s.hp,
+              maxHp: s.hp,
+              currentHp: s.hp,
+              perk: s.perk,
+              perkValue: s.perkValue
+            };
+          }
+          return c;
+        });
+        if (changed) {
+          await tx.arenaPoint.update({
+            where: { id: point.id },
+            data: { defendingCards: newCards }
+          });
+        }
+      }
+    }
+  }
+}
+
+async function getStatsRangesForCard(tx, card) {
+  let minP = card.minPower, maxP = card.maxPower;
+  let minH = card.minHp, maxH = card.maxHp;
+  
+  if (minP === null || minH === null || maxP === null || maxH === null) {
+    const pack = await tx.packCatalog.findUnique({ where: { id: card.packId } });
+    if (pack && pack.statsRanges) {
+       let ranges = null;
+       if (typeof pack.statsRanges === 'string') {
+         try { ranges = JSON.parse(pack.statsRanges); } catch(e) {}
+       } else {
+         ranges = pack.statsRanges;
+       }
+       if (ranges && ranges[card.rarity]) {
+         if (minP === null && ranges[card.rarity].minPower !== undefined) minP = ranges[card.rarity].minPower;
+         if (maxP === null && ranges[card.rarity].maxPower !== undefined) maxP = ranges[card.rarity].maxPower;
+         if (minH === null && ranges[card.rarity].minHp !== undefined) minH = ranges[card.rarity].minHp;
+         if (maxH === null && ranges[card.rarity].maxHp !== undefined) maxH = ranges[card.rarity].maxHp;
+       }
+    }
+  }
+  
+  const defaultMins = { 'Унікальна': 100, 'Легендарна': 50, 'Епічна': 25, 'Рідкісна': 10, 'Звичайна': 1 };
+  if (minP === null) minP = defaultMins[card.rarity] || 1;
+  if (minH === null) minH = minP * 2;
+  if (maxP === null) maxP = minP * 2;
+  if (maxH === null) maxH = minH * 2;
+
+  return { minPower: Number(minP), maxPower: Number(maxP), minHp: Number(minH), maxHp: Number(maxH) };
+}
+
+async function handleCardStatsUpdate(tx, cardId) {
+  const card = await tx.cardCatalog.findUnique({ where: { id: cardId } });
+  if (!card) return;
+  const pack = await tx.packCatalog.findUnique({ where: { id: card.packId } });
+  const isGame = (pack && pack.isGame) || card.isGame;
+  if (!isGame) return;
+
+  const ranges = await getStatsRangesForCard(tx, card);
+  
+  // 1. Інвентар
+  const items = await tx.inventoryItem.findMany({ where: { cardId } });
+  for (const item of items) {
+    if (item.amount > 0 && Array.isArray(item.gameStats) && item.gameStats.length > 0) {
+      let changed = false;
+      const newStats = item.gameStats.map(s => {
+         let p = typeof s === 'object' ? (s.power || 0) : Number(s);
+         let h = typeof s === 'object' ? (s.hp || p * 2) : p * 2;
+         let inSafe = typeof s === 'object' ? !!s.inSafe : false;
+         
+         let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, p));
+         let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, h));
+         
+         if (newP !== p || newH !== h || (typeof s !== 'object')) {
+            changed = true;
+         }
+         return { power: newP, hp: newH, inSafe };
+      });
+      if (changed) {
+         await tx.inventoryItem.update({ where: { id: item.id }, data: { gameStats: newStats } });
+      }
+    }
+  }
+  
+  // 2. Ринок
+  const listings = await tx.marketListing.findMany({ where: { cardId } });
+  for (const listing of listings) {
+     if (listing.power !== null && listing.hp !== null) {
+         let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, listing.power));
+         let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, listing.hp));
+         if (newP !== listing.power || newH !== listing.hp) {
+             await tx.marketListing.update({ where: { id: listing.id }, data: { power: newP, hp: newH } });
+         }
+     }
+  }
+  
+  // 3. Арена
+  const points = await tx.arenaPoint.findMany();
+  for (const point of points) {
+     if (point.defendingCards && Array.isArray(point.defendingCards)) {
+        let changed = false;
+        const newCards = point.defendingCards.map(c => {
+           if (c.id === cardId) {
+              changed = true;
+              let currentP = c.power !== undefined ? c.power : ranges.minPower;
+              let currentH = c.maxHp !== undefined ? c.maxHp : (c.hp !== undefined ? c.hp : ranges.minHp);
+              let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, currentP));
+              let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, currentH));
+              let currentHp = Math.min(c.currentHp !== undefined ? c.currentHp : newH, newH);
+              return { ...c, power: newP, hp: newH, maxHp: newH, currentHp, perk: card.perk, perkValue: card.perkValue };
+           }
+           return c;
+        });
+        if (changed) {
+           await tx.arenaPoint.update({ where: { id: point.id }, data: { defendingCards: newCards } });
+        }
+     }
+  }
+}
+
 // Публічний роут для отримання всіх карток та паків
 app.get('/api/catalog', async (req, res) => {
   try {
@@ -1021,6 +1251,23 @@ app.post(
       let card;
       if (existing) {
         card = await prisma.cardCatalog.update({ where: { id: cardData.id }, data: cardData });
+        const pack = await prisma.packCatalog.findUnique({ where: { id: card.packId } });
+        const effectiveStatusOld = (pack && pack.isGame) || existing.isGame;
+        const effectiveStatusNew = (pack && pack.isGame) || card.isGame;
+        
+        if (effectiveStatusOld !== effectiveStatusNew) {
+           await handleIsGameStatusChange(prisma, [card.id], effectiveStatusNew);
+        } else if (effectiveStatusNew) {
+           const statsChanged = existing.minPower !== card.minPower || 
+                                existing.maxPower !== card.maxPower || 
+                                existing.minHp !== card.minHp || 
+                                existing.maxHp !== card.maxHp || 
+                                existing.perk !== card.perk || 
+                                existing.perkValue !== card.perkValue;
+           if (statsChanged) {
+               await handleCardStatsUpdate(prisma, card.id);
+           }
+        }
       } else {
         card = await prisma.cardCatalog.create({ data: cardData });
       }
@@ -1073,6 +1320,15 @@ app.post(
       let pack;
       if (existing) {
         pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
+        if (existing.isGame !== pack.isGame) {
+           const packCards = await prisma.cardCatalog.findMany({ 
+               where: { packId: pack.id, isGame: false } 
+           });
+           const cardIds = packCards.map(c => c.id);
+           if (cardIds.length > 0) {
+              await handleIsGameStatusChange(prisma, cardIds, pack.isGame);
+           }
+        }
       } else {
         pack = await prisma.packCatalog.create({ data: packData });
       }
@@ -1498,7 +1754,7 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
 
           const map = createSpliceMap(statsArray.length, powerIndex, 1);
           const removed = statsArray.splice(powerIndex, 1)[0];
-          await syncArenaIndices(prisma, user.uid, cardId, map);
+          await syncArenaIndices(tx, user.uid, cardId, map);
 
           removedPower = typeof removed === 'object' ? removed.power : removed;
           removedHp = typeof removed === 'object' ? removed.hp : null;
@@ -1519,7 +1775,7 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           }
           const map = createSpliceMap(statsArray.length, closestIndex, 1);
           const removed = statsArray.splice(closestIndex, 1)[0];
-          await syncArenaIndices(prisma, user.uid, cardId, map);
+          await syncArenaIndices(tx, user.uid, cardId, map);
 
           removedPower = typeof removed === 'object' ? removed.power : removed;
           removedHp = typeof removed === 'object' ? removed.hp : null;
@@ -1530,9 +1786,14 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
       } else if (statsArray.length > 0) {
         let weakestIndex = -1;
         let minSum = Infinity;
+        const defInstances = await getDefendingInstances(user.uid);
         for (let i = 0; i < statsArray.length; i++) {
           const s = statsArray[i];
           if (s && s.inSafe) continue; // Пропускаємо сейвлені картки
+          
+          const isDefending = defInstances.some(inst => inst.cardId === cardId && inst.statsIndex === i);
+          if (isDefending) continue; // Пропускаємо картки, що захищають Арену
+
           const sum = typeof s === 'object' ? (s.power || 0) + (s.hp || 0) : Number(s);
           if (sum < minSum) {
             minSum = sum;
@@ -1540,11 +1801,11 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           }
         }
         if (weakestIndex === -1) {
-          throw new Error('Усі ваші картки цього типу знаходяться у Сейфі.');
+          throw new Error('Усі ваші картки цього типу знаходяться у Сейфі або захищають Арену.');
         }
         const map = createSpliceMap(statsArray.length, weakestIndex, 1);
         const removed = statsArray.splice(weakestIndex, 1)[0]; // забираємо найслабшу
-        await syncArenaIndices(prisma, user.uid, cardId, map);
+        await syncArenaIndices(tx, user.uid, cardId, map);
 
         removedPower = typeof removed === 'object' ? removed.power : removed;
         removedHp = typeof removed === 'object' ? removed.hp : null;

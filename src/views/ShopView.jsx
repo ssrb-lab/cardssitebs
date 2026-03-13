@@ -219,7 +219,7 @@ export default function ShopView({
                   </CardFrame>
                   <PerkBadge perk={card.perk} />
                   {Number(card.maxSupply) > 0 && (
-                    <div className="absolute top-2 right-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
+                    <div className="absolute top-2 left-2 bg-black/90 text-white text-[8px] sm:text-[10px] px-2 py-1 rounded-md border border-neutral-700 font-black z-10">
                       {cardStats[card.id] || 0} / {card.maxSupply}
                     </div>
                   )}
@@ -228,7 +228,7 @@ export default function ShopView({
                       e.stopPropagation();
                       sellSinglePulledCard(card);
                     }}
-                    className="absolute top-2 left-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
+                    className="absolute top-2 right-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
                     title="Продати картку"
                   >
                     <Coins size={14} className="sm:w-4 sm:h-4 w-[14px] h-[14px]" />
