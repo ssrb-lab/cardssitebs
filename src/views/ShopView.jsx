@@ -658,7 +658,7 @@ export default function ShopView({
 
             <div className="relative w-20 h-20 sm:w-40 sm:h-40 mb-3 sm:mb-6 flex justify-center items-center perspective-1000">
               <div
-                className={`w-full h-full bg-neutral-800 rounded-xl sm:rounded-2xl border-2 sm:border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300`}
+                className={`w-full h-full bg-neutral-800 rounded-xl sm:rounded-2xl border-2 sm:border-4 ${pack.isPremiumOnly ? 'border-fuchsia-800/50' : 'border-neutral-700'} shadow-xl overflow-hidden group-hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300 isolate z-0`}
               >
                 <img
                   src={pack.image}

@@ -1678,7 +1678,7 @@ export default function AdminView({
                           className={`bg-neutral-950 rounded-xl border-2 ${style.border} overflow-hidden flex flex-col items-center p-1 relative group ${effectClass} cursor-pointer transition-transform hover:-translate-y-1`}
                           onClick={() => setViewingCard({ card: c, amount: invItem.amount })}
                         >
-                          <CardFrame frame={c.frame} effect={c.effect}>
+                          <CardFrame frame={c.frame} effect={c.effect} className="rounded-lg overflow-hidden isolate z-0">
                             {isGif ? (
                               <canvas
                                 className="w-full aspect-[2/3] object-cover rounded-lg mb-2 group-hover:opacity-40 transition-opacity"

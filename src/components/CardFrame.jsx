@@ -4,8 +4,10 @@ import ElectricEffect from './effects/ElectricEffect';
 import EmberEffect from './effects/EmberEffect';
 
 export default function CardFrame({ frame = 'normal', children, className = '', effect = '' }) {
-  // Базові класи, які мають бути завжди
-  const baseContainer = 'relative w-full h-full overflow-hidden rounded-[inherit]';
+  // Базові класи, які мають бути завжди. 
+  // Ми прибрали overflow-hidden та rounded-[inherit] звідси, щоб уникнути конфліктів заокруглень.
+  // Тепер за кліпінг відповідає або батько, або className.
+  const baseContainer = 'relative w-full h-full';
   const containerClass = `${baseContainer} ${className}`;
 
   if (!frame || frame === 'normal') {
@@ -23,7 +25,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
   }
 
   // Загальні класи для всіх рамок (накладаються ПОВЕРХ картинки)
-  // Використовуємо rounded-[inherit], щоб рамка повторювала заокруглення контейнера
+  // Тут ми залишаємо rounded-[inherit], щоб сама лінія рамки повторювала заокруглення батька.
   const baseFrameClass = 'pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-[6px]';
 
   // Класи для конкретних рамок
@@ -36,7 +38,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden rounded-[inherit] ${className}`}
+      className={containerClass}
     >
       {/* Картинка / контент картки */}
       <div className="absolute inset-0 z-0">{children}</div>

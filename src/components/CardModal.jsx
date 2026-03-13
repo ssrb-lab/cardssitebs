@@ -77,7 +77,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
         </button>
 
         <div
-          className="preserve-3d w-full"
+          className="preserve-3d w-full rounded-3xl"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onMouseEnter={handleMouseEnter}

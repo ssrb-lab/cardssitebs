@@ -40,7 +40,7 @@ export default function EffectsPreview() {
               <div key={frame.id} className="flex flex-col items-center">
                 <div className="w-full aspect-[2/3] mb-4">
                   <TiltWrapper isEnabled={isTiltEnabled}>
-                    <CardFrame frame={frame.id} className="w-full h-full shadow-2xl">
+                    <CardFrame frame={frame.id} className="w-full h-full shadow-2xl rounded-2xl overflow-hidden isolate z-0">
                       <img src={sampleImage} alt={frame.name} className="w-full h-full object-cover" />
                     </CardFrame>
                   </TiltWrapper>
@@ -66,7 +66,7 @@ export default function EffectsPreview() {
                   <TiltWrapper isEnabled={isTiltEnabled}>
                     <CardFrame 
                       effect={effect.id}
-                      className={`w-full h-full shadow-2xl effect-${effect.id}`}
+                      className={`w-full h-full shadow-2xl effect-${effect.id} rounded-2xl overflow-hidden isolate z-0`}
                     >
                       <img src={sampleImage} alt={effect.name} className="w-full h-full object-cover" />
                     </CardFrame>
@@ -102,7 +102,7 @@ export default function EffectsPreview() {
                       <CardFrame 
                         frame={combo.f}
                         effect={combo.e}
-                        className={`w-full h-full shadow-2xl effect-${combo.e}`}
+                        className={`w-full h-full shadow-2xl effect-${combo.e} rounded-2xl overflow-hidden isolate z-0`}
                       >
                         <img src={sampleImage} alt={combo.n} className="w-full h-full object-cover" />
                       </CardFrame>
