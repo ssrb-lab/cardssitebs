@@ -854,7 +854,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       <div className="flex flex-col lg:flex-row gap-6 w-full h-[calc(100vh-100px)] min-h-0 pb-4 relative overflow-hidden">
         {/* Left Panel - Deck Selection */}
         <div
-          className={`flex flex-col gap-4 transition-all duration-500 ease-in-out shrink-0 h-full
+          className={`flex flex-col gap-4 transition-all duration-500 ease-in-out shrink-0 h-full transform-gpu will-change-transform
             ${isSidebarOpen 
               ? 'absolute inset-0 z-50 bg-black/95 p-4 lg:p-0 lg:bg-transparent lg:relative w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] opacity-100 translate-y-0 lg:translate-x-0 lg:translate-y-0' 
               : 'absolute inset-0 z-50 lg:relative w-full lg:w-0 opacity-0 translate-y-full lg:-ml-6 lg:-translate-x-full lg:translate-y-0 pointer-events-none'}
@@ -1515,7 +1515,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           {/* Selected Point Right Panel Overlay */}
           {selectedPoint && (
-            <div className="absolute bottom-0 right-0 w-full lg:w-80 h-[80vh] lg:h-full max-h-full rounded-t-3xl lg:rounded-none overflow-y-auto bg-neutral-900/95 backdrop-blur-md border-t lg:border-t-0 lg:border-l border-neutral-800 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] lg:shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-40 flex flex-col p-4 animate-in slide-in-from-bottom lg:slide-in-from-right duration-300">
+            <div className="absolute bottom-0 right-0 w-full lg:w-80 h-[80vh] lg:h-full max-h-full rounded-t-3xl lg:rounded-none overflow-y-auto bg-neutral-900/95 backdrop-blur-md border-t lg:border-t-0 lg:border-l border-neutral-800 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] lg:shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-40 flex flex-col p-4 animate-in slide-in-from-bottom lg:slide-in-from-right duration-300 transform-gpu will-change-transform">
               {/* Panel Header */}
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-xl font-bold uppercase text-white truncate pr-2">
