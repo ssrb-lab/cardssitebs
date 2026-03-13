@@ -5,7 +5,7 @@ import EmberEffect from './effects/EmberEffect';
 
 export default function CardFrame({ frame = 'normal', children, className = '', effect = '' }) {
   // Базові класи, які мають бути завжди
-  const baseContainer = 'relative w-full h-full overflow-hidden';
+  const baseContainer = 'relative w-full h-full overflow-hidden rounded-[inherit]';
   const containerClass = `${baseContainer} ${className}`;
 
   if (!frame || frame === 'normal') {
@@ -36,7 +36,7 @@ export default function CardFrame({ frame = 'normal', children, className = '', 
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden rounded-xl ${className}`}
+      className={`relative w-full h-full overflow-hidden rounded-[inherit] ${className}`}
     >
       {/* Картинка / контент картки */}
       <div className="absolute inset-0 z-0">{children}</div>

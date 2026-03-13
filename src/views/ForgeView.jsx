@@ -138,7 +138,7 @@ export default function ForgeView({
                   const effectClass = selectedCard.card.effect ? `effect-${selectedCard.card.effect}` : '';
                   return (
                     <div
-                      className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${style.border} ${effectClass}`}
+                      className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform ${style.border} ${effectClass} isolate z-0`}
                     >
                       <CardFrame frame={selectedCard.card.frame} effect={selectedCard.card.effect}>
                         <img
@@ -312,7 +312,7 @@ export default function ForgeView({
                 title={isDefending ? "Захищає точку на Арені" : ""}
               >
                 <div
-                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} ${effectClass} hover:border-neutral-400`}`}
+                  className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 transform-gpu will-change-transform isolate z-0 ${isSelected ? 'border-orange-500 shadow-[0_0_20px_rgba(234,88,12,0.4)]' : `${style.border} ${effectClass} hover:border-neutral-400`}`}
                 >
                   <CardFrame frame={item.card.frame} effect={item.card.effect}>
                     <img

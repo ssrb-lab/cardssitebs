@@ -266,7 +266,7 @@ export default function PublicProfileView({
                     className="relative group cursor-pointer animate-in zoom-in-95"
                   >
                     <div
-                      className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} transition-transform group-hover:-translate-y-2 transform-gpu will-change-transform`}
+                      className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} transition-transform group-hover:-translate-y-2 transform-gpu will-change-transform isolate z-0`}
                     >
                       <CardFrame frame={c.frame} effect={c.effect}>
                         <img
@@ -438,7 +438,7 @@ export default function PublicProfileView({
             >
               <div
                 onClick={() => setViewingCard({ card: item.card, amount: item.amount })}
-                className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform-gpu will-change-transform ${style.border} ${effectClass}`}
+                className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform-gpu will-change-transform ${style.border} ${effectClass} isolate z-0`}
               >
                 {Number(item.card.maxSupply) > 0 && (
                   <div className="absolute top-1 left-1 bg-black/90 text-white font-black text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-sm z-10 border border-neutral-700">

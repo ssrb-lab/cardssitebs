@@ -318,7 +318,7 @@ export default function ProfileView({
                   >
                     <div className="flex items-center gap-3">
                       {item.card?.image && (
-                        <div className={`w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative ${effectClass}`}>
+                        <div className={`w-10 h-14 rounded-md border border-neutral-700 bg-neutral-950 overflow-hidden relative ${effectClass} isolate z-0`}>
                           <CardFrame frame={item.card.frame} effect={item.card.effect}>
                             <img
                               src={item.card.image}

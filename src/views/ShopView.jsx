@@ -123,7 +123,7 @@ export default function ShopView({
               return (
                 <div
                   key={i}
-                  className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass} transform-gpu will-change-transform`}
+                  className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass} transform-gpu will-change-transform isolate z-0`}
                 >
                   <CardFrame frame={item.frame} effect={item.effect}>
                     <img
@@ -207,7 +207,7 @@ export default function ShopView({
                 }}
               >
                 <div
-                  className={`w-28 sm:w-40 md:w-56 aspect-[2/3] rounded-xl sm:rounded-2xl border-2 sm:border-4 overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.6)] sm:shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-2 sm:mb-4 ${effectClass} transform-gpu will-change-transform`}
+                  className={`w-28 sm:w-40 md:w-56 aspect-[2/3] rounded-xl sm:rounded-2xl border-2 sm:border-4 overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.6)] sm:shadow-[0_0_40px_rgba(0,0,0,0.6)] transform transition-all group-hover:scale-105 group-hover:rotate-2 ${style.border} bg-neutral-900 relative mb-2 sm:mb-4 ${effectClass} transform-gpu will-change-transform isolate z-0`}
                 >
                   <CardFrame frame={card.frame} effect={card.effect}>
                     <img
@@ -459,7 +459,7 @@ export default function ShopView({
                   onClick={() => !isSoldOut && setViewingCard({ card })}
                 >
                   <div
-                    className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? 'group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]' : ''} ${style.border} ${effectClass} transform-gpu will-change-transform`}
+                    className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-2 transition-all duration-300 ${!isSoldOut ? 'group-hover:-translate-y-2 group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.5)]' : ''} ${style.border} ${effectClass} transform-gpu will-change-transform isolate z-0`}
                   >
                     <CardFrame frame={card.frame} effect={card.effect}>
                       <img
