@@ -195,8 +195,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [initialPinchDist, setInitialPinchDist] = useState(null);
+  const [initialPinchZoom, setInitialPinchZoom] = useState(null);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 
   // Admin state
   const [isAddingPoint, setIsAddingPoint] = useState(false);
@@ -301,6 +303,53 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const handleMouseLeave = () => {
     setIsDragging(false);
     clampPan(pan, zoom);
+  };
+
+  const handleTouchStart = (e) => {
+    if (isDrawingPolygon) return;
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
+    } else if (e.touches.length === 2) {
+      setIsDragging(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setInitialPinchDist(dist);
+      setInitialPinchZoom(zoom);
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (isDrawingPolygon) return;
+    if (e.touches.length === 1 && isDragging) {
+      setPan({
+        x: e.touches[0].clientX - dragStart.x,
+        y: e.touches[0].clientY - dragStart.y,
+      });
+    } else if (e.touches.length === 2 && initialPinchDist) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const zoomSensitivity = 0.005;
+      const zoomDelta = (dist - initialPinchDist) * zoomSensitivity;
+      let newZoom = initialPinchZoom + zoomDelta;
+      newZoom = Math.min(Math.max(0.5, newZoom), 5);
+      setZoom(newZoom);
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (e.touches.length < 2) {
+      setInitialPinchDist(null);
+      setInitialPinchZoom(null);
+    }
+    if (e.touches.length === 0) {
+      setIsDragging(false);
+      clampPan(pan, zoom);
+    }
   };
 
   // Admin Add Point
@@ -758,17 +807,27 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       <div className="flex flex-col lg:flex-row gap-6 w-full h-[calc(100vh-100px)] min-h-0 pb-4 relative overflow-hidden">
         {/* Left Panel - Deck Selection */}
         <div
-          className={`flex flex-col gap-4 relative transition-all duration-500 ease-in-out shrink-0 h-full
-            ${isSidebarOpen ? 'w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] opacity-100 lg:translate-x-0' : 'w-0 opacity-0 lg:-ml-6 lg:-translate-x-full absolute lg:relative z-40'}
+          className={`flex flex-col gap-4 transition-all duration-500 ease-in-out shrink-0 h-full
+            ${isSidebarOpen 
+              ? 'absolute inset-0 z-50 bg-black/95 p-4 lg:p-0 lg:bg-transparent lg:relative w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] opacity-100 translate-y-0 lg:translate-x-0 lg:translate-y-0' 
+              : 'absolute inset-0 z-50 lg:relative w-full lg:w-0 opacity-0 translate-y-full lg:-ml-6 lg:-translate-x-full lg:translate-y-0 pointer-events-none'}
           `}
         >
           {/* Inner wrapper to maintain exact width while collapsing */}
-          <div className="w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] flex flex-col gap-4 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2 pb-4">
+          <div className="w-full lg:w-[550px] xl:w-[650px] 2xl:w-[750px] flex flex-col gap-4 h-[calc(100vh-120px)] lg:h-full overflow-y-auto custom-scrollbar lg:pr-2 pb-4">
             {/* Block 1: Selected Cards */}
             <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] shrink-0 h-min">
-              <h3 className="text-xl font-black text-white uppercase tracking-wide mb-2 flex items-center gap-2">
-                <Swords size={20} className="text-indigo-500" /> Ваша Колода
-              </h3>
+              <div className="flex items-center justify-between w-full mb-2">
+                <h3 className="text-xl font-black text-white uppercase tracking-wide flex items-center gap-2">
+                  <Swords size={20} className="text-indigo-500" /> Ваша Колода
+                </h3>
+                <button 
+                  className="lg:hidden p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-neutral-400 hover:text-white transition-colors border border-neutral-700" 
+                  onClick={() => setIsSidebarOpen(false)}
+                >
+                  <X size={20}/>
+                </button>
+              </div>
 
               <div className="text-indigo-300 text-sm font-bold mb-4 bg-indigo-900/30 py-2 px-3 rounded-lg flex justify-between items-center">
                 <span>Обрано карт:</span>
@@ -883,6 +942,17 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               <ChevronRight className="text-indigo-400 group-hover:scale-110 transition-transform" size={24} />
             )}
           </button>
+
+          {/* Mobile Deck Button */}
+          {!isSidebarOpen && (
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden absolute bottom-4 right-4 z-[60] bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-full shadow-[0_0_20px_rgba(79,70,229,0.5)] flex items-center justify-center transition-transform active:scale-95"
+            >
+              <Swords size={24} />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border border-indigo-900">{deck.length}</span>
+            </button>
+          )}
 
           {/* Admin Map Toolbar */}
           {profile?.isAdmin && (
@@ -1392,7 +1462,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           {/* Selected Point Right Panel Overlay */}
           {selectedPoint && (
-            <div className="absolute top-0 right-0 w-80 h-full max-h-full overflow-y-auto bg-neutral-900/95 backdrop-blur-md border-l border-neutral-800 shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-40 flex flex-col p-4 animate-in slide-in-from-right duration-300">
+            <div className="absolute bottom-0 right-0 w-full lg:w-80 h-[80vh] lg:h-full max-h-full rounded-t-3xl lg:rounded-none overflow-y-auto bg-neutral-900/95 backdrop-blur-md border-t lg:border-t-0 lg:border-l border-neutral-800 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] lg:shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-40 flex flex-col p-4 animate-in slide-in-from-bottom lg:slide-in-from-right duration-300">
               {/* Panel Header */}
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-xl font-bold uppercase text-white truncate pr-2">
@@ -1636,7 +1706,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     {battleState.point.ownerNickname}
                   </h3>
                 </div>
-                <div className="flex gap-4 justify-center items-center">
+                <div className="flex gap-1.5 sm:gap-4 justify-center items-center">
                   {battleState.defenderDeck.map((card, idx) => {
                     const hp =
                       card.currentHp !== undefined ? card.currentHp : card.hp || card.power || 1;
@@ -1663,7 +1733,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     return (
                       <div
                         key={idx}
-                        className={`card-container relative w-28 sm:w-36 md:w-40 aspect-[2/3] transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit && !isDodge ? '-translate-y-2 rotate-[-5deg] brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''}`}
+                        className={`card-container relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit && !isDodge ? '-translate-y-2 rotate-[-5deg] brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''}`}
                       >
                         <div className={`card-inner w-full h-full ${isCardRevealed ? 'is-flipped' : ''}`}>
                           {/* Face Down (Сорочка) */}
@@ -1738,7 +1808,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
               {/* Player (Attacker) Area */}
               <div className="w-full flex-1 flex flex-col items-center justify-end gap-4">
-                <div className="flex gap-4 justify-center items-center">
+                <div className="flex gap-1.5 sm:gap-4 justify-center items-center">
                   {battleState.attackerDeck.map((card, idx) => {
                     const hp =
                       card.currentHp !== undefined ? card.currentHp : card.hp || card.power || 1;
@@ -1761,7 +1831,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     return (
                       <div
                         key={idx}
-                        className={`relative w-28 sm:w-36 md:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''}`}
+                        className={`relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''}`}
                         style={!isAttacking && !isHit ? { animationDelay: `${idx * 100}ms` } : {}}
                       >
                         <PerkBadge perk={card.perk} />
