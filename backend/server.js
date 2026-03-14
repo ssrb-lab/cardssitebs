@@ -2962,6 +2962,25 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
       include: { inventory: true },
     });
 
+    if (!user) {
+      releasePoint();
+      releaseUser();
+      return res.status(404).json({ error: 'Користувача не знайдено.' });
+    }
+
+    // --- ARENA ATTACK COOLDOWN CHECK ---
+    if (user.arenaCooldowns && typeof user.arenaCooldowns === 'object') {
+      const cooldownUntil = user.arenaCooldowns[id];
+      if (cooldownUntil && new Date(cooldownUntil) > new Date()) {
+        const minsLeft = Math.ceil((new Date(cooldownUntil) - new Date()) / 60000);
+        releasePoint();
+        releaseUser();
+        return res.status(403).json({
+          error: `Ви нещодавно програли бій за цю територію. Напад дозволено через ${minsLeft} хв.`,
+        });
+      }
+    }
+
     const cardIds = [...new Set(cards.map((c) => c.id))];
     const catalogCards = await prisma.cardCatalog.findMany({ where: { id: { in: cardIds } } });
 
@@ -3152,6 +3171,25 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       where: { uid: req.user.uid },
       include: { inventory: true },
     });
+
+    if (!user) {
+      releasePoint();
+      releaseUser();
+      return res.status(404).json({ error: 'Користувача не знайдено.' });
+    }
+
+    // --- ARENA ATTACK COOLDOWN CHECK ---
+    if (user.arenaCooldowns && typeof user.arenaCooldowns === 'object') {
+      const cooldownUntil = user.arenaCooldowns[id];
+      if (cooldownUntil && new Date(cooldownUntil) > new Date()) {
+        const minsLeft = Math.ceil((new Date(cooldownUntil) - new Date()) / 60000);
+        releasePoint();
+        releaseUser();
+        return res.status(403).json({
+          error: `Ви нещодавно програли бій за цю територію. Напад дозволено через ${minsLeft} хв.`,
+        });
+      }
+    }
 
     const cardIds = [...new Set(cards.map((c) => c.id))];
     const catalogCards = await prisma.cardCatalog.findMany({ where: { id: { in: cardIds } } });
@@ -3509,9 +3547,26 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     const defenderResults = [];
 
     await prisma.$transaction(async (tx) => {
+      const userDataToUpdate = { coins: { decrement: point.entryFee } };
+      
+      if (!attackerWon) {
+        const currentCooldowns = user.arenaCooldowns && typeof user.arenaCooldowns === 'object' 
+          ? { ...user.arenaCooldowns } 
+          : {};
+        
+        // Cleanup expired
+        const now = new Date();
+        for (const [key, val] of Object.entries(currentCooldowns)) {
+          if (new Date(val) < now) delete currentCooldowns[key];
+        }
+        
+        currentCooldowns[id] = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        userDataToUpdate.arenaCooldowns = currentCooldowns;
+      }
+
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { decrement: point.entryFee } },
+        data: userDataToUpdate,
       });
 
       // Збереження пошкоджень атакуючих

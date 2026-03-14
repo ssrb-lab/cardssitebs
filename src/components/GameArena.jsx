@@ -565,6 +565,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     setSelectedPoint(null); // Close sidebar
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('power'); // 'power', 'hp', 'rarity'
+
   const ownedGameCards = React.useMemo(() => {
     const cards = [];
     if (profile?.inventory && cardsCatalog) {
@@ -608,44 +611,55 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         }
       });
     }
-    return cards.sort((a, b) => b.power - a.power);
+    return cards;
   }, [profile?.inventory, cardsCatalog]);
 
-  const groupedOwnedCards = React.useMemo(() => {
-    const groups = [];
-    const processedIndices = new Set(); // To track cards that are defending or already in groups
-
-    // 1. First, handle cards that are DEFENDING or SELECTED in deck (they must be unique entries)
-    ownedGameCards.forEach((card) => {
-      const isSelected = deck.some((c) => c.uniqueInstanceId === card.uniqueInstanceId);
-      const isDefending = profile?.defendingInstances?.some(
-        (inst) => inst.cardId === card.id && inst.statsIndex === card.statsIndex
-      );
-
-      if (isSelected || isDefending) {
-        groups.push({ ...card, count: 1, isDefending, isSelected });
-        processedIndices.add(card.uniqueInstanceId);
-      }
+  const filteredAndSortedCards = React.useMemo(() => {
+    const selectedIds = new Set(deck.map(c => c.id));
+    
+    // 1. Filter cards
+    const filtered = ownedGameCards.filter(card => {
+      // Hide if this card type (ID) is already in the selected deck
+      if (selectedIds.has(card.id)) return false;
+      
+      // Apply search query
+      if (searchQuery && !card.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      
+      return true;
     });
 
-    // 2. Group the remaining cards by (id, power, hp)
-    const remainingGroups = {};
-    ownedGameCards.forEach((card) => {
-      if (processedIndices.has(card.uniqueInstanceId)) return;
+    // 2. Map with defending status
+    const withStatus = filtered.map(card => ({
+      ...card,
+      isDefending: profile?.defendingInstances?.some(
+        inst => inst.cardId === card.id && inst.statsIndex === card.statsIndex
+      )
+    }));
 
-      const key = `${card.id}-${card.power}-${card.hp}`;
-      if (!remainingGroups[key]) {
-        remainingGroups[key] = { ...card, count: 1, isDefending: false, isSelected: false };
-      } else {
-        remainingGroups[key].count++;
-      }
-    });
-
-    return [...groups, ...Object.values(remainingGroups)].sort((a, b) => {
+    // 3. Sorting logic
+    const rarityOrder = { 'Унікальна': 0, 'Легендарна': 1, 'Епічна': 2, 'Рідкісна': 3, 'Звичайна': 4 };
+    
+    return withStatus.sort((a, b) => {
+      // Always put defending cards at the bottom
       if (a.isDefending !== b.isDefending) return a.isDefending ? 1 : -1;
-      return b.power - a.power;
+
+      if (sortBy === 'power') {
+        if (b.power !== a.power) return b.power - a.power;
+        return b.hp - a.hp;
+      }
+      if (sortBy === 'hp') {
+        if (b.hp !== a.hp) return b.hp - a.hp;
+        return b.power - a.power;
+      }
+      if (sortBy === 'rarity') {
+        const orderA = rarityOrder[a.rarity] ?? 10;
+        const orderB = rarityOrder[b.rarity] ?? 10;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.power - a.power;
+      }
+      return 0;
     });
-  }, [ownedGameCards, profile?.defendingInstances, deck]);
+  }, [ownedGameCards, profile?.defendingInstances, deck, searchQuery, sortBy]);
 
   const handleToggleCard = (card) => {
     if (deck.find((c) => c.uniqueInstanceId === card.uniqueInstanceId)) {
@@ -958,21 +972,56 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
             {/* Block 2: Inventory Cards */}
             <div className="bg-neutral-900/80 border border-indigo-500/30 rounded-3xl p-4 flex flex-col relative overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.1)] flex-1 min-h-0">
-              <h3 className="text-lg font-black text-white uppercase tracking-wide mb-3 flex items-center gap-2">
-                Інвентар
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h3 className="text-lg font-black text-white uppercase tracking-wide flex items-center gap-2">
+                  Інвентар
+                </h3>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Пошук..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-neutral-950 border border-neutral-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 w-32 sm:w-40 transition-all"
+                    />
+                    <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500">
+                      <Target size={14} />
+                    </div>
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sort Dropdown */}
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-indigo-400 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="power">⚡ Сила</option>
+                    <option value="hp">❤️ HP</option>
+                    <option value="rarity">💎 Рідкість</option>
+                  </select>
+                </div>
+              </div>
 
                   <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                {groupedOwnedCards.length === 0 ? (
+                {filteredAndSortedCards.length === 0 ? (
                   <div className="text-neutral-500 text-center py-10 font-medium">
                     <ShieldAlert size={40} className="mx-auto mb-3 opacity-20" />У вас немає карт із
                     силою для Арени.
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {groupedOwnedCards.map((card) => {
-                      if (card.isSelected) return null; // Сховати, якщо вже в колоді
-
+                    {filteredAndSortedCards.map((card) => {
                       const isDefending = card.isDefending;
 
                       return (
@@ -987,11 +1036,6 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                               <div className="bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full border border-red-700 shadow-xl text-center whitespace-nowrap">
                                 Захищає
                               </div>
-                            </div>
-                          )}
-                          {!isDefending && card.count > 1 && (
-                            <div className="absolute top-1 right-1 bg-black/80 text-white font-black text-[8px] px-1.5 py-0.5 rounded-sm z-30 border border-neutral-700 shadow-lg">
-                              x{card.count}
                             </div>
                           )}
                           <PerkBadge perk={card.perk} />
@@ -1495,20 +1539,36 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     >
                       <div className="relative">
                         {/* Таймери над точкою */}
-                        {(isProtected || lockRemaining > 0) && (
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 z-30 pointer-events-none">
-                            {lockRemaining > 0 && (
-                              <div className="bg-red-600/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-lg border border-red-400 flex items-center gap-1 animate-pulse">
-                                <Flame size={8} /> {formatTime(lockRemaining)}
-                              </div>
-                            )}
-                            {isProtected && lockRemaining <= 0 && (
-                              <div className="bg-yellow-500/90 text-black font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-lg border border-yellow-300 flex items-center gap-1">
-                                <ShieldCheck size={8} /> {formatTime(cdRemaining)}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {(() => {
+                          // Check individual player cooldown
+                          let userCdRemaining = 0;
+                          if (profile?.arenaCooldowns && typeof profile.arenaCooldowns === 'object') {
+                            const cdUntil = profile.arenaCooldowns[point.id];
+                            if (cdUntil) {
+                              userCdRemaining = Math.max(0, new Date(cdUntil).getTime() - now);
+                            }
+                          }
+
+                          return (isProtected || lockRemaining > 0 || userCdRemaining > 0) && (
+                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 z-30 pointer-events-none">
+                              {lockRemaining > 0 && (
+                                <div className="bg-red-600/90 text-white font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-lg border border-red-400 flex items-center gap-1 animate-pulse">
+                                  <Flame size={8} /> {formatTime(lockRemaining)}
+                                </div>
+                              )}
+                              {userCdRemaining > 0 && lockRemaining <= 0 && (
+                                <div className="bg-red-950/90 text-red-400 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-lg border border-red-800 flex items-center gap-1 animate-pulse">
+                                  <Skull size={8} /> {formatTime(userCdRemaining)}
+                                </div>
+                              )}
+                              {isProtected && lockRemaining <= 0 && userCdRemaining <= 0 && (
+                                <div className="bg-yellow-500/90 text-black font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-lg border border-yellow-300 flex items-center gap-1">
+                                  <ShieldCheck size={8} /> {formatTime(cdRemaining)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         <div
                           className={`

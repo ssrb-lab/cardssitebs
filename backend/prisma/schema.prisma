@@ -58,6 +58,7 @@ model User {
   blackjackState       Json?
   resetToken           String?
   resetTokenExpiry     DateTime?
+  arenaCooldowns       Json?    @default("{}")
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
