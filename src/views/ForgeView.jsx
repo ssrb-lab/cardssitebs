@@ -288,17 +288,17 @@ function CardUI({ item, rarities }) {
   const style = getCardStyle(item.card.rarity, rarities);
   const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
   return (
-    <div className={`relative w-full h-full bg-neutral-950 overflow-hidden isolate ${effectClass}`}>
+    <div className={`relative w-full h-full bg-black rounded-[inherit] overflow-hidden isolate ${effectClass}`}>
        <CardFrame frame={item.card.frame} effect={item.card.effect}>
           <img
             src={item.card.image}
             alt={item.card.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-[inherit]"
             loading="lazy"
           />
         </CardFrame>
-        {/* Рарність текстом знизу (опціонально) */}
-        <div className={`absolute bottom-0 left-0 right-0 py-0.5 text-[7px] font-black uppercase text-center bg-black/60 ${style.text}`}>
+        {/* Рарність текстом знизу з примусовим заокругленням нижніх кутів */}
+        <div className={`absolute bottom-0 left-0 right-0 py-1 text-[7px] font-black uppercase text-center bg-black/80 backdrop-blur-sm ${style.text} border-t border-white/5`}>
            {item.card.rarity}
         </div>
     </div>
