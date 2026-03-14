@@ -158,7 +158,7 @@ export default function ForgeView({
               </div>
             )}
           </div>
-          </div>
+
           {/* Інфо та Кнопка */}
           <div className="w-full lg:w-1/2 space-y-6">
             <div>
