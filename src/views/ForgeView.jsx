@@ -126,41 +126,39 @@ export default function ForgeView({
 
         <div className="flex flex-col lg:flex-row gap-12 items-center relative z-10">
           {/* Слот для головної картки та матеріалу */}
-          <div className="flex gap-4 items-center justify-center w-full lg:w-1/2">
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">Головна</span>
-              {selectedMain ? (
-                <div className={`w-40 aspect-[2/3] transition-all duration-500 ${isForging ? 'animate-pulse scale-105 blur-[1px]' : ''}`}>
-                   <CardUI item={selectedMain} rarities={rarities} />
-                </div>
-              ) : (
-                <div className="w-40 aspect-[2/3] border-2 border-dashed border-neutral-800 rounded-xl flex flex-col items-center justify-center bg-black/20 text-neutral-600">
-                  <Hammer size={32} className="mb-2 opacity-20" />
-                  <span className="text-[10px] font-bold uppercase">Оберіть карту</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col items-center justify-center text-neutral-700">
-              <Sparkles size={24} className={isForging ? 'animate-spin text-orange-500' : ''} />
-              <div className="h-12 w-px bg-neutral-800 my-2" />
-            </div>
-
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Матеріал</span>
-              {materialCard ? (
-                <div className={`w-32 aspect-[2/3] opacity-60 grayscale transition-all duration-500 ${isForging ? 'animate-ping scale-75 opacity-0' : ''}`}>
-                   <CardUI item={materialCard} rarities={rarities} />
-                </div>
-              ) : (
-                <div className="w-32 aspect-[2/3] border-2 border-dashed border-neutral-800 rounded-xl flex flex-col items-center justify-center bg-black/20 text-neutral-600">
-                  <Layers size={24} className="mb-2 opacity-20" />
-                  <span className="text-[10px] font-bold uppercase text-center px-2">Потрібен дублікат</span>
-                </div>
-              )}
-            </div>
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">Головна</span>
+            {selectedMain ? (
+              <div className={`w-40 aspect-[2/3] transition-all duration-500 rounded-xl overflow-hidden shadow-2xl ${isForging ? 'animate-pulse scale-105 blur-[1px]' : ''}`}>        
+                 <CardUI item={selectedMain} rarities={rarities} />
+              </div>
+            ) : (
+              <div className="w-40 aspect-[2/3] border-2 border-dashed border-neutral-800 rounded-xl flex flex-col items-center justify-center bg-black/20 text-neutral-600">
+                <Hammer size={32} className="mb-2 opacity-20" />
+                <span className="text-[10px] font-bold uppercase">Оберіть карту</span>
+              </div>
+            )}
           </div>
 
+          <div className="flex flex-col items-center justify-center text-neutral-700">
+            <Sparkles size={24} className={isForging ? 'animate-spin text-orange-500' : ''} />
+            <div className="h-12 w-px bg-neutral-800 my-2" />
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Матеріал</span>
+            {materialCard ? (
+              <div className={`w-32 aspect-[2/3] opacity-60 grayscale transition-all duration-500 rounded-xl overflow-hidden ${isForging ? 'animate-ping scale-75 opacity-0' : ''}`}>
+                 <CardUI item={materialCard} rarities={rarities} />
+              </div>
+            ) : (
+              <div className="w-32 aspect-[2/3] border-2 border-dashed border-neutral-800 rounded-xl flex flex-col items-center justify-center bg-black/20 text-neutral-600">
+                <Layers size={24} className="mb-2 opacity-20" />
+                <span className="text-[10px] font-bold uppercase text-center px-2">Потрібен дублікат</span>
+              </div>
+            )}
+          </div>
+          </div>
           {/* Інфо та Кнопка */}
           <div className="w-full lg:w-1/2 space-y-6">
             <div>
