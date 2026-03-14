@@ -25,7 +25,7 @@ const RARITY_MIN_POWER = {
   Звичайна: 5,
 };
 
-// Повертає масив об'єктів { power, hp, isRecorded, statsIndex } для картки.
+// Повертає масив об'єктів { power, hp, isRecorded, statsIndex, inSafe } для картки.
 // isRecorded=false: сила не записана в БД (мінімальний заповнювач).
 function getEffectivePowers(item, packsCatalog = []) {
   const recorded = Array.isArray(item.gameStats) ? item.gameStats.map((s, idx) => ({ ...parseGameStat(s, item.card.rarity), statsIndex: idx, inSafe: !!s?.inSafe })) : [];
@@ -34,9 +34,10 @@ function getEffectivePowers(item, packsCatalog = []) {
   if (!isGameCard) return [];
   const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
   const parsedDefault = parseGameStat(minPower, item.card.rarity);
+  
   const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true, statsIndex: v.statsIndex, inSafe: v.inSafe }));
   while (powers.length < item.amount) {
-    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: null, inSafe: false });
+    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: powers.length, inSafe: false });
   }
   return powers;
 }
@@ -75,10 +76,24 @@ export default function InventoryView({
 
   // Стейт для вікна дублікатів ігрових карток
   const [viewingGameCard, setViewingGameCard] = useState(null);
+  const [gameCardSortBy, setGameCardSortBy] = useState('power'); // 'power', 'hp', 'recorded'
 
   // Стейт для Сейфу
   const [isSafeOpen, setIsSafeOpen] = useState(false);
   const [safeTransferModal, setSafeTransferModal] = useState(null);
+
+  // СИНХРОНІЗАЦІЯ ВІДКРИТОЇ КАРТКИ З ОСНОВНИМ ІНВЕНТАРЕМ
+  useEffect(() => {
+    if (viewingGameCard) {
+      const updatedItem = inventory.find(i => i.card.id === viewingGameCard.card.id);
+      if (updatedItem) {
+        // Зберігаємо відкрите вікно, але з новими даними
+        setViewingGameCard(updatedItem);
+      } else {
+        setViewingGameCard(null);
+      }
+    }
+  }, [inventory]);
 
   const categories = ['all', ...new Set(packsCatalog.map((p) => p.category || 'Базові'))];
   const relevantPacks =
@@ -769,8 +784,42 @@ export default function InventoryView({
                 </div>
 
                 <div className="p-6">
+                  {/* Sorting for Game Cards */}
+                  <div className="flex items-center gap-3 mb-6 bg-neutral-950/50 p-3 rounded-2xl border border-neutral-800">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500 ml-1">Сортувати:</span>
+                    <button 
+                      onClick={() => setGameCardSortBy('power')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'power' ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
+                    >
+                      Сила
+                    </button>
+                    <button 
+                      onClick={() => setGameCardSortBy('hp')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'hp' ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
+                    >
+                      ХП
+                    </button>
+                    <button 
+                      onClick={() => setGameCardSortBy('recorded')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'recorded' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
+                    >
+                      Тип (Прокачані)
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {powers.filter(p => !p.inSafe).map((powerObj, displayIdx) => {
+                    {powers
+                      .filter(p => !p.inSafe)
+                      .sort((a, b) => {
+                        if (gameCardSortBy === 'power') return b.power - a.power;
+                        if (gameCardSortBy === 'hp') return b.hp - a.hp;
+                        if (gameCardSortBy === 'recorded') {
+                          if (a.isRecorded !== b.isRecorded) return b.isRecorded ? 1 : -1;
+                          return b.power - a.power;
+                        }
+                        return 0;
+                      })
+                      .map((powerObj, displayIdx) => {
                       const idx = powerObj.statsIndex; // <- ВИКОРИСТОВУЄМО ОРИГІНАЛЬНИЙ ІНДЕКС
                       const powerVal = powerObj.power;
                       const hpVal = powerObj.hp;

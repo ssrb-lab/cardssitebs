@@ -1838,7 +1838,8 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
       where: { uid: req.user.uid },
       include: { inventory: true },
     });
-    res.json({ success: true, profile: updatedUser });
+    const updatedDefendingList = await getDefendingInstances(req.user.uid);
+    res.json({ success: true, profile: { ...updatedUser, defendingInstances: updatedDefendingList } });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Помилка виставлення на ринок.' });
   }
@@ -2075,7 +2076,8 @@ app.post('/api/game/inventory/safe', authenticate, async (req, res) => {
       where: { uid: req.user.uid },
       include: { inventory: true },
     });
-    res.json({ success: true, profile: updatedUser });
+    const updatedDefendingSafe = await getDefendingInstances(req.user.uid);
+    res.json({ success: true, profile: { ...updatedUser, defendingInstances: updatedDefendingSafe } });
   } catch (error) {
     res.status(400).json({ error: error.message || 'Помилка сейфу' });
   }
@@ -2140,20 +2142,28 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
       }
     }
 
-    if (currentDailyFarm >= 500000) {
-      const updatedUser = await prisma.user.update({
-        where: { uid: req.user.uid },
-        data: { activeMinigame: null },
-      });
-      return res.json({ success: true, earned: 0, profile: updatedUser, message: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
+    // Вже не викидаємо помилку, якщо `currentDailyFarm >= 500000`.
+    // Прогрес у грі буде зберігатися, але монети не будуть нараховуватись, якщо ліміт вичерпано.
+
+    // ANTI-CHEAT: cap score based on elapsed play time.
+    // Average pro play: ~200 pts/sec. Capping at 1000 pts/sec.
+    const MAX_POINTS_PER_SECOND = 1000;
+    const startTime = minigame.startTime ? new Date(minigame.startTime) : null;
+    let claimedScore = Math.round(Number(score));
+    if (startTime) {
+      const elapsedSeconds = Math.max(0, (now.getTime() - startTime.getTime()) / 1000);
+      const maxAllowedScore = Math.ceil(elapsedSeconds * MAX_POINTS_PER_SECOND);
+      if (claimedScore > maxAllowedScore) {
+        claimedScore = maxAllowedScore;
+      }
     }
 
     // Курс: 1 поїнт рахунку = 1 монета
-    let coinsToGive = score;
+    let coinsToGive = claimedScore;
 
     // Обрізаємо нагороду, якщо вона перевищує залишок ліміту
     if (currentDailyFarm + coinsToGive > 500000) {
-      coinsToGive = 500000 - currentDailyFarm;
+      coinsToGive = Math.max(0, 500000 - currentDailyFarm);
     }
 
     const updatedUser = await prisma.user.update({
@@ -2162,7 +2172,7 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
         coins: { increment: coinsToGive },
         dailyFarmAmount: currentDailyFarm + coinsToGive,
         lastFarmDate: now,
-        activeMinigame: null, // Cleared
+        activeMinigame: null, // Очищуємо активну гру
       },
     });
     res.json({ success: true, earned: coinsToGive, profile: updatedUser });
@@ -2232,17 +2242,12 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
       }
     }
 
-    if (currentDailyFarm >= 500000) {
-      const updatedUser = await prisma.user.update({
-        where: { uid: req.user.uid },
-        data: { activeMinigame: null },
-      });
-      return res.json({ success: true, earned: 0, profile: updatedUser, message: 'Досягнуто денний ліміт фарму (500,000 монет)!' });
-    }
+    // Вже не викидаємо помилку, якщо `currentDailyFarm >= 500000`.
+    // Прогрес у грі буде зберігатися, але монети не будуть нараховуватись, якщо ліміт вичерпано.
 
     // ANTI-CHEAT: cap score based on elapsed play time.
-    // Max realistically achievable ≈ 25 points/sec (4 lines/sec * 1500pts / 60s... actually capping at ~1500pts/min)
-    const MAX_POINTS_PER_SECOND = 500;
+    // Max realistically achievable ≈ 25 points/sec... actually for pro players with hard drop let's allow 1000 pts/sec.
+    const MAX_POINTS_PER_SECOND = 1000;
     const startTime = minigame.startTime ? new Date(minigame.startTime) : null;
     let claimedScore = Math.round(Number(score));
     if (startTime) {
@@ -2257,7 +2262,7 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
     let coinsToGive = claimedScore * 6;
 
     if (currentDailyFarm + coinsToGive > 500000) {
-      coinsToGive = 500000 - currentDailyFarm;
+      coinsToGive = Math.max(0, 500000 - currentDailyFarm);
     }
 
     // Update best score if this game is a new record
@@ -2359,7 +2364,7 @@ app.post('/api/game/fuse/claim', authenticate, async (req, res) => {
     if (isNaN(coinsToGive) || coinsToGive < 0) coinsToGive = 0;
 
     if (currentDailyFarm + coinsToGive > 500000) {
-      coinsToGive = 500000 - currentDailyFarm;
+      coinsToGive = Math.max(0, 500000 - currentDailyFarm);
     }
 
     const updatedUser = await prisma.user.update({
@@ -5989,7 +5994,9 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
       include: { inventory: true },
     });
 
-    res.json({ success: true, earned: totalEarned, totalRemoved: totalCardsRemoved, profile: updatedUser });
+    const updatedDefending = await getDefendingInstances(req.user.uid);
+    const profileWithDefending = { ...updatedUser, defendingInstances: updatedDefending };
+    res.json({ success: true, earned: totalEarned, totalRemoved: totalCardsRemoved, profile: profileWithDefending });
   } catch (error) {
     console.error(error);
     res.status(400).json({ error: error.message || 'Помилка продажу карток.' });
@@ -6050,26 +6057,24 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Одна з карток зараз на Арені і не може бути використана.' });
     }
 
-    // Вартість у кристалах та ліміти статів
+    // Вартість у кристалах
     let crystalCost = 5;
-    let maxPower = 50, maxHp = 100;
-    
     switch (invItem.card.rarity) {
-      case 'Звичайна': 
-        crystalCost = 5; maxPower = 50; maxHp = 100; break;
-      case 'Рідкісна': 
-        crystalCost = 10; maxPower = 80; maxHp = 200; break;
-      case 'Епічна': 
-        crystalCost = 25; maxPower = 100; maxHp = 300; break;
-      case 'Легендарна': 
-        crystalCost = 50; maxPower = 125; maxHp = 400; break;
-      case 'Унікальна': 
-        crystalCost = 100; maxPower = 150; maxHp = 500; break;
+      case 'Звичайна':  crystalCost = 5;   break;
+      case 'Рідкісна':  crystalCost = 10;  break;
+      case 'Епічна':    crystalCost = 25;  break;
+      case 'Легендарна': crystalCost = 50; break;
+      case 'Унікальна': crystalCost = 100; break;
     }
+
+    // Ліміти статів: пріоритет картка > пак > замовчування за рідкістю
+    const statRanges = await getStatsRangesForCard(prisma, invItem.card);
+    const maxPower = statRanges.maxPower;
+    const maxHp = statRanges.maxHp;
 
     // Перевірка лімітів: якщо ОБИДВА стати вже на максимумі, кувати не можна
     if (mP >= maxPower && mH >= maxHp) {
-      return res.status(400).json({ error: `Ця картка вже досягла ліміту характеристик для своєї рідкості (⚡${maxPower}, ❤️${maxHp}).` });
+      return res.status(400).json({ error: `Ця картка вже досягла ліміту характеристик (⚡${maxPower}, ❤️${maxHp}).` });
     }
 
     if (user.crystals < crystalCost) {

@@ -585,8 +585,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
         if (cardDetails && (cardDetails.isGame || stats.length > 0)) {
           const minPower = RARITY_MIN_POWER[cardDetails.rarity] || 5;
-          const defaultStat = parseGameStat(minPower, cardDetails.rarity);
-          const effectiveStats = stats.map((s) => parseGameStat(s, cardDetails.rarity));
+          const defaultStat = { ...parseGameStat(minPower, cardDetails.rarity), inSafe: false };
+          const effectiveStats = stats.map((s) => ({ ...parseGameStat(s, cardDetails.rarity), inSafe: !!s?.inSafe }));
 
           while (effectiveStats.length < invItem.amount) {
             effectiveStats.push(defaultStat);
@@ -595,7 +595,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           const limitedStats = effectiveStats.slice(0, invItem.amount);
 
           limitedStats.forEach((statObj, idx) => {
-            if (statObj.power > 0) {
+            if (statObj.power > 0 && !statObj.inSafe) {
               cards.push({
                 ...cardDetails,
                 uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`,
@@ -610,6 +610,42 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     }
     return cards.sort((a, b) => b.power - a.power);
   }, [profile?.inventory, cardsCatalog]);
+
+  const groupedOwnedCards = React.useMemo(() => {
+    const groups = [];
+    const processedIndices = new Set(); // To track cards that are defending or already in groups
+
+    // 1. First, handle cards that are DEFENDING or SELECTED in deck (they must be unique entries)
+    ownedGameCards.forEach((card) => {
+      const isSelected = deck.some((c) => c.uniqueInstanceId === card.uniqueInstanceId);
+      const isDefending = profile?.defendingInstances?.some(
+        (inst) => inst.cardId === card.id && inst.statsIndex === card.statsIndex
+      );
+
+      if (isSelected || isDefending) {
+        groups.push({ ...card, count: 1, isDefending, isSelected });
+        processedIndices.add(card.uniqueInstanceId);
+      }
+    });
+
+    // 2. Group the remaining cards by (id, power, hp)
+    const remainingGroups = {};
+    ownedGameCards.forEach((card) => {
+      if (processedIndices.has(card.uniqueInstanceId)) return;
+
+      const key = `${card.id}-${card.power}-${card.hp}`;
+      if (!remainingGroups[key]) {
+        remainingGroups[key] = { ...card, count: 1, isDefending: false, isSelected: false };
+      } else {
+        remainingGroups[key].count++;
+      }
+    });
+
+    return [...groups, ...Object.values(remainingGroups)].sort((a, b) => {
+      if (a.isDefending !== b.isDefending) return a.isDefending ? 1 : -1;
+      return b.power - a.power;
+    });
+  }, [ownedGameCards, profile?.defendingInstances, deck]);
 
   const handleToggleCard = (card) => {
     if (deck.find((c) => c.uniqueInstanceId === card.uniqueInstanceId)) {
@@ -926,21 +962,18 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                 Інвентар
               </h3>
 
-              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                {ownedGameCards.length === 0 ? (
+                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {groupedOwnedCards.length === 0 ? (
                   <div className="text-neutral-500 text-center py-10 font-medium">
                     <ShieldAlert size={40} className="mx-auto mb-3 opacity-20" />У вас немає карт із
                     силою для Арени.
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {ownedGameCards.map((card) => {
-                      const isSelected = deck.find((c) => c.id === card.id);
-                      if (isSelected) return null; // Hide from inventory if already in deck
+                    {groupedOwnedCards.map((card) => {
+                      if (card.isSelected) return null; // Сховати, якщо вже в колоді
 
-                      const isDefending = profile?.defendingInstances?.some(
-                        inst => inst.cardId === card.id && inst.statsIndex === card.statsIndex
-                      );
+                      const isDefending = card.isDefending;
 
                       return (
                         <div
@@ -950,8 +983,15 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                           title={isDefending ? "Захищає точку на Арені" : card.name}
                         >
                           {isDefending && (
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full z-20 border border-red-700 shadow-xl text-center whitespace-nowrap">
-                              Захищає
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                              <div className="bg-red-900/90 text-white font-black text-[8px] px-1.5 py-0.5 rounded-full border border-red-700 shadow-xl text-center whitespace-nowrap">
+                                Захищає
+                              </div>
+                            </div>
+                          )}
+                          {!isDefending && card.count > 1 && (
+                            <div className="absolute top-1 right-1 bg-black/80 text-white font-black text-[8px] px-1.5 py-0.5 rounded-sm z-30 border border-neutral-700 shadow-lg">
+                              x{card.count}
                             </div>
                           )}
                           <PerkBadge perk={card.perk} />
@@ -963,12 +1003,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                             <img
                               src={card.image}
                               className="w-full h-full object-cover pointer-events-none"
+                              loading="lazy"
                             />
                           </div>
                         </div>
                       );
                     })}
                   </div>
+
                 )}
               </div>
             </div>

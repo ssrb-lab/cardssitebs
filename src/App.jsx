@@ -318,7 +318,7 @@ export default function App() {
             });
 
             if (data.profile) {
-              setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+              setProfile((prev) => ({ ...data.profile, defendingInstances: prev?.defendingInstances || [], autoSoundEnabled: prev?.autoSoundEnabled }));
               if (data.profile.inventory) {
                 setDbInventory(
                   data.profile.inventory.map((i) => ({
@@ -506,7 +506,7 @@ export default function App() {
       const power = listingCard?.targetPowerToSell || null;
       const hp = listingCard?.targetHpToSell || null;
       const data = await listCardRequest(getToken(), cardId, price, power, hp);
-      setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setProfile((prev) => ({ ...data.profile, defendingInstances: data.profile.defendingInstances ?? prev?.defendingInstances ?? [], autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
         data.profile.inventory.map((i) => ({
           id: i.cardId,
@@ -628,7 +628,7 @@ export default function App() {
               (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
             );
             setPulledCards(sortedResults);
-            setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+            setProfile((prev) => ({ ...data.profile, defendingInstances: prev?.defendingInstances || [], autoSoundEnabled: prev?.autoSoundEnabled }));
             setDbInventory(
               data.profile.inventory.map((i) => ({
                 id: i.cardId,
@@ -655,7 +655,7 @@ export default function App() {
             (a, b) => getCardWeight(a.rarity, rarities) - getCardWeight(b.rarity, rarities)
           );
           setPulledCards(sortedResults);
-          setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+          setProfile((prev) => ({ ...data.profile, defendingInstances: prev?.defendingInstances || [], autoSoundEnabled: prev?.autoSoundEnabled }));
           setDbInventory(
             data.profile.inventory.map((i) => ({
               id: i.cardId,
@@ -802,7 +802,7 @@ export default function App() {
     setIsProcessing(true);
     try {
       const data = await toggleSafeRequest(getToken(), cardId, statsIndex, amount, isSafe);
-      setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setProfile((prev) => ({ ...data.profile, defendingInstances: data.profile.defendingInstances ?? prev?.defendingInstances ?? [], autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
         data.profile.inventory.map((i) => ({
           id: i.cardId,
@@ -833,7 +833,7 @@ export default function App() {
         payload.hp = hp;
       }
       const data = await sellCardsRequest(getToken(), [payload]);
-      setProfile((prev) => ({ ...data.profile, autoSoundEnabled: prev?.autoSoundEnabled }));
+      setProfile((prev) => ({ ...data.profile, defendingInstances: data.profile.defendingInstances ?? prev?.defendingInstances ?? [], autoSoundEnabled: prev?.autoSoundEnabled }));
       setDbInventory(
         data.profile.inventory.map((i) => ({
           id: i.cardId,
