@@ -6062,14 +6062,26 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Одна з карток зараз на Арені і не може бути використана.' });
     }
 
-    // Вартість у кристалах
+    // Вартість у кристалах та ліміти статів
     let crystalCost = 5;
+    let maxPower = 50, maxHp = 100;
+    
     switch (invItem.card.rarity) {
-      case 'Звичайна': crystalCost = 5; break;
-      case 'Рідкісна': crystalCost = 10; break;
-      case 'Епічна': crystalCost = 25; break;
-      case 'Легендарна': crystalCost = 50; break;
-      case 'Унікальна': crystalCost = 100; break;
+      case 'Звичайна': 
+        crystalCost = 5; maxPower = 50; maxHp = 100; break;
+      case 'Рідкісна': 
+        crystalCost = 10; maxPower = 80; maxHp = 200; break;
+      case 'Епічна': 
+        crystalCost = 25; maxPower = 100; maxHp = 300; break;
+      case 'Легендарна': 
+        crystalCost = 50; maxPower = 125; maxHp = 400; break;
+      case 'Унікальна': 
+        crystalCost = 100; maxPower = 150; maxHp = 500; break;
+    }
+
+    // Перевірка лімітів: якщо ОБИДВА стати вже на максимумі або вище, кувати не можна
+    if (mP >= maxPower && (mH === null || mH >= maxHp)) {
+      return res.status(400).json({ error: `Ця картка вже досягла ліміту характеристик для своєї рідкості (⚡${maxPower}, ❤️${maxHp}).` });
     }
 
     if (user.crystals < crystalCost) {
@@ -6088,9 +6100,9 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
     let finalStats = [...statsArray];
 
     if (isSuccess) {
-      // +15% статів
-      newPower = Math.ceil(mP * 1.15);
-      newHp = Math.ceil((mH || 50) * 1.15);
+      // +15% статів, але не вище ліміту
+      newPower = Math.min(Math.ceil(mP * 1.15), maxPower);
+      newHp = Math.min(Math.ceil((mH || 50) * 1.15), maxHp);
       
       finalStats[mainIndex] = { power: newPower, hp: newHp };
       finalStats.splice(materialIndex, 1);
