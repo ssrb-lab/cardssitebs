@@ -6000,9 +6000,9 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 // КУЗНЯ (ФОРДЖ) - АПГРЕЙД КАРТКИ (ШАНС 70%)
 // ----------------------------------------
 app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
-  const { cardId, mainPower, mainHp, materialPower, materialHp } = req.body;
+  const { cardId, mainIndex, materialIndex } = req.body;
 
-  if (!cardId || mainPower === undefined || materialPower === undefined) {
+  if (!cardId || mainIndex === undefined || materialIndex === undefined) {
     return res.status(400).json({ error: 'Некоректні дані для кування.' });
   }
 
@@ -6015,39 +6015,24 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
       include: { card: true },
     });
 
-    if (!invItem || invItem.amount < 2) {
-      return res.status(400).json({ error: 'Вам потрібно мінімум 2 однакові картки для кування.' });
+    if (!invItem || !invItem.gameStats) {
+      return res.status(400).json({ error: 'Картку не знайдено в інвентарі.' });
     }
 
-    let statsArray = [];
-    if (invItem.gameStats) {
-      statsArray =
-        typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+    let statsArray =
+      typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+
+    if (!statsArray[mainIndex] || !statsArray[materialIndex]) {
+      return res.status(400).json({ error: 'Одну з карток не знайдено за вказаним індексом.' });
     }
 
-    const mP = Number(mainPower);
-    const mH = mainHp !== undefined ? Number(mainHp) : null;
-    const matP = Number(materialPower);
-    const matH = materialHp !== undefined ? Number(materialHp) : null;
-
-    // Знаходимо основну картку
-    const mainIndex = statsArray.findIndex((p) => {
-      const stats = typeof p === 'object' && p !== null ? p : { power: p, hp: 0 };
-      if (mH !== null && Number(stats.hp) !== mH) return false;
-      return Number(stats.power) === mP;
-    });
-
-    // Знаходимо матеріал (має бути інший індекс)
-    const materialIndex = statsArray.findIndex((p, idx) => {
-      if (idx === mainIndex) return false;
-      const stats = typeof p === 'object' && p !== null ? p : { power: p, hp: 0 };
-      if (matH !== null && Number(stats.hp) !== matH) return false;
-      return Number(stats.power) === matP;
-    });
-
-    if (mainIndex === -1 || materialIndex === -1) {
-      return res.status(400).json({ error: 'Одну з карток не знайдено в інвентарі.' });
+    if (mainIndex === materialIndex) {
+      return res.status(400).json({ error: 'Не можна використовувати одну і ту саму картку як основу і матеріал.' });
     }
+
+    const mainCardStats = statsArray[mainIndex];
+    const mP = Number(mainCardStats.power);
+    const mH = mainCardStats.hp !== undefined ? Number(mainCardStats.hp) : null;
 
     // Перевірка Арени
     const defInstances = await getDefendingInstances(user.uid);

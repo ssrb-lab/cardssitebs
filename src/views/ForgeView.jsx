@@ -58,15 +58,27 @@ export default function ForgeView({
   // Знаходимо матеріал для обраної головної картки
   const materialCard = useMemo(() => {
     if (!selectedMain) return null;
-    // Шукаємо іншу картку з таким же ID, але НЕ ту саму (по унікальному ключу)
-    // Обираємо найслабшу за сумою статів
-    const duplicates = allGameCards.filter(
-      (c) => c.card.id === selectedMain.card.id && c.uniqueKey !== selectedMain.uniqueKey
-    );
+    
+    // Отримуємо список всіх інстанцій на Арені для перевірки
+    const defendingIndices = profile?.defendingInstances || [];
+
+    // Шукаємо іншу картку з таким же ID, але НЕ ту саму
+    // І головне — вона НЕ має бути на Арені
+    const duplicates = allGameCards.filter((c) => {
+      if (c.card.id !== selectedMain.card.id) return false;
+      if (c.uniqueKey === selectedMain.uniqueKey) return false;
+      
+      const isDefending = defendingIndices.some(
+        (inst) => inst.cardId === c.card.id && inst.statsIndex === c.statsIndex
+      );
+      return !isDefending;
+    });
+
     if (duplicates.length === 0) return null;
 
+    // Обираємо найслабшу за сумою статів
     return duplicates.sort((a, b) => (a.power + a.hp) - (b.power + b.hp))[0];
-  }, [selectedMain, allGameCards]);
+  }, [selectedMain, allGameCards, profile]);
 
   useEffect(() => {
     if (selectedMain && !isForging) {
@@ -90,10 +102,8 @@ export default function ForgeView({
       const data = await upgradeCardRequest(
         getToken(),
         selectedMain.card.id,
-        selectedMain.power,
-        selectedMain.hp,
-        materialCard.power,
-        materialCard.hp
+        selectedMain.statsIndex,
+        materialCard.statsIndex
       );
 
       // Очікуємо трохи для драматизму

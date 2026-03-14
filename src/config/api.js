@@ -200,14 +200,14 @@ export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSaf
   return data;
 };
 
-export const upgradeCardRequest = async (token, cardId, mainPower, mainHp, materialPower, materialHp) => {
+export const upgradeCardRequest = async (token, cardId, mainIndex, materialIndex) => {
   const response = await safeFetch(`${API_URL}/game/forge/upgrade`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ cardId, mainPower, mainHp, materialPower, materialHp }),
+    body: JSON.stringify({ cardId, mainIndex, materialIndex }),
   });
   if (!response.ok) {
     const err = await response.json();
