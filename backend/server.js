@@ -6030,9 +6030,12 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Не можна використовувати одну і ту саму картку як основу і матеріал.' });
     }
 
-    const mainCardStats = statsArray[mainIndex];
+    // Нормалізація статів (об'єкт або число)
+    const normalize = (s) => (typeof s === 'object' && s !== null ? s : { power: s, hp: 50 });
+    
+    const mainCardStats = normalize(statsArray[mainIndex]);
     const mP = Number(mainCardStats.power);
-    const mH = mainCardStats.hp !== undefined ? Number(mainCardStats.hp) : null;
+    const mH = mainCardStats.hp !== undefined && mainCardStats.hp !== null ? Number(mainCardStats.hp) : 50;
 
     // Перевірка Арени
     const defInstances = await getDefendingInstances(user.uid);
@@ -6064,8 +6067,8 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
         crystalCost = 100; maxPower = 150; maxHp = 500; break;
     }
 
-    // Перевірка лімітів: якщо ОБИДВА стати вже на максимумі або вище, кувати не можна
-    if (mP >= maxPower && (mH === null || mH >= maxHp)) {
+    // Перевірка лімітів: якщо ОБИДВА стати вже на максимумі, кувати не можна
+    if (mP >= maxPower && mH >= maxHp) {
       return res.status(400).json({ error: `Ця картка вже досягла ліміту характеристик для своєї рідкості (⚡${maxPower}, ❤️${maxHp}).` });
     }
 
@@ -6075,7 +6078,7 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
 
     const isSuccess = Math.random() <= 0.75; // 75% успіху
     let newPower = mP;
-    let newHp = mH || 0;
+    let newHp = mH;
 
     const map = new Map();
     // Логіка видалення/оновлення індексів для Арени
@@ -6087,7 +6090,7 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
     if (isSuccess) {
       // +15% статів, але не вище ліміту
       newPower = Math.min(Math.ceil(mP * 1.15), maxPower);
-      newHp = Math.min(Math.ceil((mH || 50) * 1.15), maxHp);
+      newHp = Math.min(Math.ceil(newHp * 1.15), maxHp);
       
       finalStats[mainIndex] = { power: newPower, hp: newHp };
       finalStats.splice(materialIndex, 1);
