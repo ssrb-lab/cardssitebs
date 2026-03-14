@@ -200,20 +200,20 @@ export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSaf
   return data;
 };
 
-export const rerollPowerRequest = async (token, cardId, currentPower, currentHp) => {
-  const response = await safeFetch(`${API_URL}/game/forge/reroll`, {
+export const upgradeCardRequest = async (token, cardId, mainPower, mainHp, materialPower, materialHp) => {
+  const response = await safeFetch(`${API_URL}/game/forge/upgrade`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ cardId, currentPower, currentHp }),
+    body: JSON.stringify({ cardId, mainPower, mainHp, materialPower, materialHp }),
   });
   if (!response.ok) {
     const err = await response.json();
     throw new Error(err.error || 'Помилка кування.');
   }
-  return response.json();
+  return await response.json();
 };
 
 // --- CRASH ---

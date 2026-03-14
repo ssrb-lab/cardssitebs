@@ -5997,12 +5997,12 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 });
 
 // ----------------------------------------
-// КУЗНЯ (ФОРДЖ) - РЕРОЛ СИЛИ КАРТКИ
+// КУЗНЯ (ФОРДЖ) - АПГРЕЙД КАРТКИ (ШАНС 70%)
 // ----------------------------------------
-app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
-  const { cardId, currentPower, currentHp } = req.body;
+app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
+  const { cardId, mainPower, mainHp, materialPower, materialHp } = req.body;
 
-  if (!cardId || currentPower === undefined || currentPower === null) {
+  if (!cardId || mainPower === undefined || materialPower === undefined) {
     return res.status(400).json({ error: 'Некоректні дані для кування.' });
   }
 
@@ -6015,8 +6015,8 @@ app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
       include: { card: true },
     });
 
-    if (!invItem || invItem.amount < 1) {
-      return res.status(400).json({ error: 'Цієї картки немає у вашому інвентарі.' });
+    if (!invItem || invItem.amount < 2) {
+      return res.status(400).json({ error: 'Вам потрібно мінімум 2 однакові картки для кування.' });
     }
 
     let statsArray = [];
@@ -6025,211 +6025,134 @@ app.post('/api/game/forge/reroll', authenticate, async (req, res) => {
         typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
     }
 
-    const parsedPower = Number(currentPower);
-    const parsedHp = currentHp !== undefined && currentHp !== null ? Number(currentHp) : null;
-    const powerIndex = statsArray.findIndex((p) => {
-      if (typeof p === 'object' && p !== null) {
-        if (parsedHp !== null && Number(p.hp) !== parsedHp) return false;
-        return Number(p.power) === parsedPower;
-      }
-      return Number(p) === parsedPower;
+    const mP = Number(mainPower);
+    const mH = mainHp !== undefined ? Number(mainHp) : null;
+    const matP = Number(materialPower);
+    const matH = materialHp !== undefined ? Number(materialHp) : null;
+
+    // Знаходимо основну картку
+    const mainIndex = statsArray.findIndex((p) => {
+      const stats = typeof p === 'object' && p !== null ? p : { power: p, hp: 0 };
+      if (mH !== null && Number(stats.hp) !== mH) return false;
+      return Number(stats.power) === mP;
     });
 
-    if (powerIndex === -1) {
-      return res
-        .status(400)
-        .json({ error: 'Картку з такими характеристиками не знайдено в інвентарі.' });
+    // Знаходимо матеріал (має бути інший індекс)
+    const materialIndex = statsArray.findIndex((p, idx) => {
+      if (idx === mainIndex) return false;
+      const stats = typeof p === 'object' && p !== null ? p : { power: p, hp: 0 };
+      if (matH !== null && Number(stats.hp) !== matH) return false;
+      return Number(stats.power) === matP;
+    });
+
+    if (mainIndex === -1 || materialIndex === -1) {
+      return res.status(400).json({ error: 'Одну з карток не знайдено в інвентарі.' });
     }
 
+    // Перевірка Арени
     const defInstances = await getDefendingInstances(user.uid);
-    const isDefending = defInstances.some(
-      (inst) => inst.cardId === cardId && inst.statsIndex === powerIndex
+    const isMainDefending = defInstances.some(
+      (inst) => inst.cardId === cardId && inst.statsIndex === mainIndex
     );
-    if (isDefending) {
-      return res
-        .status(400)
-        .json({ error: 'Ця картка зараз захищає точку на Арені і не може бути перекована.' });
+    const isMaterialDefending = defInstances.some(
+      (inst) => inst.cardId === cardId && inst.statsIndex === materialIndex
+    );
+
+    if (isMainDefending || isMaterialDefending) {
+      return res.status(400).json({ error: 'Одна з карток зараз на Арені і не може бути використана.' });
     }
 
-    let cost = 100;
+    // Вартість у кристалах
+    let crystalCost = 5;
     switch (invItem.card.rarity) {
-      case 'Звичайна':
-        cost = 100;
-        break;
-      case 'Рідкісна':
-        cost = 300;
-        break;
-      case 'Епічна':
-        cost = 1000;
-        break;
-      case 'Легендарна':
-        cost = 5000;
-        break;
-      case 'Унікальна':
-        cost = 15000;
-        break;
+      case 'Звичайна': crystalCost = 5; break;
+      case 'Рідкісна': crystalCost = 10; break;
+      case 'Епічна': crystalCost = 25; break;
+      case 'Легендарна': crystalCost = 50; break;
+      case 'Унікальна': crystalCost = 100; break;
     }
 
-    if (user.coins < cost) {
-      return res.status(400).json({ error: 'Недостатньо монет для кування!' });
+    if (user.crystals < crystalCost) {
+      return res.status(400).json({ error: 'Недостатньо кристалів!' });
     }
 
-    const pack = await prisma.packCatalog.findUnique({ where: { id: invItem.card.packId } });
+    const isSuccess = Math.random() <= 0.75; // 75% успіху
+    let newPower = mP;
+    let newHp = mH || 0;
 
-    const generatePower = (rarity, cardObj, packObj) => {
-      let min = 0,
-        max = 0;
-
-      if (cardObj && cardObj.minPower !== null && cardObj.maxPower !== null) {
-        min = cardObj.minPower;
-        max = cardObj.maxPower;
-      } else {
-        let ranges;
-        if (packObj && packObj.statsRanges) {
-          if (typeof packObj.statsRanges === 'string') {
-            try {
-              ranges = JSON.parse(packObj.statsRanges);
-            } catch (e) {}
-          } else {
-            ranges = packObj.statsRanges;
-          }
-        }
-        
-        if (
-          ranges &&
-          ranges[rarity] &&
-          ranges[rarity].minPower !== undefined &&
-          ranges[rarity].maxPower !== undefined &&
-          ranges[rarity].minPower !== '' &&
-          ranges[rarity].maxPower !== ''
-        ) {
-          min = Number(ranges[rarity].minPower);
-          max = Number(ranges[rarity].maxPower);
-        } else {
-          switch (rarity) {
-            case 'Унікальна':
-              min = 100;
-              max = 150;
-              break;
-            case 'Легендарна':
-              min = 50;
-              max = 125;
-              break;
-            case 'Епічна':
-              min = 25;
-              max = 100;
-              break;
-            case 'Рідкісна':
-              min = 10;
-              max = 80;
-              break;
-            case 'Звичайна':
-              min = 5;
-              max = 50;
-              break;
-            default:
-              return null;
-          }
-        }
-      }
-      return Math.floor(Math.random() * (max - min + 1)) + min;
-    };
-
-    const generateHp = (rarity, cardObj, packObj) => {
-      let min = 0,
-        max = 0;
-
-      if (cardObj && cardObj.minHp !== null && cardObj.maxHp !== null) {
-        min = cardObj.minHp;
-        max = cardObj.maxHp;
-      } else {
-        let ranges;
-        if (packObj && packObj.statsRanges) {
-          if (typeof packObj.statsRanges === 'string') {
-            try {
-              ranges = JSON.parse(packObj.statsRanges);
-            } catch (e) {}
-          } else {
-            ranges = packObj.statsRanges;
-          }
-        }
-
-        if (
-          ranges &&
-          ranges[rarity] &&
-          ranges[rarity].minHp !== undefined &&
-          ranges[rarity].maxHp !== undefined &&
-          ranges[rarity].minHp !== '' &&
-          ranges[rarity].maxHp !== ''
-        ) {
-          min = Number(ranges[rarity].minHp);
-          max = Number(ranges[rarity].maxHp);
-        } else {
-          switch (rarity) {
-            case 'Унікальна':
-              min = 300;
-              max = 500;
-              break;
-            case 'Легендарна':
-              min = 200;
-              max = 400;
-              break;
-            case 'Епічна':
-              min = 150;
-              max = 300;
-              break;
-            case 'Рідкісна':
-              min = 100;
-              max = 200;
-              break;
-            case 'Звичайна':
-              min = 50;
-              max = 100;
-              break;
-            default:
-              return null;
-          }
-        }
-      }
-      return Math.floor(Math.random() * (max - min + 1)) + min;
-    };
-
-    const newPower = generatePower(invItem.card.rarity, invItem.card, pack) || parsedPower;
-    const newHp = generateHp(invItem.card.rarity, invItem.card, pack) || parsedHp || 50;
-    const newStats = { power: newPower, hp: newHp };
-
-    // Define index map for splice and push
     const map = new Map();
-    for (let i = 0; i < statsArray.length; i++) {
-      if (i === powerIndex) map.set(i, statsArray.length - 1);
-      else if (i > powerIndex) map.set(i, i - 1);
-      else map.set(i, i);
-    }
+    // Логіка видалення/оновлення індексів для Арени
+    // Це складно, бо видаляємо 1 або 2 елементи. 
+    // Простіше за все: якщо неуспіх - видаляємо обидві. Якщо успіх - видаляємо матеріал і оновлюємо головну.
 
-    // Remove old power and add new power
-    statsArray.splice(powerIndex, 1);
-    statsArray.push(newStats);
+    let finalStats = [...statsArray];
+
+    if (isSuccess) {
+      // +15% статів
+      newPower = Math.ceil(mP * 1.15);
+      newHp = Math.ceil((mH || 50) * 1.15);
+      
+      finalStats[mainIndex] = { power: newPower, hp: newHp };
+      finalStats.splice(materialIndex, 1);
+      
+      // Створюємо мапу для зсуву індексів Арени
+      for (let i = 0; i < statsArray.length; i++) {
+        if (i === materialIndex) map.set(i, -1); // Видалено
+        else if (i > materialIndex) map.set(i, i - 1);
+        else map.set(i, i);
+      }
+    } else {
+      // Обидві видаляються
+      // Важливо видаляти з більшого індексу до меншого, щоб не збивати порядок
+      const firstToRemove = Math.max(mainIndex, materialIndex);
+      const secondToRemove = Math.min(mainIndex, materialIndex);
+      
+      finalStats.splice(firstToRemove, 1);
+      finalStats.splice(secondToRemove, 1);
+
+      for (let i = 0; i < statsArray.length; i++) {
+        if (i === mainIndex || i === materialIndex) map.set(i, -1);
+        else {
+          let offset = 0;
+          if (i > firstToRemove) offset++;
+          if (i > secondToRemove) offset++;
+          map.set(i, i - offset);
+        }
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await syncArenaIndices(tx, user.uid, cardId, map);
 
       await tx.user.update({
         where: { uid: user.uid },
-        data: { coins: { decrement: cost } },
+        data: { 
+          crystals: { decrement: crystalCost }
+        },
       });
 
       await tx.inventoryItem.update({
         where: { userId_cardId: { userId: user.uid, cardId: cardId } },
-        data: { gameStats: statsArray },
+        data: { 
+          gameStats: finalStats,
+          amount: { decrement: isSuccess ? 1 : 2 }
+        },
       });
     });
 
     const updatedUser = await prisma.user.findUnique({
       where: { uid: req.user.uid },
-      include: { inventory: true },
+      include: { inventory: { include: { card: true } } },
     });
 
-    res.json({ success: true, profile: updatedUser, newPower, newHp, cost });
+    res.json({ 
+      success: true, 
+      isSuccess, 
+      profile: updatedUser, 
+      newPower: isSuccess ? newPower : 0, 
+      newHp: isSuccess ? newHp : 0, 
+      crystalCost 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Помилка внутрішнього сервера під час кування.' });
