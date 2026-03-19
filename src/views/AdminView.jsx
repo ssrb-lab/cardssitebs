@@ -51,6 +51,11 @@ import {
   deleteAchievementSettingsRequest,
   sendAdminNotification,
   uploadBannerRequest,
+  fetchAdminEmeraldTypes,
+  saveEmeraldTypeRequest,
+  deleteEmeraldTypeRequest,
+  fetchAdminEmeraldSettings,
+  saveEmeraldSettingsRequest,
 } from '../config/api';
 import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, FRAME_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
@@ -118,6 +123,7 @@ export default function AdminView({
   const [adminAddCardAmount, setAdminAddCardAmount] = useState(1);
   const [adminAddCardPower, setAdminAddCardPower] = useState('');
   const [adminAddCardHp, setAdminAddCardHp] = useState('');
+  const [adminAddCardLevel, setAdminAddCardLevel] = useState('');
   const [adminAddCoinsAmount, setAdminAddCoinsAmount] = useState(100);
   const [adminSetCoinsAmount, setAdminSetCoinsAmount] = useState(0);
 
@@ -139,12 +145,17 @@ export default function AdminView({
     soundVolume: 0.5,
     frame: 'normal',
     isGame: false,
+    blockGame: false,
     minPower: '',
     maxPower: '',
     minHp: '',
     maxHp: '',
     perk: '',
     perkValue: '',
+    levelingConfig: {},
+    bonusPerkLevel: '',
+    bonusPerk: '',
+    bonusPerkValue: '',
   });
   const [editingPack, setEditingPack] = useState(null);
   const [packForm, setPackForm] = useState({
@@ -248,6 +259,13 @@ export default function AdminView({
   });
   const [editingShopItem, setEditingShopItem] = useState(null);
 
+  // Emerald admin state
+  const [emeraldTypes, setEmeraldTypes] = useState([]);
+  const [emeraldSettings, setEmeraldSettings] = useState({ boxCostAmount: 100, boxCostCurrency: 'coins', maxDailyOpens: 3 });
+  const [editingEmeraldType, setEditingEmeraldType] = useState(null);
+  const [emeraldTypeForm, setEmeraldTypeForm] = useState({ name: '', color: '#10b981', perkBoostPercent: 10, dropWeight: 50 });
+  const [isSavingEmerald, setIsSavingEmerald] = useState(false);
+
   const updatePackStatsRange = (rarity, field, value) => {
     setPackForm((prev) => ({
       ...prev,
@@ -327,6 +345,22 @@ export default function AdminView({
         }
       };
       loadAchievements();
+    }
+
+    if (activeTab === 'emeralds' && currentProfile.isAdmin) {
+      const loadEmeralds = async () => {
+        try {
+          const [types, settings] = await Promise.all([
+            fetchAdminEmeraldTypes(getToken()),
+            fetchAdminEmeraldSettings(getToken()),
+          ]);
+          setEmeraldTypes(types || []);
+          setEmeraldSettings(settings || { boxCostAmount: 100, boxCostCurrency: 'coins', maxDailyOpens: 3 });
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      loadEmeralds();
     }
   }, [activeTab, db, appId, currentProfile]);
 
@@ -545,11 +579,13 @@ export default function AdminView({
         amount: adminAddCardAmount,
         power: adminAddCardPower ? Number(adminAddCardPower) : undefined,
         hp: adminAddCardHp ? Number(adminAddCardHp) : undefined,
+        level: adminAddCardLevel ? Number(adminAddCardLevel) : undefined,
       });
       showToast(`Успішно нараховано ${adminAddCardAmount} шт.`, 'success');
       handleInspectUser(viewingUser.uid);
       setAdminAddCardPower('');
       setAdminAddCardHp('');
+      setAdminAddCardLevel('');
       loadUsers();
     } catch {
       showToast('Помилка картки.', 'error');
@@ -757,6 +793,7 @@ export default function AdminView({
       soundVolume: cardForm.soundVolume !== undefined ? Number(cardForm.soundVolume) : 0.5,
       frame: cardForm.frame || 'normal',
       isGame: !!cardForm.isGame,
+      blockGame: !!cardForm.blockGame,
       perk: cardForm.perk || '',
       perkValue: cardForm.perkValue ? Number(cardForm.perkValue) : '',
       pulledCount: editingCard ? editingCard.pulledCount || 0 : 0,
@@ -764,6 +801,10 @@ export default function AdminView({
       maxPower: cardForm.maxPower !== '' && cardForm.maxPower !== null && cardForm.maxPower !== undefined ? Number(cardForm.maxPower) : null,
       minHp: cardForm.minHp !== '' && cardForm.minHp !== null && cardForm.minHp !== undefined ? Number(cardForm.minHp) : null,
       maxHp: cardForm.maxHp !== '' && cardForm.maxHp !== null && cardForm.maxHp !== undefined ? Number(cardForm.maxHp) : null,
+      levelingConfig: cardForm.levelingConfig || {},
+      bonusPerkLevel: cardForm.bonusPerkLevel ? Number(cardForm.bonusPerkLevel) : null,
+      bonusPerk: cardForm.bonusPerk || '',
+      bonusPerkValue: cardForm.bonusPerkValue ? Number(cardForm.bonusPerkValue) : null,
     };
     if (cardImageFile) {
       newCardData.imageFile = cardImageFile;
@@ -795,6 +836,7 @@ export default function AdminView({
         soundVolume: 0.5,
         frame: 'normal',
         isGame: false,
+        blockGame: false,
         minPower: '',
         maxPower: '',
         minHp: '',
@@ -1373,6 +1415,12 @@ export default function AdminView({
               <Gem size={18} /> Прем Товари
             </button>
             <button
+              onClick={() => setActiveTab('emeralds')}
+              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'emeralds' ? 'bg-emerald-700 text-white' : 'text-emerald-400/70 hover:bg-neutral-800'}`}
+            >
+              💎 Смарагди
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'settings' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
             >
@@ -1473,6 +1521,18 @@ export default function AdminView({
                     value={adminAddCardHp}
                     onChange={(e) => setAdminAddCardHp(e.target.value)}
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="w-full sm:w-20">
+                  <label className="text-xs text-neutral-400 font-bold mb-1 block">Рівень:</label>
+                  <input
+                    type="number"
+                    placeholder="1"
+                    min="1"
+                    max="10"
+                    value={adminAddCardLevel}
+                    onChange={(e) => setAdminAddCardLevel(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white outline-none focus:border-yellow-500"
                   />
                 </div>
                 <button
@@ -3330,15 +3390,26 @@ export default function AdminView({
                 <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
                   <span className="w-8 h-px bg-neutral-800"></span> Ігрові параметри
                 </h4>
-                <label className="inline-flex items-center gap-2 text-xs text-green-400 font-bold cursor-pointer bg-green-900/10 px-3 py-1.5 rounded-lg border border-green-900/30 hover:bg-green-900/20 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={cardForm.isGame || false}
-                    onChange={(e) => setCardForm({ ...cardForm, isGame: e.target.checked })}
-                    className="w-3.5 h-3.5 accent-green-500 rounded"
-                  />
-                  Активувати ігрову логіку
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex items-center gap-2 text-xs text-green-400 font-bold cursor-pointer bg-green-900/10 px-3 py-1.5 rounded-lg border border-green-900/30 hover:bg-green-900/20 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={cardForm.isGame || false}
+                      onChange={(e) => setCardForm({ ...cardForm, isGame: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-green-500 rounded"
+                    />
+                    Активувати ігрову логіку
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-xs text-red-400 font-bold cursor-pointer bg-red-900/10 px-3 py-1.5 rounded-lg border border-red-900/30 hover:bg-red-900/20 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={cardForm.blockGame || false}
+                      onChange={(e) => setCardForm({ ...cardForm, blockGame: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-red-500 rounded"
+                    />
+                    Заблокувати ігровий статус
+                  </label>
+                </div>
               </div>
 
               <div className={`transition-all duration-300 ${cardForm.isGame ? 'opacity-100' : 'opacity-40 grayscale pointer-events-none'}`}>
@@ -3355,7 +3426,7 @@ export default function AdminView({
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. Сила</label>
                     <input
-                      type="number" placeholder="Авто"
+                      type="number" placeholder="Фікс. якщо пусте"
                       value={cardForm.maxPower ?? ''}
                       onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value })}
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-blue-400 focus:border-blue-500 outline-none"
@@ -3373,7 +3444,7 @@ export default function AdminView({
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. HP</label>
                     <input
-                      type="number" placeholder="Авто"
+                      type="number" placeholder="Фікс. якщо пусте"
                       value={cardForm.maxHp ?? ''}
                       onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value })}
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-red-400 focus:border-red-500 outline-none"
@@ -3395,12 +3466,14 @@ export default function AdminView({
                         <option value="cleave">Сплеск (по сусідах)</option>
                         <option value="poison">Отрута (3 ходи)</option>
                         <option value="lifesteal">Вампіризм (ліфстіл)</option>
+                        <option value="burn">Опік (вогняна шкода)</option>
                       </optgroup>
                       <optgroup label="🛡️ Захисні">
                         <option value="dodge">Ухилення</option>
                         <option value="thorns">Шипи (повернення шкоди)</option>
                         <option value="armor">Броня (зниження шкоди)</option>
                         <option value="laststand">Виживання (1 HP)</option>
+                        <option value="shield">Щит (відновлюється)</option>
                       </optgroup>
                       <optgroup label="🎯 Тактичні">
                         <option value="taunt">Провокація (таунт)</option>
@@ -3419,6 +3492,110 @@ export default function AdminView({
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none disabled:opacity-30"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* --- СЕКЦІЯ 5: ПРОКАЧКА (РІВНІ) --- */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-8 h-px bg-neutral-800"></span> Прокачка (Рівні 1-10)
+                </h4>
+              </div>
+
+              <div className={`transition-all duration-300 p-4 bg-blue-950/10 border border-blue-900/20 rounded-2xl ${cardForm.isGame ? 'opacity-100' : 'opacity-40 grayscale pointer-events-none'}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-blue-400 uppercase ml-1">Рівень розблокування перку</label>
+                    <select
+                      value={cardForm.bonusPerkLevel || ''}
+                      onChange={(e) => setCardForm({ ...cardForm, bonusPerkLevel: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+                    >
+                      <option value="">Без додаткового перку</option>
+                      {[2,3,4,5,6,7,8,9,10].map(lvl => (
+                        <option key={lvl} value={lvl}>На {lvl} рівні</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-blue-400 uppercase ml-1">Додатковий перк</label>
+                    <select
+                      value={cardForm.bonusPerk || ''}
+                      disabled={!cardForm.bonusPerkLevel}
+                      onChange={(e) => setCardForm({ ...cardForm, bonusPerk: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none disabled:opacity-30"
+                    >
+                      <option value="">Оберіть перк</option>
+                      <optgroup label="⚔️ Атакувальні">
+                        <option value="crit">Крит (2× шкоди)</option>
+                        <option value="cleave">Сплеск (по сусідах)</option>
+                        <option value="poison">Отрута (3 ходи)</option>
+                        <option value="lifesteal">Вампіризм (ліфстіл)</option>
+                        <option value="burn">Опік (вогняна шкода)</option>
+                      </optgroup>
+                      <optgroup label="🛡️ Захисні">
+                        <option value="dodge">Ухилення</option>
+                        <option value="thorns">Шипи (повернення шкоди)</option>
+                        <option value="armor">Броня (зниження шкоди)</option>
+                        <option value="laststand">Виживання (1 HP)</option>
+                        <option value="shield">Щит (відновлюється)</option>
+                      </optgroup>
+                      <optgroup label="🎯 Тактичні">
+                        <option value="taunt">Провокація (таунт)</option>
+                        <option value="healer">Цілитель</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-blue-400 uppercase ml-1">Ефективність перку (%)</label>
+                    <input
+                      type="number" min="1" max="100"
+                      placeholder={cardForm.bonusPerk === 'taunt' || cardForm.bonusPerk === 'laststand' ? 'Авто' : 'Напр: 25'}
+                      disabled={!cardForm.bonusPerk || cardForm.bonusPerk === 'taunt' || cardForm.bonusPerk === 'laststand'}
+                      value={cardForm.bonusPerkValue ?? ''}
+                      onChange={(e) => setCardForm({ ...cardForm, bonusPerkValue: e.target.value })}
+                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none disabled:opacity-30"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
+                    const lCfg = cardForm.levelingConfig?.[level] || { dupes: 0, cost: 0, currency: 'coins', powerAdd: 0, hpAdd: 0 };
+                    return (
+                      <div key={level} className="flex flex-col lg:flex-row items-center gap-2 bg-neutral-900 p-2 rounded-xl border border-neutral-800">
+                        <div className="w-full lg:w-16 text-center font-bold text-blue-400">Лвл {level}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 w-full">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-neutral-500 uppercase px-1">Дублікатів</span>
+                            <input type="number" min="0" value={lCfg.dupes} onChange={(e) => setCardForm({...cardForm, levelingConfig: {...(cardForm.levelingConfig || {}), [level]: {...lCfg, dupes: Number(e.target.value)}}})} className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-white outline-none w-full" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-neutral-500 uppercase px-1">Вартість</span>
+                            <input type="number" min="0" value={lCfg.cost} onChange={(e) => setCardForm({...cardForm, levelingConfig: {...(cardForm.levelingConfig || {}), [level]: {...lCfg, cost: Number(e.target.value)}}})} className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-white outline-none w-full" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-neutral-500 uppercase px-1">Валюта</span>
+                            <select value={lCfg.currency} onChange={(e) => setCardForm({...cardForm, levelingConfig: {...(cardForm.levelingConfig || {}), [level]: {...lCfg, currency: e.target.value}}})} className="bg-neutral-950 border border-neutral-700 rounded-lg px-1 py-1.5 text-xs text-white outline-none w-full">
+                              <option value="coins">Монети</option>
+                              <option value="crystals">Кристали</option>
+                            </select>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-neutral-500 uppercase px-1">+Сила</span>
+                            <input type="number" min="0" value={lCfg.powerAdd} onChange={(e) => setCardForm({...cardForm, levelingConfig: {...(cardForm.levelingConfig || {}), [level]: {...lCfg, powerAdd: Number(e.target.value)}}})} className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-green-400 outline-none w-full" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-neutral-500 uppercase px-1">+HP</span>
+                            <input type="number" min="0" value={lCfg.hpAdd} onChange={(e) => setCardForm({...cardForm, levelingConfig: {...(cardForm.levelingConfig || {}), [level]: {...lCfg, hpAdd: Number(e.target.value)}}})} className="bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-red-400 outline-none w-full" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -3452,6 +3629,7 @@ export default function AdminView({
                       soundVolume: 0.5,
                       frame: 'normal',
                       isGame: false,
+                      blockGame: false,
                       minPower: '',
                       maxPower: '',
                       minHp: '',
@@ -3628,6 +3806,10 @@ export default function AdminView({
                             maxHp: card.maxHp !== null ? card.maxHp : '',
                             perk: card.perk || '',
                             perkValue: card.perkValue !== null && card.perkValue !== undefined ? card.perkValue : '',
+                            levelingConfig: card.levelingConfig || {},
+                            bonusPerkLevel: card.bonusPerkLevel || '',
+                            bonusPerk: card.bonusPerk || '',
+                            bonusPerkValue: card.bonusPerkValue !== null && card.bonusPerkValue !== undefined ? card.bonusPerkValue : '',
                           });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
@@ -3864,6 +4046,226 @@ export default function AdminView({
               Надіслати {notifForm.type === 'gift' ? 'Подарунок' : 'Сповіщення'}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* --- Вкладка: СМАРАГДИ --- */}
+      {activeTab === 'emeralds' && currentProfile.isAdmin && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Box Settings */}
+          <div className="bg-neutral-900 border border-emerald-900/40 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-5">
+              💎 Налаштування Скрині
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Вартість відкриття</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={emeraldSettings.boxCostAmount}
+                  onChange={(e) => setEmeraldSettings({ ...emeraldSettings, boxCostAmount: Number(e.target.value) })}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 outline-none font-bold"
+                />
+              </div>
+              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Валюта</label>
+                <select
+                  value={emeraldSettings.boxCostCurrency}
+                  onChange={(e) => setEmeraldSettings({ ...emeraldSettings, boxCostCurrency: e.target.value })}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 outline-none font-bold"
+                >
+                  <option value="coins">Монети</option>
+                  <option value="crystals">Кристали</option>
+                </select>
+              </div>
+              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                <label className="text-xs font-bold text-neutral-400 uppercase mb-2 block">Макс. відкриттів/день</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={emeraldSettings.maxDailyOpens}
+                  onChange={(e) => setEmeraldSettings({ ...emeraldSettings, maxDailyOpens: Number(e.target.value) })}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 outline-none font-bold"
+                />
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await saveEmeraldSettingsRequest(getToken(), emeraldSettings);
+                  showToast('Налаштування скрині збережено!', 'success');
+                } catch (e) {
+                  showToast(e.message || 'Помилка збереження.', 'error');
+                }
+              }}
+              className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+            >
+              Зберегти Налаштування
+            </button>
+          </div>
+
+          {/* Emerald Types */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-5">
+              Типи Смарагдів
+            </h3>
+
+            {/* Type form */}
+            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-5 mb-6">
+              <h4 className="text-sm font-bold text-neutral-300 mb-4">
+                {editingEmeraldType ? `Редагувати: ${editingEmeraldType.name}` : 'Новий тип смарагду'}
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 mb-1 block">Назва</label>
+                  <input
+                    type="text"
+                    value={emeraldTypeForm.name}
+                    onChange={(e) => setEmeraldTypeForm({ ...emeraldTypeForm, name: e.target.value })}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 outline-none text-sm"
+                    placeholder="Назва смарагду"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 mb-1 block">Колір</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={emeraldTypeForm.color}
+                      onChange={(e) => setEmeraldTypeForm({ ...emeraldTypeForm, color: e.target.value })}
+                      className="w-10 h-10 rounded cursor-pointer border border-neutral-700 bg-neutral-900"
+                    />
+                    <input
+                      type="text"
+                      value={emeraldTypeForm.color}
+                      onChange={(e) => setEmeraldTypeForm({ ...emeraldTypeForm, color: e.target.value })}
+                      className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 outline-none text-sm font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 mb-1 block">Буст перку (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={emeraldTypeForm.perkBoostPercent}
+                    onChange={(e) => setEmeraldTypeForm({ ...emeraldTypeForm, perkBoostPercent: Number(e.target.value) })}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-neutral-400 mb-1 block">Вага випадання</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={emeraldTypeForm.dropWeight}
+                    onChange={(e) => setEmeraldTypeForm({ ...emeraldTypeForm, dropWeight: Number(e.target.value) })}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  disabled={isSavingEmerald || !emeraldTypeForm.name}
+                  onClick={async () => {
+                    if (!emeraldTypeForm.name) return;
+                    setIsSavingEmerald(true);
+                    try {
+                      const payload = editingEmeraldType
+                        ? { ...emeraldTypeForm, id: editingEmeraldType.id }
+                        : emeraldTypeForm;
+                      const res = await saveEmeraldTypeRequest(getToken(), payload);
+                      if (editingEmeraldType) {
+                        setEmeraldTypes(emeraldTypes.map((t) => (t.id === res.emeraldType.id ? res.emeraldType : t)));
+                      } else {
+                        setEmeraldTypes([...emeraldTypes, res.emeraldType]);
+                      }
+                      setEditingEmeraldType(null);
+                      setEmeraldTypeForm({ name: '', color: '#10b981', perkBoostPercent: 10, dropWeight: 50 });
+                      showToast('Тип смарагду збережено!', 'success');
+                    } catch (e) {
+                      showToast(e.message || 'Помилка збереження.', 'error');
+                    } finally {
+                      setIsSavingEmerald(false);
+                    }
+                  }}
+                  className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm"
+                >
+                  {editingEmeraldType ? 'Оновити' : 'Додати'}
+                </button>
+                {editingEmeraldType && (
+                  <button
+                    onClick={() => {
+                      setEditingEmeraldType(null);
+                      setEmeraldTypeForm({ name: '', color: '#10b981', perkBoostPercent: 10, dropWeight: 50 });
+                    }}
+                    className="bg-neutral-700 hover:bg-neutral-600 text-white font-bold px-5 py-2 rounded-xl transition-colors text-sm"
+                  >
+                    Скасувати
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Types table */}
+            {emeraldTypes.length === 0 ? (
+              <div className="text-center py-10 text-neutral-500 text-sm">Типи смарагдів ще не додані.</div>
+            ) : (
+              <div className="space-y-2">
+                {emeraldTypes.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-4 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: t.color }}
+                    >
+                      <Gem size={14} className="text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-white font-bold text-sm">{t.name}</div>
+                      <div className="text-neutral-400 text-xs">
+                        +{t.perkBoostPercent}% до перку · Вага: {t.dropWeight}
+                      </div>
+                    </div>
+                    <div className="text-xs text-neutral-500 font-mono">{t.color}</div>
+                    <button
+                      onClick={() => {
+                        setEditingEmeraldType(t);
+                        setEmeraldTypeForm({
+                          name: t.name,
+                          color: t.color,
+                          perkBoostPercent: t.perkBoostPercent,
+                          dropWeight: t.dropWeight,
+                        });
+                      }}
+                      className="text-blue-400 hover:text-blue-300 p-2 rounded-lg hover:bg-blue-900/20 transition-colors"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`Видалити "${t.name}"?`)) return;
+                        try {
+                          await deleteEmeraldTypeRequest(getToken(), t.id);
+                          setEmeraldTypes(emeraldTypes.filter((x) => x.id !== t.id));
+                          showToast('Тип смарагду видалено.', 'success');
+                        } catch (e) {
+                          showToast(e.message || 'Помилка видалення.', 'error');
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

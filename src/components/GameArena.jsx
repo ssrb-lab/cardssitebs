@@ -33,6 +33,9 @@ import {
   Crosshair,
   Stethoscope,
   Wind,
+  RefreshCw,
+  ScrollText,
+  ShieldPlus,
 } from 'lucide-react';
 import { getCardStyle, parseGameStat } from '../utils/helpers';
 import PlayerAvatar from './PlayerAvatar';
@@ -44,7 +47,7 @@ import {
   deleteArenaPointRequest,
   captureArenaPointRequest,
   battleArenaPointRequest,
-
+  swapArenaCardsRequest,
   getToken,
 } from '../config/api';
 
@@ -235,6 +238,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const [animationStepData, setAnimationStepData] = useState(null);
   const [battleResult, setBattleResult] = useState(null);
   const [showPerkInfo, setShowPerkInfo] = useState(false); // Perk info modal
+
+  // Combat Log state
+  const [combatLog, setCombatLog] = useState([]);
+  const [showCombatLog, setShowCombatLog] = useState(true);
+  const combatLogRef = useRef(null);
+  // Status effects visible on cards: { 'attacker_0': true, 'defender_1': true }
+  const [burningCards, setBurningCards] = useState({});
+  const [shieldedCards, setShieldedCards] = useState({});
   const mapRef = useRef(null);
 
   // Timer state for cooldowns - using server synchronized time
@@ -447,6 +458,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       entryFee: 0,
       cooldownMinutes: 15,
       crystalRatePerHour: 0,
+      cardSwapCost: 0,
       isLandingZone: false,
       neighborIds: [],
     });
@@ -504,9 +516,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const handleCapturePoint = async (pointId, point, e) => {
     if (e) e.stopPropagation();
 
-    if (deck.length !== 5) {
+    if (deck.length !== 4) {
       return showToast(
-        'Для захоплення точки необхідно обрати рівно 5 карт зі свого інвентаря.',
+        'Для захоплення точки необхідно обрати рівно 4 карти зі свого інвентаря.',
         'error'
       );
     }
@@ -536,11 +548,38 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     }
   };
 
+  const [isSwapping, setIsSwapping] = useState(false);
+
+  const handleSwapCards = async (e) => {
+    if (e) e.stopPropagation();
+    if (deck.length !== 4) {
+      return showToast('Для заміни захисників необхідно обрати рівно 4 карти.', 'error');
+    }
+    if (!selectedPoint) return;
+
+    const cost = selectedPoint.cardSwapCost || 0;
+    if (!window.confirm(`Замінити захисників на цій точці?${cost > 0 ? ` Це коштуватиме ${cost} монет.` : ''}`)) return;
+
+    setIsSwapping(true);
+    try {
+      const data = await swapArenaCardsRequest(getToken(), selectedPoint.id, deck);
+      setPoints(points.map((p) => (p.id === selectedPoint.id ? data.point : p)));
+      setSelectedPoint(data.point);
+      if (setProfile && data.profile) setProfile(data.profile);
+      setDeck([]);
+      showToast(data.message || 'Захисників замінено!', 'success');
+    } catch (error) {
+      showToast(error.message || 'Помилка заміни карток.', 'error');
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
   const handleAttackPoint = (e) => {
     if (e) e.stopPropagation();
 
-    if (deck.length !== 5) {
-      return showToast('Для атаки необхідно обрати рівно 5 карт зі свого інвентаря.', 'error');
+    if (deck.length !== 4) {
+      return showToast('Для атаки необхідно обрати рівно 4 карти зі свого інвентаря.', 'error');
     }
 
     if (!selectedPoint || !selectedPoint.ownerId) return; // Saftey check
@@ -556,7 +595,13 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       return showToast('На цій точці вже ведеться бій іншим гравцем. Зачекайте...', 'error');
     }
 
-    // Enter battle view!
+    // Enter battle view! Reset previous battle state
+    setIsRevealed(false);
+    setAnimationStepData(null);
+    setCombatLog([]);
+    setBurningCards({});
+    setShieldedCards({});
+    setBattleResult(null);
     setBattleState({
       point: selectedPoint,
       defenderDeck: selectedPoint.defendingCards || [],
@@ -586,7 +631,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           stats = [];
         }
 
-        if (cardDetails && (cardDetails.isGame || stats.length > 0)) {
+        if (cardDetails && ((cardDetails.isGame && !cardDetails.blockGame) || stats.length > 0)) {
           const minPower = RARITY_MIN_POWER[cardDetails.rarity] || 5;
           const defaultStat = { ...parseGameStat(minPower, cardDetails.rarity), inSafe: false };
           const effectiveStats = stats.map((s) => ({ ...parseGameStat(s, cardDetails.rarity), inSafe: !!s?.inSafe }));
@@ -604,6 +649,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                 uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`,
                 power: statObj.power,
                 hp: statObj.hp,
+                level: statObj.level || 1,
                 statsIndex: idx,
               });
             }
@@ -661,6 +707,23 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     });
   }, [ownedGameCards, profile?.defendingInstances, deck, searchQuery, sortBy]);
 
+  // Групуємо відфільтровані картки за card.id — показуємо унікальну + кількість
+  const groupedForDisplay = React.useMemo(() => {
+    const groups = {};
+    filteredAndSortedCards.forEach((card) => {
+      if (!groups[card.id]) groups[card.id] = [];
+      groups[card.id].push(card);
+    });
+
+    return Object.values(groups).map((instances) => {
+      const nonDefending = instances.filter((c) => !c.isDefending);
+      const representative = nonDefending.length > 0
+        ? nonDefending.reduce((best, c) => c.power > best.power ? c : best, nonDefending[0])
+        : instances[0];
+      return { ...representative, displayCount: nonDefending.length };
+    });
+  }, [filteredAndSortedCards]);
+
   const handleToggleCard = (card) => {
     if (deck.find((c) => c.uniqueInstanceId === card.uniqueInstanceId)) {
       // Remove from deck
@@ -671,8 +734,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
         showToast('Ця карта вже є в колоді (дублікати заборонені)', 'error');
         return;
       }
-      if (deck.length >= 5) {
-        showToast('Можна обрати максимум 5 карт у колоду', 'error');
+      if (deck.length >= 4) {
+        showToast('Можна обрати максимум 4 карти у колоду', 'error');
         return;
       }
       setDeck([...deck, card]);
@@ -683,93 +746,126 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     let currentAttackers = [...initialAttackers];
     let currentDefenders = [...initialDefenders];
     let finalNote = null;
+    const logMessages = [];
+
+    // Initialise shield/burn tracking from card perks
+    const initBurning = {};
+    const initShielded = {};
+    initialAttackers.forEach((c, i) => { if (c.perk === 'shield' || c.bonusPerk === 'shield') initShielded[`attacker_${i}`] = true; });
+    initialDefenders.forEach((c, i) => { if (c.perk === 'shield' || c.bonusPerk === 'shield') initShielded[`defender_${i}`] = true; });
+    setBurningCards(initBurning);
+    setShieldedCards(initShielded);
+    setCombatLog([]);
 
     // Reveal hidden cards before starting animation
     setIsRevealed(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for flip animation
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     for (let i = 0; i < log.length; i++) {
       const step = log[i];
-      if (step.note) {
-        finalNote = step.note;
-        continue; // Skip notes
-      }
+      if (step.note) { finalNote = step.note; continue; }
+
+      // Log-only steps (e.g. shield_regen notification)
+      if (step.msg) logMessages.push(step.msg);
 
       const events = step.events || [];
-      const targetSide = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
 
-      setAnimationStepData({
-        attackerSide: step.attackerSide,
-        attackerIndex: step.attackerIndex,
-        targetSide: events.includes('healer') ? step.attackerSide : targetSide,
-        targetIndex: step.targetIndex,
-        damage: step.damage,
-        isDead: step.isTargetDead,
-        events,
-        healAmount: step.healAmount,
-        thornsDamage: step.thornsDamage,
-      });
+      // Skip visual animation ONLY for pure background events (e.g. shield regen).
+      // An empty events array means a normal attack — must be animated.
+      const isBackgroundOnly = events.length > 0 && events.every(e => e === 'shield_regen');
+      const isVisualEvent = !isBackgroundOnly;
 
-      await new Promise((resolve) => setTimeout(resolve, events.includes('dodge') ? 600 : 800));
+      if (isVisualEvent) {
+        const targetSide = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
 
-      // Update HP based on events
-      if (events.includes('healer')) {
-        // Healer heals own team
-        const team = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
-        team[step.targetIndex] = { ...team[step.targetIndex] };
-        team[step.targetIndex].currentHp = Math.min(
-          team[step.targetIndex].maxHp || team[step.targetIndex].hp || 1,
-          team[step.targetIndex].currentHp + (step.healAmount || 0)
-        );
-      } else if (!events.includes('dodge')) {
-        // Apply damage to target
-        const defTeam = step.attackerSide === 'attacker' ? currentDefenders : currentAttackers;
-        defTeam[step.targetIndex] = { ...defTeam[step.targetIndex] };
-        defTeam[step.targetIndex].currentHp -= step.damage;
-        if (events.includes('laststand') && defTeam[step.targetIndex].currentHp <= 0) {
-          defTeam[step.targetIndex].currentHp = 1;
+        setAnimationStepData({
+          attackerSide: step.attackerSide,
+          attackerIndex: step.attackerIndex,
+          targetSide: events.includes('healer') ? step.attackerSide : targetSide,
+          targetIndex: step.targetIndex,
+          damage: step.damage,
+          isDead: step.isTargetDead,
+          events,
+          healAmount: step.healAmount,
+          thornsDamage: step.thornsDamage,
+          shieldBlocked: step.shieldBlocked,
+          armorBlocked: step.armorBlocked,
+        });
+
+        // Update status effect overlays
+        if (events.includes('burn')) {
+          setBurningCards(prev => ({ ...prev, [`${targetSide}_${step.targetIndex}`]: true }));
         }
-        
-        // Strict sync with backend
-        if (step.isTargetDead) {
-          defTeam[step.targetIndex].currentHp = 0;
-        } else if (defTeam[step.targetIndex].currentHp <= 0) {
-          defTeam[step.targetIndex].currentHp = 1;
+        if (events.includes('burn_tick') && step.isTargetDead) {
+          const bside = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
+          setBurningCards(prev => ({ ...prev, [`${bside}_${step.targetIndex}`]: false }));
+        }
+        // Shield breaks when fully depleted
+        if (events.includes('shield_block') && !events.includes('shield_regen')) {
+          const bside = step.attackerSide === 'attacker' ? 'defender' : 'attacker';
+          setShieldedCards(prev => ({ ...prev, [`${bside}_${step.targetIndex}`]: false }));
         }
 
-        if (defTeam[step.targetIndex].currentHp < 0) defTeam[step.targetIndex].currentHp = 0;
+        await new Promise((resolve) => setTimeout(resolve, events.includes('dodge') ? 600 : 800));
 
-        // Lifesteal heal
-        if (step.healAmount && events.includes('lifesteal')) {
-          const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
-          atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
-          atkTeam[step.attackerIndex].currentHp = Math.min(
-            atkTeam[step.attackerIndex].maxHp || atkTeam[step.attackerIndex].hp || 1,
-            atkTeam[step.attackerIndex].currentHp + step.healAmount
+        // Update HP based on events
+        if (events.includes('healer')) {
+          const team = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+          team[step.targetIndex] = { ...team[step.targetIndex] };
+          team[step.targetIndex].currentHp = Math.min(
+            team[step.targetIndex].maxHp || team[step.targetIndex].hp || 1,
+            team[step.targetIndex].currentHp + (step.healAmount || 0)
           );
+        } else if (!events.includes('dodge')) {
+          const defTeam = step.attackerSide === 'attacker' ? currentDefenders : currentAttackers;
+          defTeam[step.targetIndex] = { ...defTeam[step.targetIndex] };
+          defTeam[step.targetIndex].currentHp -= step.damage;
+          if (events.includes('laststand') && defTeam[step.targetIndex].currentHp <= 0) {
+            defTeam[step.targetIndex].currentHp = 1;
+          }
+          if (step.isTargetDead) {
+            defTeam[step.targetIndex].currentHp = 0;
+          } else if (defTeam[step.targetIndex].currentHp <= 0) {
+            defTeam[step.targetIndex].currentHp = 1;
+          }
+          if (defTeam[step.targetIndex].currentHp < 0) defTeam[step.targetIndex].currentHp = 0;
+
+          // Lifesteal
+          if (step.healAmount && events.includes('lifesteal')) {
+            const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+            atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
+            atkTeam[step.attackerIndex].currentHp = Math.min(
+              atkTeam[step.attackerIndex].maxHp || atkTeam[step.attackerIndex].hp || 1,
+              atkTeam[step.attackerIndex].currentHp + step.healAmount
+            );
+          }
+          // Thorns
+          if (step.thornsDamage) {
+            const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
+            atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
+            atkTeam[step.attackerIndex].currentHp -= step.thornsDamage;
+            if (atkTeam[step.attackerIndex].currentHp < 0) atkTeam[step.attackerIndex].currentHp = 0;
+          }
         }
-        // Thorns damage
-        if (step.thornsDamage) {
-          const atkTeam = step.attackerSide === 'attacker' ? currentAttackers : currentDefenders;
-          atkTeam[step.attackerIndex] = { ...atkTeam[step.attackerIndex] };
-          atkTeam[step.attackerIndex].currentHp -= step.thornsDamage;
-          if (atkTeam[step.attackerIndex].currentHp < 0) atkTeam[step.attackerIndex].currentHp = 0;
-        }
+
+        setBattleState((prev) => ({
+          ...prev,
+          attackerDeck: currentAttackers,
+          defenderDeck: currentDefenders,
+        }));
+
+        setAnimationStepData(null);
+        await new Promise((resolve) => setTimeout(resolve, 250));
       }
 
-      setBattleState((prev) => ({
-        ...prev,
-        attackerDeck: currentAttackers,
-        defenderDeck: currentDefenders,
-      }));
-
-      setAnimationStepData(null);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      setCombatLog([...logMessages]);
+      // Auto-scroll to bottom
+      if (combatLogRef.current) combatLogRef.current.scrollTop = combatLogRef.current.scrollHeight;
     }
 
     setTimeout(() => {
       setIsBattleAnimating(false);
-      setBattleResult({ won, attackerResults: pointUpdate.attackerResults, defenderResults: pointUpdate.defenderResults, note: finalNote });
+      setBattleResult({ won, attackerResults: pointUpdate.attackerResults, defenderResults: pointUpdate.defenderResults, note: finalNote, combatLog: logMessages });
       setPoints((points) => points.map((p) => (p.id === pointUpdate.id ? pointUpdate : p)));
       setDeck([]);
     }, 1500);
@@ -781,6 +877,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
     try {
       setIsBattleAnimating(true);
       setBattleResult(null);
+      setCombatLog([]);
+      setBurningCards({});
+      setShieldedCards({});
+      setShowCombatLog(true);
 
       const data = await battleArenaPointRequest(getToken(), battleState.point.id, deck);
 
@@ -929,14 +1029,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               <div className="text-indigo-300 text-sm font-bold mb-4 bg-indigo-900/30 py-2 px-3 rounded-lg flex justify-between items-center">
                 <span>Обрано карт:</span>
                 <span
-                  className={`${deck.length === 5 ? 'text-green-400' : 'text-indigo-400'} text-lg`}
+                  className={`${deck.length === 4 ? 'text-green-400' : 'text-indigo-400'} text-lg`}
                 >
-                  {deck.length} / 5
+                  {deck.length} / 4
                 </span>
               </div>
 
-              <div className="grid grid-cols-5 gap-2 w-full pt-1 pb-3">
-                {[...Array(5)].map((_, i) => {
+              <div className="grid grid-cols-4 gap-2 w-full pt-1 pb-3">
+                {[...Array(4)].map((_, i) => {
                   const card = deck[i];
                   return card ? (
                     <div
@@ -948,7 +1048,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         <img src={card.image} className="w-full h-full object-cover" />
                       </div>
 
-                      <PerkBadge perk={card.perk} />
+                      <PerkBadge perks={[card.perk, card.bonusPerk]} />
 
                       {/* Scale stats to prevent overflowing width */}
                       <div className="absolute -bottom-2 inset-x-0 w-[110%] -ml-[5%] mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[8px] sm:text-[10px] xl:text-xs px-1 py-0.5 rounded-full z-10 flex items-center justify-center gap-0.5 shadow-md whitespace-nowrap">
@@ -1021,12 +1121,12 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredAndSortedCards.map((card) => {
+                    {groupedForDisplay.map((card) => {
                       const isDefending = card.isDefending;
 
                       return (
                         <div
-                          key={card.uniqueInstanceId}
+                          key={card.id}
                           onClick={() => !isDefending && handleToggleCard(card)}
                           className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 transition-all ${getCardStyle(card.rarity).border} ${isDefending ? 'grayscale opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:border-indigo-500'}`}
                           title={isDefending ? "Захищає точку на Арені" : card.name}
@@ -1038,10 +1138,20 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                               </div>
                             </div>
                           )}
-                          <PerkBadge perk={card.perk} />
-                          <div className={`absolute top-1 ${card.perk ? 'left-7' : 'left-1'} bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded-sm z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md`}>
-                            <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{card.power}</span></div>
-                            <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{card.hp || card.power || 50}</span></div>
+                          <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                          {/* Рівень — верхній правий кут */}
+                          {(() => {
+                            const lv = card.level || 1;
+                            const isMax = lv >= 10;
+                            return (
+                              <div className={`absolute top-1 right-1 z-20 text-white font-black text-[9px] px-1.5 py-0.5 rounded-md whitespace-nowrap ${isMax ? 'bg-gradient-to-r from-yellow-600 to-amber-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] border border-yellow-400/40' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_6px_rgba(99,102,241,0.5)] border border-blue-400/30'}`}>
+                                {isMax ? '★ ' : ''}Lv.{lv}
+                              </div>
+                            );
+                          })()}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/90 font-black text-[10px] px-1.5 py-1 z-10 text-white flex items-center justify-center gap-2 border-t border-neutral-700/50">
+                            <div className="flex items-center gap-0.5"><Zap size={9} className="text-yellow-400" /> <span>{card.power}</span></div>
+                            <div className="flex items-center gap-0.5"><span className="text-red-500 text-[9px]">❤️</span> <span>{card.hp || card.power || 50}</span></div>
                           </div>
                           <div className="w-full h-full relative group">
                             <img
@@ -1187,6 +1297,20 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         setAdminPointData({ ...adminPointData, crystalRatePerHour: e.target.value })
                       }
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs uppercase font-bold text-neutral-400 mb-1 flex items-center gap-1">
+                      <RefreshCw size={10} className="text-emerald-500" /> Заміна карт
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={adminPointData.cardSwapCost || 0}
+                      onChange={(e) =>
+                        setAdminPointData({ ...adminPointData, cardSwapCost: e.target.value })
+                      }
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
                     />
                   </div>
                 </div>
@@ -1729,14 +1853,36 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                       return (
                         <div
                           key={idx}
-                          className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-950 ${isHidden ? 'border-neutral-800' : getCardStyle(defCard.rarity).border}`}
+                          className={`relative aspect-[2/3] rounded-lg border-2 overflow-hidden bg-neutral-900 transition-all ${isHidden ? 'border-neutral-800' : getCardStyle(defCard.rarity).border}`}
                         >
-                          {!isHidden && <PerkBadge perk={defCard.perk} />}
                           {!isHidden && (
-                            <div className={`absolute top-1 ${defCard.perk ? 'left-7' : 'left-1'} bg-black/80 font-black text-[10px] px-1.5 py-0.5 rounded z-10 text-white flex items-center gap-1.5 border border-neutral-700 shadow-md`}>
-                              <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /> <span>{defCard.power}</span></div>
-                              <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px]">❤️</span> <span>{defCard.hp || defCard.power || 50}</span></div>
-                            </div>
+                            <>
+                              <PerkBadge perks={[defCard.perk, defCard.bonusPerk]} />
+                              {(() => {
+                                const lv = defCard.level || 1;
+                                const isMax = lv >= 10;
+                                return (
+                                  <div
+                                    className={`absolute top-1 right-1 z-20 text-white font-black text-[9px] px-1.5 py-0.5 rounded-md whitespace-nowrap ${
+                                      isMax
+                                        ? 'bg-gradient-to-r from-yellow-600 to-amber-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] border border-yellow-400/40'
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_6px_rgba(99,102,241,0.5)] border border-blue-400/30'
+                                    }`}
+                                  >
+                                    {isMax ? '★ ' : ''}Lv.{lv}
+                                  </div>
+                                );
+                              })()}
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/90 font-black text-[10px] px-1.5 py-1 z-10 text-white flex items-center justify-center gap-2 border-t border-neutral-700/50">
+                                <div className="flex items-center gap-0.5">
+                                  <Zap size={9} className="text-yellow-400" /> <span>{defCard.power}</span>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-red-500 text-[9px]">❤️</span>{' '}
+                                  <span>{defCard.hp || defCard.power || 50}</span>
+                                </div>
+                              </div>
+                            </>
                           )}
                           
                           {isHidden ? (
@@ -1768,7 +1914,29 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   })();
 
                   if (selectedPoint.ownerId) {
-                    if (selectedPoint.ownerId === profile?.uid) return null;
+                    if (selectedPoint.ownerId === profile?.uid) {
+                      const swapCost = selectedPoint.cardSwapCost || 0;
+                      return (
+                        <button
+                          onClick={handleSwapCards}
+                          disabled={isSwapping || deck.length !== 4}
+                          className={`w-full font-bold py-3 rounded-xl transition-colors shadow-lg flex flex-col items-center justify-center ${deck.length === 4 && !isSwapping ? 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
+                        >
+                          {isSwapping ? (
+                            <RefreshCw size={18} className="animate-spin" />
+                          ) : (
+                            <>
+                              <span>Замінити захисників{swapCost > 0 ? ` (${swapCost} монет)` : ' (безкоштовно)'}</span>
+                              {deck.length < 4 && (
+                                <span className="text-[9px] font-normal opacity-70 mt-1">
+                                  Оберіть ще {4 - deck.length} карт
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
 
                     if (!canAccess) {
                       return (
@@ -1783,12 +1951,12 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     return (
                       <button
                         onClick={handleAttackPoint}
-                        className={`w-full font-bold py-3 rounded-xl transition-colors shadow-lg flex flex-col items-center justify-center ${deck.length === 5 ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-500/20' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
+                        className={`w-full font-bold py-3 rounded-xl transition-colors shadow-lg flex flex-col items-center justify-center ${deck.length === 4 ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-500/20' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
                       >
                         <span>Атакувати (Ціна: {selectedPoint.entryFee})</span>
-                        {deck.length < 5 && (
+                        {deck.length < 4 && (
                           <span className="text-[9px] font-normal opacity-70 mt-1">
-                            Оберіть ще {5 - deck.length} карт
+                            Оберіть ще {4 - deck.length} карт
                           </span>
                         )}
                       </button>
@@ -1807,12 +1975,12 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     return (
                       <button
                         onClick={(e) => handleCapturePoint(selectedPoint.id, selectedPoint, e)}
-                        className={`w-full font-bold py-3 rounded-xl transition-colors shadow-lg flex flex-col items-center justify-center ${deck.length === 5 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
+                        className={`w-full font-bold py-3 rounded-xl transition-colors shadow-lg flex flex-col items-center justify-center ${deck.length === 4 ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
                       >
                         <span>Захопити (Ціна: {selectedPoint.entryFee})</span>
-                        {deck.length < 5 && (
+                        {deck.length < 4 && (
                           <span className="text-[9px] font-normal opacity-70 mt-1">
-                            Оберіть ще {5 - deck.length} карт
+                            Оберіть ще {4 - deck.length} карт
                           </span>
                         )}
                       </button>
@@ -1879,16 +2047,21 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const isDodge = isHit && ev.includes('dodge');
                     const isCrit = isHit && ev.includes('crit');
                     const isHeal = animationStepData?.targetSide === 'defender' && animationStepData?.targetIndex === idx && ev.includes('healer');
+                    const isShieldBlock = isHit && ev.includes('shield_block');
+                    const isBurnTick = isHit && ev.includes('burn_tick');
                     const hasTaunt = card.perk === 'taunt' && !isDead;
+                    const isBurning = !!burningCards[`defender_${idx}`] && !isDead;
+                    const isShielded = !!shieldedCards[`defender_${idx}`] && !isDead;
 
                     // Masking logic for the visual flip
                     const isOwner = battleState.point.ownerId === profile?.uid;
                     const isCardRevealed = isRevealed || isOwner || idx === 0;
 
+                    const defArmorVal = card.perk === 'armor' ? card.perkValue : card.bonusPerk === 'armor' ? card.bonusPerkValue : null;
                     return (
                       <div
                         key={idx}
-                        className={`card-container relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit && !isDodge ? '-translate-y-2 rotate-[-5deg] brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''}`}
+                        className={`card-container relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative top-4' : ''} ${isAttacking ? 'translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(239,68,68,1)]' : ''} ${isHit && !isDodge ? '-translate-y-2 rotate-[-5deg] brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${isBurning ? 'shadow-[0_0_12px_rgba(239,68,68,0.6)]' : ''}`}
                       >
                         <div className={`card-inner w-full h-full ${isCardRevealed ? 'is-flipped' : ''}`}>
                           {/* Face Down (Сорочка) */}
@@ -1898,19 +2071,34 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                           </div>
 
                           {/* Face Up (Лицьова сторона) */}
-                          <div className={`card-back w-full h-full rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} ${hasTaunt ? 'ring-2 ring-red-500/60 animate-pulse' : ''}`}>
-                            <PerkBadge perk={card.perk} />
-                            <div className="absolute -bottom-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-red-500 shadow-lg">
-                              <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
-                              <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
-                            </div>
+                          <div className={`card-back w-full h-full rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} ${hasTaunt ? 'ring-2 ring-red-500/60 animate-pulse' : ''} ${isBurning ? 'ring-1 ring-orange-500/70' : ''} ${isShielded ? 'ring-1 ring-sky-400/60' : ''}`}>
+                            <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                            {/* Burn overlay */}
+                            {isBurning && (
+                              <div className="absolute top-0 left-0 right-0 bottom-0 z-10 pointer-events-none">
+                                <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-orange-600/30 to-transparent rounded-t-xl" />
+                                <span className="absolute top-1 right-1 text-sm">🔥</span>
+                              </div>
+                            )}
+                            {/* Shield badge */}
+                            {isShielded && (
+                              <div className="absolute top-1 right-1 z-20 bg-sky-500/30 border border-sky-400/50 rounded-full p-0.5">
+                                <ShieldPlus size={10} className="text-sky-300" />
+                              </div>
+                            )}
 
                             {/* Floating combat text */}
                             {isHit && !isDodge && !isHeal && (
                               <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-500">
-                                <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>
-                                  {isCrit ? '💥' : ''}-{animationStepData.damage}
+                                <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
+                                  {isCrit ? '💥' : isBurnTick ? '🔥' : ''}-{animationStepData.damage}
                                 </span>
+                                {isShieldBlock && animationStepData.shieldBlocked > 0 && (
+                                  <span className="text-sky-300 font-black text-sm mt-0.5">🛡️ -{animationStepData.shieldBlocked} щит</span>
+                                )}
+                                {ev.includes('armor') && animationStepData.armorBlocked > 0 && (
+                                  <span className="text-stone-300 font-black text-xs mt-0.5">⚔️ -{animationStepData.armorBlocked} броня</span>
+                                )}
                               </div>
                             )}
 
@@ -1927,6 +2115,17 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                             </div>
                           </div>
                         </div>
+
+                        {/* Stats bar — outside card-back so it's not clipped by overflow-hidden */}
+                        {isCardRevealed && (
+                          <div className="absolute -bottom-3 inset-x-0 flex justify-center z-30 pointer-events-none">
+                            <div className="bg-black/95 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md text-white flex items-center justify-center gap-1.5 border border-red-500/70 shadow-lg whitespace-nowrap">
+                              <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /><span>{card.power}</span></div>
+                              <div className="flex items-center gap-0.5"><span className="text-red-400">❤️</span><span>{Math.ceil(hp)}</span></div>
+                              {defArmorVal != null && <div className="flex items-center gap-0.5"><Shield size={9} className="text-stone-300" /><span className="text-stone-300">{defArmorVal}%</span></div>}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1961,6 +2160,46 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                 )}
               </div>
 
+              {/* Combat Log Panel */}
+              {(isBattleAnimating || battleResult) && combatLog.length > 0 && (
+                <div className="w-full shrink-0">
+                  {showCombatLog ? (
+                    <div className="w-full bg-neutral-950/90 border border-indigo-900/40 rounded-xl overflow-hidden">
+                      <div className="px-3 py-1.5 border-b border-indigo-900/30 flex items-center justify-between">
+                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <ScrollText size={11} /> Лог Бою
+                          <span className="text-neutral-600 font-normal normal-case tracking-normal">{combatLog.length} подій</span>
+                        </span>
+                        <button onClick={() => setShowCombatLog(false)} className="text-neutral-600 hover:text-white transition-colors p-0.5">
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <div ref={combatLogRef} className="max-h-28 overflow-y-auto custom-scrollbar p-2 flex flex-col gap-0.5">
+                        {combatLog.map((msg, mi) => {
+                          const isLatest = mi === combatLog.length - 1;
+                          const isFire = msg.includes('🔥') || msg.includes('Опік');
+                          const isShield = msg.includes('Щит') || msg.includes('щит');
+                          const isDeath = msg.includes('💀');
+                          const isPoisonOrBurn = msg.includes('Отрути') || msg.includes('Опіку');
+                          return (
+                            <div key={mi} className={`text-[10px] leading-tight px-1 py-0.5 rounded transition-colors ${isLatest ? 'text-white bg-indigo-950/50' : isDeath ? 'text-red-400' : isFire ? 'text-orange-300' : isShield ? 'text-sky-300' : isPoisonOrBurn ? 'text-green-300' : 'text-neutral-400'}`}>
+                              {msg}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowCombatLog(true)}
+                      className="flex items-center gap-1.5 text-[10px] text-indigo-500 hover:text-indigo-300 transition-colors px-2 py-1 bg-neutral-950/60 border border-indigo-900/30 rounded-lg"
+                    >
+                      <ScrollText size={11} /> Показати лог бою ({combatLog.length})
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Player (Attacker) Area */}
               <div className="w-full flex-1 flex flex-col items-center justify-end gap-4">
                 <div className="flex gap-1.5 sm:gap-4 justify-center items-center">
@@ -1981,28 +2220,63 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                     const isDodge = isHit && ev.includes('dodge');
                     const isCrit = isHit && ev.includes('crit');
                     const isHeal = animationStepData?.targetSide === 'attacker' && animationStepData?.targetIndex === idx && ev.includes('healer');
+                    const isShieldBlock = isHit && ev.includes('shield_block');
+                    const isBurnTick = isHit && ev.includes('burn_tick');
                     const hasTaunt = card.perk === 'taunt' && !isDead;
+                    const isBurning = !!burningCards[`attacker_${idx}`] && !isDead;
+                    const isShielded = !!shieldedCards[`attacker_${idx}`] && !isDead;
 
+                    const atkArmorVal = card.perk === 'armor' ? card.perkValue : card.bonusPerk === 'armor' ? card.bonusPerkValue : null;
                     return (
                       <div
                         key={idx}
-                        className={`relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''}`}
+                        className={`relative w-[17vw] sm:w-28 md:w-36 lg:w-40 aspect-[2/3] rounded-xl border-2 bg-neutral-900 shadow-xl shadow-indigo-500/10 ${getCardStyle(card.rarity).border} transition-all duration-500 ${isDead ? 'grayscale opacity-50 relative -top-4' : ''} ${isAttacking ? '-translate-y-[12vh] scale-125 z-40 shadow-[0_0_50px_rgba(99,102,241,1)]' : ''} ${isHit && !isDodge ? 'translate-y-2 rotate-[5deg] border-red-500 brightness-150' : ''} ${isDodge ? 'opacity-40 scale-95' : ''} ${hasTaunt ? 'ring-2 ring-indigo-500/60 animate-pulse' : ''} ${isBurning ? 'shadow-[0_0_12px_rgba(239,68,68,0.6)] ring-1 ring-orange-500/70' : ''} ${isShielded ? 'ring-1 ring-sky-400/60' : ''}`}
                         style={!isAttacking && !isHit ? { animationDelay: `${idx * 100}ms` } : {}}
                       >
-                        <PerkBadge perk={card.perk} />
-                        <div className="absolute -top-2.5 inset-x-1 bg-black/90 font-black text-[10px] sm:text-xs md:text-sm px-1 py-1 rounded-lg z-20 text-white flex items-center justify-center gap-1 border border-indigo-500 shadow-lg">
-                          <div className="flex items-center gap-0.5"><Zap size={12} className="text-yellow-400" /> <span className="mr-0.5">{card.power}</span></div>
-                          <div className="flex items-center gap-0.5"><span className="text-red-500 text-[10px] sm:text-xs">❤️</span> <span>{Math.ceil(hp)}</span></div>
+                        {/* Image layer — overflow-hidden тільки тут для обрізки зображення */}
+                        <div className="absolute inset-0 rounded-[10px] overflow-hidden">
+                          <img
+                            src={card.image}
+                            className="w-full h-full object-cover pointer-events-none"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-neutral-900 border-t border-indigo-500/30 z-10">
+                            <div
+                              className="h-full bg-indigo-500 transition-all duration-500 ease-out"
+                              style={{ width: `${hpPercent}%` }}
+                            ></div>
+                          </div>
+                          {/* Burn overlay */}
+                          {isBurning && (
+                            <div className="absolute top-0 left-0 right-0 bottom-0 z-10 pointer-events-none">
+                              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-orange-600/30 to-transparent" />
+                            </div>
+                          )}
                         </div>
+
+                        {/* Overlays — поза overflow-hidden */}
+                        <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                        {isBurning && <span className="absolute top-1 right-1 text-sm z-20 pointer-events-none">🔥</span>}
+                        {isShielded && (
+                          <div className="absolute top-1 right-1 z-20 bg-sky-500/30 border border-sky-400/50 rounded-full p-0.5">
+                            <ShieldPlus size={10} className="text-sky-300" />
+                          </div>
+                        )}
 
                         {/* Floating combat text */}
                         {isHit && !isDodge && !isHeal && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-top-5 fade-in duration-500">
-                            <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>
-                              {isCrit ? '💥' : ''}-{animationStepData.damage}
+                            <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
+                              {isCrit ? '💥' : isBurnTick ? '🔥' : ''}-{animationStepData.damage}
                             </span>
                             {ev.includes('laststand') && <span className="text-yellow-300 font-black text-sm mt-1 animate-bounce">1 HP!</span>}
                             {ev.includes('poison') && <span className="text-green-400 font-bold text-xs mt-1">☠️ Отруєно</span>}
+                            {ev.includes('burn') && <span className="text-orange-400 font-bold text-xs mt-1">🔥 Підпалено</span>}
+                            {isShieldBlock && animationStepData.shieldBlocked > 0 && (
+                              <span className="text-sky-300 font-black text-sm mt-0.5">🛡️ -{animationStepData.shieldBlocked} щит</span>
+                            )}
+                            {ev.includes('armor') && animationStepData.armorBlocked > 0 && (
+                              <span className="text-stone-300 font-black text-xs mt-0.5">⚔️ -{animationStepData.armorBlocked} броня</span>
+                            )}
                           </div>
                         )}
                         {isDodge && (
@@ -2017,26 +2291,24 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         )}
                         {/* Thorns feedback */}
                         {animationStepData?.thornsDamage && animationStepData?.attackerSide === 'attacker' && animationStepData?.attackerIndex === idx && (
-                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                          <div className="absolute top-1 left-1 z-30 pointer-events-none animate-in fade-in duration-300">
                             <span className="text-amber-400 font-black text-xs">🌵-{animationStepData.thornsDamage}</span>
                           </div>
                         )}
                         {/* Lifesteal feedback */}
                         {animationStepData?.healAmount && ev.includes('lifesteal') && animationStepData?.attackerSide === 'attacker' && animationStepData?.attackerIndex === idx && (
-                          <div className="absolute top-1 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
+                          <div className="absolute bottom-4 right-1 z-30 pointer-events-none animate-in fade-in duration-300">
                             <span className="text-pink-400 font-black text-xs">💗+{animationStepData.healAmount}</span>
                           </div>
                         )}
-                        <img
-                          src={card.image}
-                          className="w-full h-full object-cover pointer-events-none"
-                        />
 
-                        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-neutral-900 border-t border-indigo-500/30 z-10">
-                          <div
-                            className="h-full bg-indigo-500 transition-all duration-500 ease-out"
-                            style={{ width: `${hpPercent}%` }}
-                          ></div>
+                        {/* Stats bar — поза overflow-hidden, не обрізається */}
+                        <div className="absolute -bottom-3 inset-x-0 flex justify-center z-30 pointer-events-none">
+                          <div className="bg-black/95 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-md text-white flex items-center justify-center gap-1.5 border border-indigo-500/70 shadow-lg whitespace-nowrap">
+                            <div className="flex items-center gap-0.5"><Zap size={10} className="text-yellow-400" /><span>{card.power}</span></div>
+                            <div className="flex items-center gap-0.5"><span className="text-red-400">❤️</span><span>{Math.ceil(hp)}</span></div>
+                            {atkArmorVal != null && <div className="flex items-center gap-0.5"><Shield size={9} className="text-stone-300" /><span className="text-stone-300">{atkArmorVal}%</span></div>}
+                          </div>
                         </div>
                       </div>
                     );
@@ -2165,6 +2437,28 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                       )}
                     </div>
 
+                    {/* Combat Log inside result modal */}
+                    {battleResult.combatLog?.length > 0 && (
+                      <div className="mb-4 border-t border-neutral-800 pt-4">
+                        <h3 className="text-xs uppercase font-black text-neutral-500 mb-2 tracking-widest flex items-center gap-2">
+                          <ScrollText size={14} /> Лог Бою
+                        </h3>
+                        <div className="max-h-36 overflow-y-auto custom-scrollbar bg-black/40 rounded-xl p-2 flex flex-col gap-0.5 border border-neutral-800">
+                          {battleResult.combatLog.map((msg, mi) => {
+                            const isFire = msg.includes('🔥') || msg.includes('Опік');
+                            const isShield = msg.includes('Щит') || msg.includes('щит');
+                            const isDeath = msg.includes('💀');
+                            const isStatus = msg.includes('Отрути') || msg.includes('Опіку');
+                            return (
+                              <div key={mi} className={`text-[10px] leading-tight px-1 py-0.5 rounded ${isDeath ? 'text-red-400' : isFire ? 'text-orange-300' : isShield ? 'text-sky-300' : isStatus ? 'text-green-300' : 'text-neutral-400'}`}>
+                                {msg}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-auto shrink-0 flex flex-col gap-3">
                       {(battleResult.attackerResults?.some(r => r.status === 'destroyed' || r.status === 'weakened')) && (
                          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-3">
@@ -2177,6 +2471,11 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         onClick={() => {
                           setBattleResult(null);
                           setBattleState(null);
+                          setIsRevealed(false);
+                          setAnimationStepData(null);
+                          setCombatLog([]);
+                          setBurningCards({});
+                          setShieldedCards({});
                         }}
                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-[0_10px_20px_rgba(79,70,229,0.2)] hover:shadow-[0_15px_25px_rgba(79,70,229,0.3)] hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-sm"
                       >
@@ -2237,46 +2536,208 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               </button>
             </div>
 
-            <div className="flex flex-col gap-6 text-sm text-neutral-300 leading-relaxed">
-              
+            <div className="flex flex-col gap-5 text-sm text-neutral-300 leading-relaxed">
+
+              {/* Basic Rules */}
               <div className="bg-indigo-950/20 border border-indigo-900/50 rounded-xl p-4">
-                <h4 className="text-lg font-black text-indigo-400 uppercase mb-2 flex items-center gap-2">
-                  <Swords size={18} /> Базові Правила
+                <h4 className="text-lg font-black text-indigo-400 uppercase mb-3 flex items-center gap-2">
+                  <Swords size={18} /> Як працює Арена
                 </h4>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>Щоб <b>захопити</b> або <b>атакувати</b> точку, вам потрібно вибрати рівно <b>5 карт</b> зі свого інвентаря, які сформують вашу колоду.</li>
-                  <li>Кожна точка має свій кулдаун захисту, протягом якого її неможливо атакувати.</li>
-                  <li>Власник точки отримує кристали (дохід залежить від точки). Дохід накопичується, його потрібно забирати вручну.</li>
-                  <li>Карти, які захищають точку, фіксуються в ній. Ви <b>не зможете</b> їх продати на ринку або сховати в сейф, поки вони там!</li>
+                <ul className="space-y-2.5">
+                  <li className="flex gap-2.5 items-start">
+                    <span className="bg-indigo-600 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <span>Оберіть рівно <b className="text-white">4 карти</b> зі свого інвентаря, які стануть вашою бойовою колодою.</span>
+                  </li>
+                  <li className="flex gap-2.5 items-start">
+                    <span className="bg-indigo-600 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <span>На карті оберіть точку для <b className="text-white">захоплення</b> (вільну) або <b className="text-white">атаки</b> (зайняту ворогом).</span>
+                  </li>
+                  <li className="flex gap-2.5 items-start">
+                    <span className="bg-indigo-600 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">3</span>
+                    <span>Бій відбувається <b className="text-white">автоматично</b> — ваші 4 карти проти 4 карт захисника. Хто залишився з живою картою — перемагає!</span>
+                  </li>
+                  <li className="flex gap-2.5 items-start">
+                    <span className="bg-indigo-600 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">4</span>
+                    <span>Переможець отримує контроль над точкою та <b className="text-fuchsia-400">кристали</b> від неї.</span>
+                  </li>
                 </ul>
               </div>
 
-              <div className="bg-neutral-950/50 border border-neutral-800 rounded-xl p-4">
-                <h4 className="text-lg font-black text-white uppercase mb-3 flex items-center gap-2">
-                  <Target size={18} className="text-amber-500" /> Режими Бою
+              {/* Important Restrictions */}
+              <div className="bg-amber-950/20 border border-amber-800/40 rounded-xl p-4">
+                <h4 className="text-base font-black text-amber-400 uppercase mb-3 flex items-center gap-2">
+                  <Lock size={16} /> Обмеження та Доступ
                 </h4>
-                <p className="mb-3">Кожна точка може мати один з трьох режимів бою. Звертайте на це увагу перед атакою!</p>
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-green-900/30">
-                    <div className="text-green-500 font-bold w-1/4 shrink-0">🟢 Повний (Default)</div>
-                    <div className="w-3/4">Найбезпечніший режим. Усі карти повністю відновлюють свої характеристики після завершення бою. Ніхто нічого не втрачає.</div>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Anchor size={14} className="text-cyan-400 shrink-0 mt-0.5" />
+                    <span><b className="text-cyan-400">Зони висадки</b> — точки позначені якорем. Їх може атакувати будь-хто.</span>
                   </div>
-                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-yellow-900/30">
-                    <div className="text-yellow-500 font-bold w-1/4 shrink-0 text-sm">🟡 Chip Damage</div>
-                    <div className="w-3/4">Кожна ваша карта має певний <b>шанс втратити частину Сили або ХП (5%)</b>. Чим частіше вона отримує шкоду, тим більший ризик, що її показники знизяться назавжди.</div>
+                  <div className="flex items-start gap-2">
+                    <Lock size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                    <span><b className="text-amber-300">Закриті точки</b> — щоб атакувати, потрібно спершу володіти сусідньою точкою.</span>
                   </div>
-                  <div className="flex gap-3 bg-neutral-900 p-3 rounded-lg border border-red-900/40">
-                    <div className="text-red-500 font-bold w-1/4 shrink-0">🔴 Хардкор</div>
-                    <div className="w-3/4"><b>Перманентна смерть!</b> Будь-яка ваша карта, яка закінчує бій маючи 0 ХП — <b>видаляється з вашого інвентаря назавжди!</b> Використовуйте цей режим обережно та беріть найкращих цілителів.</div>
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                    <span><b className="text-yellow-300">Кулдаун захисту</b> — після захоплення точка деякий час захищена від атак.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Skull size={14} className="text-red-400 shrink-0 mt-0.5" />
+                    <span><b className="text-red-300">Персональний кулдаун</b> — після програшу ви деякий час не зможете атакувати ту саму точку.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Shield size={14} className="text-indigo-400 shrink-0 mt-0.5" />
+                    <span>Карти-захисники <b className="text-white">заблоковані</b> на точці: їх не можна продати, сховати в сейф чи прокачати, поки вони там.</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4">
-                 <h4 className="text-lg font-black text-red-400 border-red-900/50 uppercase mb-2 flex items-center gap-2">
-                  <Skull size={18} /> Механіка Атаки
+              {/* Battle Modes */}
+              <div className="bg-neutral-950/50 border border-neutral-800 rounded-xl p-4">
+                <h4 className="text-lg font-black text-white uppercase mb-3 flex items-center gap-2">
+                  <Target size={18} className="text-amber-500" /> Режими Бою
                 </h4>
-                <p>Бій проходить автоматично у форматі 5 на 5. Карти самостійно атакують і використовують свої перки (наприклад цілитель лікує, танк поглинає шкоду і так далі). Хто залишився хоча б з однією живою картою — той і перемагає!</p>
+                <p className="mb-3 text-neutral-400">Кожна точка має свій режим. <b className="text-white">Перевіряйте перед атакою!</b> Режим впливає на наслідки для ваших карт.</p>
+                <div className="flex flex-col gap-3">
+                  <div className="bg-neutral-900 p-3 rounded-xl border border-green-900/30">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                      <span className="text-green-400 font-black text-sm uppercase">Повне Відновлення</span>
+                    </div>
+                    <p className="text-neutral-400 text-xs">Найбезпечніший режим. Після бою всі карти повністю відновлюють свої характеристики. Ідеально для тренувань та легких боїв.</p>
+                  </div>
+                  <div className="bg-neutral-900 p-3 rounded-xl border border-yellow-900/30">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                      <span className="text-yellow-400 font-black text-sm uppercase">Втрата Статів (Chip Damage)</span>
+                    </div>
+                    <p className="text-neutral-400 text-xs">Кожна карта, що отримала шкоду, має шанс <b className="text-yellow-300">назавжди втратити 5% Сили або HP</b>. Стати не можуть впасти нижче 30% від базового значення. Шанс втрати залежить від точки.</p>
+                  </div>
+                  <div className="bg-neutral-900 p-3 rounded-xl border border-red-900/40">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                      <span className="text-red-400 font-black text-sm uppercase">Хардкор (Смерть)</span>
+                    </div>
+                    <p className="text-neutral-400 text-xs"><b className="text-red-300">Перманентна смерть!</b> Карта, яка закінчує бій з 0 HP — <b className="text-red-300">видаляється з інвентаря назавжди</b>. Використовуйте з обережністю, беріть цілителів!</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Damage & Repair */}
+              <div className="bg-emerald-950/20 border border-emerald-800/40 rounded-xl p-4">
+                <h4 className="text-base font-black text-emerald-400 uppercase mb-3 flex items-center gap-2">
+                  <Stethoscope size={16} /> Пошкодження та Ремонт
+                </h4>
+                <div className="space-y-3">
+                  <div className="bg-neutral-900/80 rounded-lg p-3 border border-neutral-800">
+                    <div className="font-black text-xs text-white uppercase mb-1.5 flex items-center gap-1.5">
+                      <Flame size={12} className="text-orange-400" /> Які бувають пошкодження?
+                    </div>
+                    <ul className="text-xs text-neutral-400 space-y-1.5">
+                      <li className="flex items-start gap-2">
+                        <span className="text-yellow-500 shrink-0">&#x2022;</span>
+                        <span><b className="text-yellow-300">Chip Damage</b> — назавжди зменшує Силу та/або HP карти на 5%. Мінімальний поріг — 30% від початкового значення.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-red-500 shrink-0">&#x2022;</span>
+                        <span><b className="text-red-300">Смерть (Хардкор)</b> — повна втрата карти, якщо HP дорівнює 0 на кінець бою. Неможливо відновити!</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-neutral-900/80 rounded-lg p-3 border border-emerald-900/30">
+                    <div className="font-black text-xs text-white uppercase mb-1.5 flex items-center gap-1.5">
+                      <Stethoscope size={12} className="text-emerald-400" /> Де та як ремонтувати?
+                    </div>
+                    <p className="text-xs text-neutral-400 mb-2">
+                      Якщо ваша карта отримала Chip Damage, вона позначається як <b className="text-amber-300">пошкоджена</b>. Відремонтувати можна у <b className="text-emerald-300">Кузні</b>:
+                    </p>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-neutral-950 rounded-lg p-2 border border-yellow-900/30 text-center">
+                        <Coins size={16} className="text-yellow-500 mx-auto mb-1" />
+                        <div className="text-[10px] text-yellow-400 font-black">200 монет</div>
+                        <div className="text-[9px] text-neutral-500">за ремонт</div>
+                      </div>
+                      <div className="flex-1 bg-neutral-950 rounded-lg p-2 border border-fuchsia-900/30 text-center">
+                        <Gem size={16} className="text-fuchsia-500 mx-auto mb-1" />
+                        <div className="text-[10px] text-fuchsia-400 font-black">5 кристалів</div>
+                        <div className="text-[9px] text-neutral-500">за ремонт</div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-neutral-500 mt-2 italic">
+                      Ремонт повністю відновлює Силу та HP карти до максимальних значень.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Crystal Income */}
+              <div className="bg-fuchsia-950/20 border border-fuchsia-800/30 rounded-xl p-4">
+                <h4 className="text-base font-black text-fuchsia-400 uppercase mb-3 flex items-center gap-2">
+                  <Gem size={16} /> Дохід з Точок
+                </h4>
+                <div className="space-y-2 text-xs text-neutral-400">
+                  <p>Кожна точка генерує <b className="text-fuchsia-300">кристали</b> щогодини для свого власника. Ставка фарму залежить від конкретної точки.</p>
+                  <p>Кристали нараховуються <b className="text-white">автоматично</b> кожну годину, поки ви є власником точки.</p>
+                  <p className="text-neutral-500 italic">Втрата точки означає втрату цього доходу. Захищайте свої точки найкращими картами!</p>
+                </div>
+              </div>
+
+              {/* Combat Mechanics */}
+              <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4">
+                <h4 className="text-base font-black text-red-400 uppercase mb-3 flex items-center gap-2">
+                  <Crosshair size={16} /> Механіка Бою
+                </h4>
+                <div className="space-y-2 text-xs text-neutral-400">
+                  <p>Бій відбувається <b className="text-white">покроково</b>. Кожна карта атакує по черзі, обираючи ціль серед живих ворогів.</p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="bg-neutral-900/60 rounded-lg p-2 border border-neutral-800">
+                      <div className="font-black text-[10px] text-yellow-400 mb-0.5 flex items-center gap-1"><Zap size={10} /> Сила</div>
+                      <p className="text-[10px] text-neutral-500">Визначає базову шкоду від атаки</p>
+                    </div>
+                    <div className="bg-neutral-900/60 rounded-lg p-2 border border-neutral-800">
+                      <div className="font-black text-[10px] text-red-400 mb-0.5 flex items-center gap-1"><Heart size={10} /> HP</div>
+                      <p className="text-[10px] text-neutral-500">Запас здоров'я карти в бою</p>
+                    </div>
+                    <div className="bg-neutral-900/60 rounded-lg p-2 border border-neutral-800">
+                      <div className="font-black text-[10px] text-indigo-400 mb-0.5 flex items-center gap-1"><Zap size={10} /> Перки</div>
+                      <p className="text-[10px] text-neutral-500">Спецздібності карти (натисніть "i" вгорі)</p>
+                    </div>
+                    <div className="bg-neutral-900/60 rounded-lg p-2 border border-neutral-800">
+                      <div className="font-black text-[10px] text-blue-400 mb-0.5 flex items-center gap-1"><Eye size={10} /> Прихованість</div>
+                      <p className="text-[10px] text-neutral-500">3 з 4 карт захисника приховані</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-xl p-4">
+                <h4 className="text-base font-black text-neutral-300 uppercase mb-3 flex items-center gap-2">
+                  <Info size={16} className="text-indigo-400" /> Поради
+                </h4>
+                <ul className="text-xs text-neutral-400 space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-400 shrink-0">&#x25B8;</span>
+                    <span>Збалансуйте свою колоду: комбінуйте <b className="text-white">танків, цілителів та атакерів</b>.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-400 shrink-0">&#x25B8;</span>
+                    <span>Перевіряйте <b className="text-white">режим бою</b> точки, перш ніж атакувати — не ризикуйте цінними картами на хардкорних точках.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-400 shrink-0">&#x25B8;</span>
+                    <span>Прокачуйте карти в <b className="text-emerald-300">Кузні</b> перед боями — рівень підвищує їх ефективність.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-400 shrink-0">&#x25B8;</span>
+                    <span>Після Chip Damage бою — загляньте в <b className="text-emerald-300">Кузню</b> та <b className="text-amber-300">відремонтуйте</b> пошкоджені карти.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-400 shrink-0">&#x25B8;</span>
+                    <span>Стратегія: захоплюйте <b className="text-cyan-300">зони висадки</b> для доступу до закритих точок з більшим фармом.</span>
+                  </li>
+                </ul>
               </div>
 
             </div>
