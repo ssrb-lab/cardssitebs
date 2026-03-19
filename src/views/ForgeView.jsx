@@ -140,6 +140,7 @@ export default function ForgeView({
     const cards = [];
     inventory.forEach((item) => {
       if (!item.gameStats || !Array.isArray(item.gameStats) || item.gameStats.length === 0) return;
+      if (item.card.blockGame) return;
       item.gameStats.forEach((statVal, index) => {
         if (statVal && statVal.inSafe) return;
         const parsed = parseGameStat(statVal, item.card.rarity);
@@ -245,12 +246,14 @@ export default function ForgeView({
             const newLevel = data.newLevel || prev.level || 1;
             const newPower = data.newPower ?? prev.power;
             const newHp = data.newHp ?? prev.hp;
+            const newStatsIndex = data.newStatsIndex ?? prev.statsIndex;
             return {
               ...prev,
               power: newPower,
               hp: newHp,
               level: newLevel,
-              uniqueKey: `${prev.card.id}-${prev.statsIndex}-${newPower}-${newHp}-${newLevel}-${prev.emerald ?? 'x'}`,
+              statsIndex: newStatsIndex,
+              uniqueKey: `${prev.card.id}-${newStatsIndex}-${newPower}-${newHp}-${newLevel}-${prev.emerald ?? 'x'}`,
             };
           });
           reloadProfile();

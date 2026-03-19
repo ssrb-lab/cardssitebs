@@ -630,26 +630,24 @@ export default function InventoryView({
                         {isGameItem && (
                           <div className="flex flex-col items-center justify-center gap-0.5 mb-2">
                             {powers[0] && (() => {
-                              const maxLv = Math.max(...powers.map(p => p.level || 1));
-                              const isMax = maxLv >= 10;
+                              // Show the main card (highest level instance)
+                              const main = powers.reduce((best, p) => (p.level || 1) > (best.level || 1) ? p : best, powers[0]);
+                              const isMax = (main.level || 1) >= 10;
                               return (
-                                <div className={`inline-flex items-center gap-1 text-white font-black text-[9px] px-2 py-0.5 rounded-full mb-0.5 ${isMax ? 'bg-gradient-to-r from-yellow-600 to-amber-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] border border-yellow-400/40' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_6px_rgba(99,102,241,0.5)] border border-blue-400/30'}`}>
-                                  {isMax ? '★ ' : ''}Lv.{maxLv}
-                                </div>
+                                <>
+                                  <div className={`inline-flex items-center gap-1 text-white font-black text-[9px] px-2 py-0.5 rounded-full mb-0.5 ${isMax ? 'bg-gradient-to-r from-yellow-600 to-amber-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] border border-yellow-400/40' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_6px_rgba(99,102,241,0.5)] border border-blue-400/30'}`}>
+                                    {isMax ? '★ ' : ''}Lv.{main.level || 1}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs font-bold text-yellow-500">
+                                    <Zap size={12} strokeWidth={2.5} />
+                                    {main.power}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-red-500">
+                                    ❤️ {main.hp}
+                                  </div>
+                                </>
                               );
                             })()}
-                            <div className="flex items-center gap-1 text-xs font-bold text-yellow-500">
-                              <Zap size={12} strokeWidth={2.5} />
-                              {powers.length === 1
-                                ? `${powers[0].power}`
-                                : `${Math.min(...powers.map(p => p.power))}–${Math.max(...powers.map(p => p.power))}`}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-red-500">
-                              ❤️
-                              {powers.length === 1
-                                ? `${powers[0].hp}`
-                                : `${Math.min(...powers.map(p => p.hp))}–${Math.max(...powers.map(p => p.hp))}`}
-                            </div>
                           </div>
                         )}
 

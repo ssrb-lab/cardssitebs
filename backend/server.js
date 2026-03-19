@@ -1383,7 +1383,8 @@ app.get('/api/catalog', async (req, res) => {
 
     // For game cards missing levelingConfig, compute it on-the-fly from pack statsRanges
     const enrichedCards = cards.map(card => {
-      if (!card.isGame) return card;
+      const effectiveIsGame = card.isGame || packMap[card.packId]?.isGame;
+      if (!effectiveIsGame) return card;
       let lc = card.levelingConfig;
       if (typeof lc === 'string') { try { lc = JSON.parse(lc); } catch(e) { lc = null; } }
       if (lc && Object.keys(lc).length > 0) return card; // already has config
@@ -1876,7 +1877,7 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       if ((pack.isGame || newCard.isGame) && !newCard.blockGame) {
         const power = generatePower(newCard.rarity, newCard);
         const hp = generateHp(newCard.rarity, newCard);
-        generatedStats = { power, hp };
+        generatedStats = { power, hp, maxHp: hp, level: 1 };
       }
 
       results.push({ ...newCard, generatedStats: generatedStats });
@@ -2187,11 +2188,8 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
           currentStats.push({ power: basePower, hp: baseHp, maxHp: baseHp, level: 1 });
         }
       } else if (listing.power !== null) {
-        if (listing.hp !== null) {
-          currentStats.push({ power: listing.power, hp: listing.hp });
-        } else {
-          currentStats.push(listing.power);
-        }
+        const hp = listing.hp !== null ? listing.hp : 50;
+        currentStats.push({ power: listing.power, hp, maxHp: hp, level: listing.level || 1 });
       }
 
       await tx.inventoryItem.upsert({
@@ -6973,12 +6971,13 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
       include: { inventory: { include: { card: true } } },
     });
 
-    res.json({ 
-      success: true, 
-      profile: updatedUser, 
-      newPower: updatedStatObj.power, 
-      newHp: updatedStatObj.hp, 
-      newLevel: updatedStatObj.level
+    res.json({
+      success: true,
+      profile: updatedUser,
+      newPower: updatedStatObj.power,
+      newHp: updatedStatObj.hp,
+      newLevel: updatedStatObj.level,
+      newStatsIndex: newStatsIndex,
     });
   } catch (error) {
     console.error(error);
