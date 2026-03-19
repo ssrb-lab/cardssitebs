@@ -4374,27 +4374,12 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
         if (point.battleMode === 'HARDCORE') {
           if (card.currentHp <= 0) {
-            // Delete dead instance
-            const oldLen = effectiveStats.length; // before splice
-            effectiveStats.splice(card.statsIndex, 1);
-            card._isDestroyed = true; 
+            // HARDCORE: картка вибуває з точки, але з інвентарю НЕ зникає
+            card._isDestroyed = true;
             cardResult.status = 'destroyed';
-            
-            if (effectiveStats.length === 0 && freshInvItem.amount === 1) {
-              await tx.inventoryItem.delete({ where: { id: freshInvItem.id } });
-            } else {
-              await tx.inventoryItem.update({
-                where: { id: freshInvItem.id },
-                data: { gameStats: effectiveStats, amount: { decrement: 1 } },
-              });
-            }
-            // Bug Fix 1: Sync other arena points where attacker is defending
-            // with this same card type — splice shifts all subsequent indices.
-            const attackerSpliceMap = createSpliceMap(oldLen, card.statsIndex, 1);
-            await syncArenaIndices(tx, user.uid, card.id, attackerSpliceMap);
           } else {
-            stat.hp = card.currentHp;
-            card.hp = stat.hp;
+            // Зменшений HP зберігається лише в знімку точки, НЕ в інвентарі
+            card.hp = card.currentHp;
             card.maxHp = stat.maxHp;
             card.power = stat.power;
             cardResult.newPower = card.power;
@@ -4428,7 +4413,8 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
           cardResult.newMaxHp = card.maxHp;
         }
 
-        if (cardResult.status !== 'destroyed') {
+        // В HARDCORE зміни HP атакуючих карток не записуються в інвентар
+        if (cardResult.status !== 'destroyed' && point.battleMode !== 'HARDCORE') {
           await tx.inventoryItem.update({
             where: { id: freshInvItem.id },
             data: { gameStats: effectiveStats },
@@ -4467,13 +4453,9 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
           },
         });
         
-        // Bug Fix 2: Update defender's InventoryItem for each defending card.
-        // In HARDCORE mode: attacker won, meaning ALL defender cards on this point
-        // are "lost" (the point was taken, but in HARDCORE their actual card instances
-        // are NOT destroyed — they only lose control of the point).
-        // The ArenaPoint ownership change is the loss; defender cards return to inventory.
-        // However, we still apply CHIP_DAMAGE and HARDCORE hp-damage to their inventory.
-        if (point.ownerId && (point.battleMode === 'HARDCORE' || point.battleMode === 'CHIP_DAMAGE')) {
+        // HARDCORE: захисні картки вибувають з точки, але з інвентарю НЕ зникають і не отримують пошкоджень
+        // CHIP_DAMAGE: застосовуємо деградацію до інвентарю захисника
+        if (point.ownerId && point.battleMode === 'CHIP_DAMAGE') {
           for (const defCard of defenderCards) {
             const defInvItem = await tx.inventoryItem.findFirst({
               where: { userId: point.ownerId, cardId: defCard.id },
@@ -4493,52 +4475,25 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             const defStatIdx = defCard.statsIndex;
             if (defStatIdx === undefined || defStatIdx === null || defStatIdx < 0 || defStatIdx >= defStats.length) continue;
 
-            if (point.battleMode === 'HARDCORE') {
-              if (defCard.currentHp <= 0) {
-                // Card was destroyed in battle — remove from inventory
-                const defOldLen = defStats.length;
-                defStats.splice(defStatIdx, 1);
-                if (defStats.length === 0 && defInvItem.amount === 1) {
-                  await tx.inventoryItem.delete({ where: { id: defInvItem.id } });
-                } else {
-                  await tx.inventoryItem.update({
-                    where: { id: defInvItem.id },
-                    data: { gameStats: defStats, amount: { decrement: 1 } },
-                  });
-                }
-                // Sync other points owned by defender that use this card
-                const defSpliceMap = createSpliceMap(defOldLen, defStatIdx, 1);
-                await syncArenaIndices(tx, point.ownerId, defCard.id, defSpliceMap);
-              } else {
-                // Card survived HARDCORE — persist current HP
-                defStats[defStatIdx] = { ...defStats[defStatIdx], hp: defCard.currentHp };
-                await tx.inventoryItem.update({
-                  where: { id: defInvItem.id },
-                  data: { gameStats: defStats },
-                });
-              }
-            } else if (point.battleMode === 'CHIP_DAMAGE') {
-              // Apply chip damage to defender's inventory stat (30% floor)
-              if (Math.random() * 100 < (point.chipDamageChance || 0)) {
-                const ds = defStats[defStatIdx];
-                if (!ds.basePower) ds.basePower = ds.power;
-                if (!ds.baseMaxHp) ds.baseMaxHp = ds.maxHp || ds.hp;
-                const floorPower = Math.max(1, Math.floor(ds.basePower * 0.30));
-                const floorMaxHp = Math.max(1, Math.floor(ds.baseMaxHp * 0.30));
-                defStats[defStatIdx] = {
-                  ...ds,
-                  maxHp: Math.max(floorMaxHp, Math.floor((ds.maxHp || ds.hp || 1) * 0.95)),
-                  power: Math.max(floorPower, Math.floor((ds.power || 1) * 0.95)),
-                };
-                defStats[defStatIdx].hp = defStats[defStatIdx].maxHp;
-              } else {
-                defStats[defStatIdx] = { ...defStats[defStatIdx], hp: defStats[defStatIdx].maxHp || defStats[defStatIdx].hp };
-              }
-              await tx.inventoryItem.update({
-                where: { id: defInvItem.id },
-                data: { gameStats: defStats },
-              });
+            if (Math.random() * 100 < (point.chipDamageChance || 0)) {
+              const ds = defStats[defStatIdx];
+              if (!ds.basePower) ds.basePower = ds.power;
+              if (!ds.baseMaxHp) ds.baseMaxHp = ds.maxHp || ds.hp;
+              const floorPower = Math.max(1, Math.floor(ds.basePower * 0.30));
+              const floorMaxHp = Math.max(1, Math.floor(ds.baseMaxHp * 0.30));
+              defStats[defStatIdx] = {
+                ...ds,
+                maxHp: Math.max(floorMaxHp, Math.floor((ds.maxHp || ds.hp || 1) * 0.95)),
+                power: Math.max(floorPower, Math.floor((ds.power || 1) * 0.95)),
+              };
+              defStats[defStatIdx].hp = defStats[defStatIdx].maxHp;
+            } else {
+              defStats[defStatIdx] = { ...defStats[defStatIdx], hp: defStats[defStatIdx].maxHp || defStats[defStatIdx].hp };
             }
+            await tx.inventoryItem.update({
+              where: { id: defInvItem.id },
+              data: { gameStats: defStats },
+            });
           }
         }
 
@@ -4573,70 +4528,14 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
           if (point.battleMode === 'HARDCORE') {
             if (c.currentHp <= 0) {
+              // HARDCORE: картка вибуває з точки, але з інвентарю НЕ зникає
               defResult.status = 'destroyed';
               finalCard = null;
-              // Update defender's InventoryItem — card is destroyed
-              if (point.ownerId) {
-                const defInvItem = await tx.inventoryItem.findFirst({
-                  where: { userId: point.ownerId, cardId: c.id },
-                });
-                if (defInvItem) {
-                  let defStats = [];
-                  if (typeof defInvItem.gameStats === 'string') {
-                    try { defStats = JSON.parse(defInvItem.gameStats); } catch (e) {}
-                  } else if (Array.isArray(defInvItem.gameStats)) {
-                    defStats = [...defInvItem.gameStats];
-                  }
-                  while (defStats.length < defInvItem.amount) {
-                    defStats.push({ power: c.power, hp: c.maxHp || c.hp, maxHp: c.maxHp || c.hp });
-                  }
-                  const defStatIdx = c.statsIndex;
-                  if (defStatIdx !== undefined && defStatIdx !== null && defStatIdx >= 0 && defStatIdx < defStats.length) {
-                    const defOldLen = defStats.length;
-                    defStats.splice(defStatIdx, 1);
-                    if (defStats.length === 0 && defInvItem.amount === 1) {
-                      await tx.inventoryItem.delete({ where: { id: defInvItem.id } });
-                    } else {
-                      await tx.inventoryItem.update({
-                        where: { id: defInvItem.id },
-                        data: { gameStats: defStats, amount: { decrement: 1 } },
-                      });
-                    }
-                    // Sync other defending points owned by defender
-                    const defSpliceMap = createSpliceMap(defOldLen, defStatIdx, 1);
-                    await syncArenaIndices(tx, point.ownerId, c.id, defSpliceMap);
-                  }
-                }
-              }
             } else {
+              // Пошкодження HP зберігається лише в знімку точки, НЕ в інвентарі
               defResult.newPower = c.power;
               defResult.newMaxHp = c.currentHp;
               finalCard = { ...c, hp: c.currentHp };
-              // Persist surviving HP into inventory
-              if (point.ownerId) {
-                const defInvItem = await tx.inventoryItem.findFirst({
-                  where: { userId: point.ownerId, cardId: c.id },
-                });
-                if (defInvItem) {
-                  let defStats = [];
-                  if (typeof defInvItem.gameStats === 'string') {
-                    try { defStats = JSON.parse(defInvItem.gameStats); } catch (e) {}
-                  } else if (Array.isArray(defInvItem.gameStats)) {
-                    defStats = [...defInvItem.gameStats];
-                  }
-                  while (defStats.length < defInvItem.amount) {
-                    defStats.push({ power: c.power, hp: c.maxHp || c.hp, maxHp: c.maxHp || c.hp });
-                  }
-                  const defStatIdx = c.statsIndex;
-                  if (defStatIdx !== undefined && defStatIdx !== null && defStatIdx >= 0 && defStatIdx < defStats.length) {
-                    defStats[defStatIdx] = { ...defStats[defStatIdx], hp: c.currentHp };
-                    await tx.inventoryItem.update({
-                      where: { id: defInvItem.id },
-                      data: { gameStats: defStats },
-                    });
-                  }
-                }
-              }
             }
           } else if (point.battleMode === 'CHIP_DAMAGE') {
             let newMax = c.maxHp || c.hp;

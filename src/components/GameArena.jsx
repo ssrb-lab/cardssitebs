@@ -1048,7 +1048,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         <img src={card.image} className="w-full h-full object-cover" />
                       </div>
 
-                      <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                      <PerkBadge perks={[card.perk, (!card.bonusPerkLevel || (card.level || 1) >= card.bonusPerkLevel) ? card.bonusPerk : null]} />
 
                       {/* Scale stats to prevent overflowing width */}
                       <div className="absolute -bottom-2 inset-x-0 w-[110%] -ml-[5%] mx-auto bg-neutral-900 border border-indigo-500 text-white font-bold text-[8px] sm:text-[10px] xl:text-xs px-1 py-0.5 rounded-full z-10 flex items-center justify-center gap-0.5 shadow-md whitespace-nowrap">
@@ -1138,7 +1138,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                               </div>
                             </div>
                           )}
-                          <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                          <PerkBadge perks={[card.perk, (!card.bonusPerkLevel || (card.level || 1) >= card.bonusPerkLevel) ? card.bonusPerk : null]} />
                           {/* Рівень — верхній правий кут */}
                           {(() => {
                             const lv = card.level || 1;
@@ -1299,20 +1299,21 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                   </div>
-                  <div className="flex-1">
-                    <label className="text-xs uppercase font-bold text-neutral-400 mb-1 flex items-center gap-1">
-                      <RefreshCw size={10} className="text-emerald-500" /> Заміна карт
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={adminPointData.cardSwapCost || 0}
-                      onChange={(e) =>
-                        setAdminPointData({ ...adminPointData, cardSwapCost: e.target.value })
-                      }
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs uppercase font-bold text-neutral-400 mb-1 flex items-center gap-1">
+                    <RefreshCw size={10} className="text-emerald-500" /> Ціна за зміну карток на точці
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={adminPointData.cardSwapCost || 0}
+                    onChange={(e) =>
+                      setAdminPointData({ ...adminPointData, cardSwapCost: e.target.value })
+                    }
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
                 </div>
 
                 <div>
@@ -1383,7 +1384,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   >
                     <option value="FULL">🟢 Повне Відновлення (Default)</option>
                     <option value="CHIP_DAMAGE">🟡 Втрата Статів (Chip Damage)</option>
-                    <option value="HARDCORE">🔴 Хардкор (Перманентна Смерть)</option>
+                    <option value="HARDCORE">🔴 Хардкор (Вибування з точки)</option>
                   </select>
 
                   {adminPointData.battleMode === 'CHIP_DAMAGE' && (
@@ -1770,7 +1771,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                 <div className="flex flex-col gap-1 mb-2">
                   {selectedPoint.battleMode === 'HARDCORE' ? (
                     <div className="flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-lg bg-red-900/30 text-red-500 border border-red-800/50">
-                      🔴 Режим: Хардкор (Смерть карток)
+                      🔴 Режим: Хардкор (Вибування карток)
                     </div>
                   ) : selectedPoint.battleMode === 'CHIP_DAMAGE' ? (
                     <div className="flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-lg bg-yellow-900/30 text-yellow-500 border border-yellow-800/50" title={`Шанс втрати статів: ${selectedPoint.chipDamageChance || 0}%`}>
@@ -1857,7 +1858,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         >
                           {!isHidden && (
                             <>
-                              <PerkBadge perks={[defCard.perk, defCard.bonusPerk]} />
+                              <PerkBadge perks={[defCard.perk, (!defCard.bonusPerkLevel || (defCard.level || 1) >= defCard.bonusPerkLevel) ? defCard.bonusPerk : null]} />
                               {(() => {
                                 const lv = defCard.level || 1;
                                 const isMax = lv >= 10;
@@ -2072,7 +2073,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
                           {/* Face Up (Лицьова сторона) */}
                           <div className={`card-back w-full h-full rounded-xl border-2 overflow-hidden bg-neutral-900 shadow-xl ${getCardStyle(card.rarity).border} ${hasTaunt ? 'ring-2 ring-red-500/60 animate-pulse' : ''} ${isBurning ? 'ring-1 ring-orange-500/70' : ''} ${isShielded ? 'ring-1 ring-sky-400/60' : ''}`}>
-                            <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                            <PerkBadge perks={[card.perk, (!card.bonusPerkLevel || (card.level || 1) >= card.bonusPerkLevel) ? card.bonusPerk : null]} />
                             {/* Burn overlay */}
                             {isBurning && (
                               <div className="absolute top-0 left-0 right-0 bottom-0 z-10 pointer-events-none">
@@ -2254,7 +2255,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         </div>
 
                         {/* Overlays — поза overflow-hidden */}
-                        <PerkBadge perks={[card.perk, card.bonusPerk]} />
+                        <PerkBadge perks={[card.perk, (!card.bonusPerkLevel || (card.level || 1) >= card.bonusPerkLevel) ? card.bonusPerk : null]} />
                         {isBurning && <span className="absolute top-1 right-1 text-sm z-20 pointer-events-none">🔥</span>}
                         {isShielded && (
                           <div className="absolute top-1 right-1 z-20 bg-sky-500/30 border border-sky-400/50 rounded-full p-0.5">
@@ -2387,7 +2388,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                                 
                                 <div className="mt-2 flex items-center gap-4">
                                   {isDestroyed ? (
-                                    <p className="text-red-400 text-[11px] font-bold leading-tight">Цю карту було назавжди втрачено в режимі Хардкор.</p>
+                                    <p className="text-red-400 text-[11px] font-bold leading-tight">Карта вибула з оборони цієї точки.</p>
                                   ) : (
                                     <div className="flex items-center gap-3">
                                       <div className="flex flex-col">
@@ -2616,9 +2617,9 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   <div className="bg-neutral-900 p-3 rounded-xl border border-red-900/40">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                      <span className="text-red-400 font-black text-sm uppercase">Хардкор (Смерть)</span>
+                      <span className="text-red-400 font-black text-sm uppercase">Хардкор (Вибування)</span>
                     </div>
-                    <p className="text-neutral-400 text-xs"><b className="text-red-300">Перманентна смерть!</b> Карта, яка закінчує бій з 0 HP — <b className="text-red-300">видаляється з інвентаря назавжди</b>. Використовуйте з обережністю, беріть цілителів!</p>
+                    <p className="text-neutral-400 text-xs">Картка, що загинула у бою, <b className="text-red-300">вибуває з оборони точки</b>. В інвентарі вона залишається цілою. Пошкодження HP діє лише на цій точці — після бою картка відновлюється.</p>
                   </div>
                 </div>
               </div>
@@ -2640,7 +2641,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-red-500 shrink-0">&#x2022;</span>
-                        <span><b className="text-red-300">Смерть (Хардкор)</b> — повна втрата карти, якщо HP дорівнює 0 на кінець бою. Неможливо відновити!</span>
+                        <span><b className="text-red-300">Хардкор</b> — картка вибуває з оборони точки, якщо HP дорівнює 0. В інвентарі вона залишається цілою та не отримує пошкоджень.</span>
                       </li>
                     </ul>
                   </div>
