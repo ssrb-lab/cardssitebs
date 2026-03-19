@@ -196,7 +196,7 @@ export default function ForgeView({
       const pickBest = (arr) => arr.reduce((best, c) => (c.level > best.level ? c : best), arr[0]);
       const representative = nonDefending.length > 0 ? pickBest(nonDefending) : pickBest(instances);
       const allDefending = nonDefending.length === 0;
-      const availDupes = Math.max(0, nonDefending.length - 1);
+      const availDupes = nonDefending.length; // загальна кількість (включно з головною)
 
       let nextLevelRequired = 0;
       if (representative.level < 10 && representative.card.levelingConfig) {
@@ -286,7 +286,7 @@ export default function ForgeView({
             : selectedMain.card.levelingConfig;
       }
       nextLevelConfig = cfg[nextLevel] || { dupes: 0, cost: 0, currency: 'coins', powerAdd: 0, hpAdd: 0 };
-      const hasDupes = availableDupes >= (nextLevelConfig.dupes || 0);
+      const hasDupes = (availableDupes + 1) >= (nextLevelConfig.dupes || 0);
       const hasCurrency =
         nextLevelConfig.currency === 'crystals'
           ? profile?.crystals >= nextLevelConfig.cost
@@ -413,20 +413,20 @@ export default function ForgeView({
                       <div className="bg-black/40 border border-neutral-800 p-4 rounded-2xl flex flex-col justify-center relative overflow-hidden">
                         <div
                           className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all"
-                          style={{ width: `${Math.min(100, (availableDupes / (nextLevelConfig?.dupes || 1)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, ((availableDupes + 1) / (nextLevelConfig?.dupes || 1)) * 100)}%` }}
                         />
                         <span className="text-[10px] font-black text-neutral-500 uppercase block mb-1">
-                          Дублікати ({availableDupes}/{nextLevelConfig?.dupes})
+                          Карток ({availableDupes + 1}/{nextLevelConfig?.dupes})
                         </span>
                         <div className="flex items-center gap-2">
                           <Layers
                             size={18}
-                            className={availableDupes >= (nextLevelConfig?.dupes || 0) ? 'text-blue-400' : 'text-neutral-600'}
+                            className={(availableDupes + 1) >= (nextLevelConfig?.dupes || 0) ? 'text-blue-400' : 'text-neutral-600'}
                           />
                           <span
-                            className={`text-2xl font-black ${availableDupes >= (nextLevelConfig?.dupes || 0) ? 'text-blue-400' : 'text-red-500'}`}
+                            className={`text-2xl font-black ${(availableDupes + 1) >= (nextLevelConfig?.dupes || 0) ? 'text-blue-400' : 'text-red-500'}`}
                           >
-                            {availableDupes}{' '}
+                            {availableDupes + 1}{' '}
                             <span className="text-sm text-neutral-500">/ {nextLevelConfig?.dupes}</span>
                           </span>
                         </div>

@@ -6904,8 +6904,9 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
       availableDupesIndices.push(i);
     }
 
-    if (availableDupesIndices.length < requiredDupes) {
-      return res.status(400).json({ error: `Недостатньо вільних дублікатів. Потрібно ${requiredDupes}, доступно ${availableDupesIndices.length}.` });
+    // +1 враховує саму картку (requiredDupes = загальна кількість карток потрібних для апгрейду)
+    if (availableDupesIndices.length + 1 < requiredDupes) {
+      return res.status(400).json({ error: `Недостатньо карток. Потрібно ${requiredDupes} загалом, доступно ${availableDupesIndices.length + 1}.` });
     }
 
     // Перевірка валюти
@@ -6917,7 +6918,8 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
     }
 
     // Видаляємо дублікати (видаляємо з кінця, щоб не збити індекси)
-    let dupesToRemove = availableDupesIndices.slice(0, requiredDupes).sort((a, b) => b - a);
+    // requiredDupes - 1, бо одна з карток (сама картка) залишається як апгрейд
+    let dupesToRemove = availableDupesIndices.slice(0, requiredDupes - 1).sort((a, b) => b - a);
     let finalStats = [...statsArray];
 
     for (const dIndex of dupesToRemove) {
