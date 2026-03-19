@@ -6839,14 +6839,8 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Картку не знайдено за вказаним індексом.' });
     }
 
-    // Перевірка Арени
+    // Отримуємо захисні екземпляри (не блокуємо апгрейд для арени — syncArenaIndices оновить індекси)
     const defInstances = await getDefendingInstances(user.uid);
-    const isDefending = defInstances.some(
-      (inst) => inst.cardId === cardId && inst.statsIndex === statsIndex
-    );
-    if (isDefending) {
-      return res.status(400).json({ error: 'Ця картка зараз на Арені і не може бути використана.' });
-    }
 
     const normalize = (s) => (typeof s === 'object' && s !== null ? s : { power: s, hp: 50, level: 1 });
     const statObj = normalize(statsArray[statsIndex]);
@@ -6890,17 +6884,12 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
     const hpAdd = Number(configForLevel.hpAdd) || 0;
 
     // Перевірка наявності дублікатів
-    // Ми не можемо видаляти саму себе, та ті, що на Арені або в Сейфі
+    // Виключаємо тільки саму картку та ті, що в Сейфі (арена дозволена — syncArenaIndices оновить)
     let availableDupesIndices = [];
     for (let i = 0; i < statsArray.length; i++) {
       if (i === statsIndex) continue; // Сама картка
-      
       const s = normalize(statsArray[i]);
       if (s.inSafe) continue; // В сейфі
-
-      const isDef = defInstances.some(inst => inst.cardId === cardId && inst.statsIndex === i);
-      if (isDef) continue; // На арені
-
       availableDupesIndices.push(i);
     }
 

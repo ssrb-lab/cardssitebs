@@ -169,16 +169,14 @@ export default function ForgeView({
 
   const availableDupes = useMemo(() => {
     if (!selectedMain) return 0;
-    const defendingIndices = profile?.defendingInstances || [];
     let count = 0;
     allGameCards.forEach((c) => {
       if (c.card.id !== selectedMain.card.id) return;
       if (c.uniqueKey === selectedMain.uniqueKey) return;
-      const isDef = defendingIndices.some((inst) => inst.cardId === c.card.id && inst.statsIndex === c.statsIndex);
-      if (!isDef) count++;
+      count++;
     });
     return count;
-  }, [selectedMain, allGameCards, profile]);
+  }, [selectedMain, allGameCards]);
 
   const groupedCards = useMemo(() => {
     const groups = {};
@@ -196,7 +194,7 @@ export default function ForgeView({
       const pickBest = (arr) => arr.reduce((best, c) => (c.level > best.level ? c : best), arr[0]);
       const representative = nonDefending.length > 0 ? pickBest(nonDefending) : pickBest(instances);
       const allDefending = nonDefending.length === 0;
-      const availDupes = nonDefending.length; // загальна кількість (включно з головною)
+      const availDupes = instances.length; // загальна кількість (включно з захисними)
 
       let nextLevelRequired = 0;
       if (representative.level < 10 && representative.card.levelingConfig) {
@@ -390,18 +388,15 @@ export default function ForgeView({
 
             {selectedMain ? (
               <>
-                {isDefendingSelected ? (
-                  <div className="bg-orange-950/40 border border-orange-700/40 p-5 rounded-2xl flex items-start gap-3">
-                    <span className="text-2xl shrink-0">🛡️</span>
-                    <div>
-                      <h3 className="text-orange-400 font-black text-sm uppercase tracking-widest mb-1">Картка на Арені</h3>
-                      <p className="text-orange-300/70 text-xs leading-relaxed">
-                        Ця картка зараз захищає точку Арени. Прокачка, ремонт та встановлення смарагдів заблоковані.
-                        Заберіть картку з точки, щоб розблокувати дії.
-                      </p>
-                    </div>
+                {isDefendingSelected && (
+                  <div className="bg-orange-950/40 border border-orange-700/40 px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <span className="shrink-0">🛡️</span>
+                    <p className="text-orange-300/70 text-xs leading-relaxed">
+                      Картка на Арені — ремонт та смарагди заблоковані, але прокачка доступна.
+                    </p>
                   </div>
-                ) : isMaxLevel ? (
+                )}
+                {isMaxLevel ? (
                   <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-2xl text-center">
                     <Star className="text-yellow-500 mx-auto mb-2" size={32} />
                     <h3 className="text-yellow-400 font-black text-xl uppercase">Максимальний рівень!</h3>
