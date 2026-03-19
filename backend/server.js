@@ -294,6 +294,109 @@ const createSpliceMap = (oldLength, spliceStart, spliceCount) => {
 };
 
 // ----------------------------------------
+// FEEDING / PERK SYSTEM — CONSTANTS & HELPERS
+// ----------------------------------------
+
+// XP granted by sacrificing one card copy of given rarity (multiplied by card level)
+const FEEDING_XP_BY_RARITY = {
+  'Звичайна': 20,
+  'Рідкісна': 50,
+  'Епічна': 120,
+  'Легендарна': 300,
+  'Унікальна': 700,
+};
+
+// Cumulative XP required to reach perk level N+1 (index = current level - 1, max index = 3 for 5→capped)
+// e.g. to go from level 1 to level 2: need 100 XP; level 2→3: 250 XP, etc.
+const PERK_LEVEL_XP = [100, 250, 500, 1000];
+const MAX_PERK_LEVEL = 5;
+
+// Perk catalog cache (loaded once from DB on first use)
+let _perkCatalogCache = null;
+async function getPerkCatalog() {
+  if (!_perkCatalogCache) {
+    _perkCatalogCache = await prisma.perk.findMany();
+  }
+  return _perkCatalogCache;
+}
+
+// Emerald catalog cache
+let _emeraldCatalogCache = null;
+async function getEmeraldCatalog() {
+  if (!_emeraldCatalogCache) {
+    _emeraldCatalogCache = await prisma.emeraldType.findMany();
+  }
+  return _emeraldCatalogCache;
+}
+
+/** Returns the perkBoostPercent for an emeraldTypeId, or 0 if none. */
+function getEmeraldBoostPct(emeraldTypeId, emeraldCatalog) {
+  if (!emeraldTypeId) return 0;
+  const et = emeraldCatalog.find((e) => e.id === Number(emeraldTypeId));
+  return et ? et.perkBoostPercent : 0;
+}
+
+/** Apply emerald perk boost to a card's perkValue / bonusPerkValue. */
+function applyEmeraldBoost(catalogCard, emeraldTypeId, emeraldCatalog) {
+  const boost = getEmeraldBoostPct(emeraldTypeId, emeraldCatalog);
+  if (!boost) return catalogCard;
+  const mul = 1 + boost / 100;
+  return {
+    ...catalogCard,
+    perkValue: catalogCard.perkValue != null ? Math.round(catalogCard.perkValue * mul) : catalogCard.perkValue,
+    bonusPerkValue: catalogCard.bonusPerkValue != null ? Math.round(catalogCard.bonusPerkValue * mul) : catalogCard.bonusPerkValue,
+  };
+}
+
+/**
+ * Compute final card stats (power & hp) for one card instance,
+ * applying the level multiplier (+15% per level) and perk bonuses.
+ *
+ * @param {object} statEntry  - single gameStats item: { power, hp, level, perks }
+ * @param {object[]} perkCatalog - array of Perk rows from DB
+ * @returns {{ finalPower: number, finalHp: number }}
+ */
+function computeFinalStats(statEntry, perkCatalog) {
+  const level = Number(statEntry.level) || 1;
+  const levelMultiplier = 1 + 0.15 * (level - 1);
+
+  let power = Math.round((statEntry.power || 0) * levelMultiplier);
+  let hp    = Math.round((statEntry.hp    || 0) * levelMultiplier);
+
+  for (const perk of (statEntry.perks || [])) {
+    const def = perkCatalog.find(p => p.type === perk.type);
+    if (!def) continue;
+    const bonus = def.effectPerLevel * (perk.level || 1);
+    switch (def.effectType) {
+      case 'power_percent': power = Math.round(power * (1 + bonus)); break;
+      case 'hp_percent':    hp    = Math.round(hp    * (1 + bonus)); break;
+      case 'power_flat':    power += Math.round((statEntry.power || 0) * bonus); break;
+      case 'hp_flat':       hp    += Math.round((statEntry.hp    || 0) * bonus); break;
+    }
+  }
+
+  return { finalPower: power, finalHp: hp };
+}
+
+/**
+ * Enrich an inventory item's gameStats with computed final stats.
+ * Mutates each entry by adding { finalPower, finalHp }.
+ */
+async function enrichGameStatsWithFinalStats(inventoryItems) {
+  const perkCatalog = await getPerkCatalog();
+  return inventoryItems.map(item => {
+    if (!Array.isArray(item.gameStats)) return item;
+    return {
+      ...item,
+      gameStats: item.gameStats.map(s => ({
+        ...s,
+        ...computeFinalStats(s, perkCatalog),
+      })),
+    };
+  });
+}
+
+// ----------------------------------------
 // ДОСЯГНЕННЯ (ACHIEVEMENTS)
 // ----------------------------------------
 const checkAndAwardCollectionAchievement = async (userId, packId) => {
@@ -871,9 +974,13 @@ app.get('/api/profile', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Compute final stats (level multiplier + perk bonuses) for each inventory item
+    const enrichedInventory = await enrichGameStatsWithFinalStats(user.inventory || []);
+
     // Додаємо підрахунок до профілю, щоб фронтенд його побачив
     const formattedUser = {
       ...user,
+      inventory: enrichedInventory,
       uniqueCardsCount: user._count.inventory,
       achievements: userAchievements,
       defendingInstances: await getDefendingInstances(user.uid),
@@ -1122,7 +1229,7 @@ async function handleCardStatsUpdate(tx, cardId) {
   const card = await tx.cardCatalog.findUnique({ where: { id: cardId } });
   if (!card) return;
   const pack = await tx.packCatalog.findUnique({ where: { id: card.packId } });
-  const isGame = (pack && pack.isGame) || card.isGame;
+  const isGame = ((pack && pack.isGame) || card.isGame) && !card.blockGame;
   if (!isGame) return;
 
   const ranges = await getStatsRangesForCard(tx, card);
@@ -1224,11 +1331,16 @@ app.post(
         ...data,
         frame: data.frame || 'normal',
         isGame: Boolean(data.isGame),
+        blockGame: Boolean(data.blockGame),
         perk: data.perk || null,
         perkValue:
           data.perk && data.perkValue !== '' && data.perkValue !== null && data.perkValue !== undefined
             ? Number(data.perkValue)
             : null,
+        levelingConfig: typeof data.levelingConfig === 'object' ? data.levelingConfig : data.levelingConfig ? JSON.parse(data.levelingConfig) : null,
+        bonusPerkLevel: data.bonusPerkLevel !== '' && data.bonusPerkLevel !== null && data.bonusPerkLevel !== undefined ? Number(data.bonusPerkLevel) : null,
+        bonusPerk: data.bonusPerk || null,
+        bonusPerkValue: data.bonusPerk && data.bonusPerkValue !== '' && data.bonusPerkValue !== null && data.bonusPerkValue !== undefined ? Number(data.bonusPerkValue) : null,
         minPower:
           data.minPower !== '' && data.minPower !== null && data.minPower !== undefined
             ? Number(data.minPower)
@@ -1252,8 +1364,8 @@ app.post(
       if (existing) {
         card = await prisma.cardCatalog.update({ where: { id: cardData.id }, data: cardData });
         const pack = await prisma.packCatalog.findUnique({ where: { id: card.packId } });
-        const effectiveStatusOld = (pack && pack.isGame) || existing.isGame;
-        const effectiveStatusNew = (pack && pack.isGame) || card.isGame;
+        const effectiveStatusOld = ((pack && pack.isGame) || existing.isGame) && !existing.blockGame;
+        const effectiveStatusNew = ((pack && pack.isGame) || card.isGame) && !card.blockGame;
         
         if (effectiveStatusOld !== effectiveStatusNew) {
            await handleIsGameStatusChange(prisma, [card.id], effectiveStatusNew);
@@ -1267,6 +1379,24 @@ app.post(
            if (statsChanged) {
                await handleCardStatsUpdate(prisma, card.id);
            }
+        }
+
+        // AUTO-RETURN MARKET LISTINGS IF CHANGED TO GAME CARD
+        if (effectiveStatusOld === false && effectiveStatusNew === true) {
+          const activeListings = await prisma.marketListing.findMany({
+            where: { cardId: card.id, status: 'active' }
+          });
+          
+          for (const listing of activeListings) {
+            await prisma.$transaction([
+              prisma.inventoryItem.upsert({
+                where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
+                update: { amount: { increment: 1 } },
+                create: { userId: listing.sellerId, cardId: listing.cardId, amount: 1 },
+              }),
+              prisma.marketListing.delete({ where: { id: listing.id } })
+            ]);
+          }
         }
       } else {
         card = await prisma.cardCatalog.create({ data: cardData });
@@ -1321,16 +1451,33 @@ app.post(
       if (existing) {
         pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
         if (existing.isGame !== pack.isGame) {
-           const packCards = await prisma.cardCatalog.findMany({ 
-               where: { packId: pack.id, isGame: false } 
+           const packCards = await prisma.cardCatalog.findMany({
+               where: { packId: pack.id, isGame: false, blockGame: false }
            });
            const cardIds = packCards.map(c => c.id);
            if (cardIds.length > 0) {
               await handleIsGameStatusChange(prisma, cardIds, pack.isGame);
+
+              // AUTO-RETURN MARKET LISTINGS IF CHANGED TO GAME CARD
+              if (existing.isGame === false && pack.isGame === true) {
+                 const activeListings = await prisma.marketListing.findMany({
+                   where: { cardId: { in: cardIds }, status: 'active' }
+                 });
+
+                 for (const listing of activeListings) {
+                   await prisma.$transaction([
+                     prisma.inventoryItem.upsert({
+                       where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
+                       update: { amount: { increment: 1 } },
+                       create: { userId: listing.sellerId, cardId: listing.cardId, amount: 1 },
+                     }),
+                     prisma.marketListing.delete({ where: { id: listing.id } })
+                   ]);
+                 }
+              }
            }
         }
-      } else {
-        pack = await prisma.packCatalog.create({ data: packData });
+      } else {        pack = await prisma.packCatalog.create({ data: packData });
       }
       res.json(pack);
     } catch (error) {
@@ -1416,9 +1563,9 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         max = 0;
 
       // Card logic overriding
-      if (cardObj && cardObj.minPower !== null && cardObj.maxPower !== null) {
+      if (cardObj && cardObj.minPower !== null) {
         min = cardObj.minPower;
-        max = cardObj.maxPower;
+        max = cardObj.maxPower !== null ? cardObj.maxPower : cardObj.minPower;
       } else {
         let ranges;
         if (typeof pack.statsRanges === 'string') {
@@ -1433,12 +1580,10 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           ranges &&
           ranges[rarity] &&
           ranges[rarity].minPower !== undefined &&
-          ranges[rarity].maxPower !== undefined &&
-          ranges[rarity].minPower !== '' &&
-          ranges[rarity].maxPower !== ''
+          ranges[rarity].minPower !== ''
         ) {
           min = Number(ranges[rarity].minPower);
-          max = Number(ranges[rarity].maxPower);
+          max = (ranges[rarity].maxPower !== undefined && ranges[rarity].maxPower !== '') ? Number(ranges[rarity].maxPower) : min;
         } else {
           switch (rarity) {
             case 'Унікальна':
@@ -1474,9 +1619,9 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
         max = 0;
 
       // Card logic overriding
-      if (cardObj && cardObj.minHp !== null && cardObj.maxHp !== null) {
+      if (cardObj && cardObj.minHp !== null) {
         min = cardObj.minHp;
-        max = cardObj.maxHp;
+        max = cardObj.maxHp !== null ? cardObj.maxHp : cardObj.minHp;
       } else {
         let ranges;
         if (typeof pack.statsRanges === 'string') {
@@ -1491,12 +1636,10 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
           ranges &&
           ranges[rarity] &&
           ranges[rarity].minHp !== undefined &&
-          ranges[rarity].maxHp !== undefined &&
-          ranges[rarity].minHp !== '' &&
-          ranges[rarity].maxHp !== ''
+          ranges[rarity].minHp !== ''
         ) {
           min = Number(ranges[rarity].minHp);
-          max = Number(ranges[rarity].maxHp);
+          max = (ranges[rarity].maxHp !== undefined && ranges[rarity].maxHp !== '') ? Number(ranges[rarity].maxHp) : min;
         } else {
           switch (rarity) {
             case 'Унікальна':
@@ -1580,7 +1723,7 @@ app.post('/api/game/open-pack', authenticate, async (req, res) => {
       }
 
       let generatedStats = null;
-      if (pack.isGame || newCard.isGame) {
+      if ((pack.isGame || newCard.isGame) && !newCard.blockGame) {
         const power = generatePower(newCard.rarity, newCard);
         const hp = generateHp(newCard.rarity, newCard);
         generatedStats = { power, hp };
@@ -1709,10 +1852,12 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
     const invItem = await prisma.inventoryItem.findUnique({
       where: { userId_cardId: { userId: user.uid, cardId } },
+      include: { card: true }
     });
 
     if (!invItem || invItem.amount < 1)
       return res.status(400).json({ error: 'У вас немає цієї картки!' });
+      
     if (price < 1 || !Number.isInteger(price))
       return res.status(400).json({ error: 'Невірна ціна!' });
 
@@ -1859,10 +2004,12 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
     if (buyer.coins < listing.price) return res.status(400).json({ error: 'Недостатньо монет!' });
 
     await prisma.$transaction(async (tx) => {
-      // Покупець: -монети, +картка, +totalCards
+      const qty = listing.isDuplicate ? listing.duplicateAmount : 1;
+
+      // Покупець: -монети, +картка(и), +totalCards
       await tx.user.update({
         where: { uid: buyer.uid },
-        data: { coins: { decrement: listing.price }, totalCards: { increment: 1 } },
+        data: { coins: { decrement: listing.price }, totalCards: { increment: qty } },
       });
 
       const buyerInv = await tx.inventoryItem.findUnique({
@@ -1876,7 +2023,15 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
             : buyerInv.gameStats;
       }
 
-      if (listing.power !== null) {
+      if (listing.isDuplicate) {
+        // Add qty base-stat instances from catalog
+        const catalogCard = await tx.cardCatalog.findUnique({ where: { id: listing.cardId } });
+        const basePower = catalogCard?.minPower || 10;
+        const baseHp = catalogCard?.minHp || 50;
+        for (let i = 0; i < qty; i++) {
+          currentStats.push({ power: basePower, hp: baseHp, maxHp: baseHp, level: 1 });
+        }
+      } else if (listing.power !== null) {
         if (listing.hp !== null) {
           currentStats.push({ power: listing.power, hp: listing.hp });
         } else {
@@ -1886,8 +2041,8 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
 
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: buyer.uid, cardId: listing.cardId } },
-        update: { amount: { increment: 1 }, gameStats: currentStats },
-        create: { userId: buyer.uid, cardId: listing.cardId, amount: 1, gameStats: currentStats },
+        update: { amount: { increment: qty }, gameStats: currentStats },
+        create: { userId: buyer.uid, cardId: listing.cardId, amount: qty, gameStats: currentStats },
       });
       // Продавець: +монети
       await tx.user.update({
@@ -1940,6 +2095,121 @@ app.post('/api/game/market/buy', authenticate, async (req, res) => {
   }
 });
 
+// 3b. Виставити дублікати ігрової картки (без параметрів) на ринок
+app.post('/api/game/market/list-duplicates', authenticate, async (req, res) => {
+  const { cardId, amount, priceTotal } = req.body;
+  const dupAmount = Number(amount);
+  const totalPrice = Number(priceTotal);
+  if (!cardId || !Number.isInteger(dupAmount) || dupAmount < 1 || !Number.isInteger(totalPrice) || totalPrice < 1) {
+    return res.status(400).json({ error: 'Невірні параметри.' });
+  }
+  try {
+    const [user, invItem] = await Promise.all([
+      prisma.user.findUnique({ where: { uid: req.user.uid } }),
+      prisma.inventoryItem.findUnique({
+        where: { userId_cardId: { userId: req.user.uid, cardId } },
+        include: { card: true },
+      }),
+    ]);
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+    if (!invItem) return res.status(400).json({ error: 'Картку не знайдено в інвентарі.' });
+    if (!invItem.card.isGame || invItem.card.blockGame) {
+      return res.status(400).json({ error: 'Тільки ігрові картки можна продавати як дублікати.' });
+    }
+
+    let statsArr = typeof invItem.gameStats === 'string'
+      ? JSON.parse(invItem.gameStats)
+      : invItem.gameStats || [];
+
+    const defInstances = await getDefendingInstances(user.uid);
+
+    // Collect indices available for sale (not safe, not defending)
+    const available = [];
+    for (let i = 0; i < statsArr.length; i++) {
+      const s = statsArr[i];
+      if (s && s.inSafe) continue;
+      if (defInstances.some((inst) => inst.cardId === cardId && inst.statsIndex === i)) continue;
+      available.push(i);
+    }
+
+    // Must keep at least 1
+    if (available.length <= dupAmount) {
+      return res.status(400).json({
+        error: `Недостатньо дублікатів. Доступно для продажу: ${Math.max(0, available.length - 1)} (потрібно залишити 1).`,
+      });
+    }
+
+    // Sort available by level ASC, power ASC — take the weakest/lowest-level ones
+    available.sort((a, b) => {
+      const sa = statsArr[a], sb = statsArr[b];
+      const lvA = (typeof sa === 'object' ? sa.level : 1) || 1;
+      const lvB = (typeof sb === 'object' ? sb.level : 1) || 1;
+      if (lvA !== lvB) return lvA - lvB;
+      const pwA = typeof sa === 'object' ? (sa.power || 0) : Number(sa);
+      const pwB = typeof sb === 'object' ? (sb.power || 0) : Number(sb);
+      return pwA - pwB;
+    });
+
+    const toRemove = available.slice(0, dupAmount).sort((a, b) => b - a); // high index first for safe splice
+
+    // Build arena index map BEFORE splicing
+    const toRemoveSet = new Set(toRemove);
+    const arenaMap = new Map();
+    for (let i = 0; i < statsArr.length; i++) {
+      if (toRemoveSet.has(i)) {
+        arenaMap.set(i, -1);
+      } else {
+        const offset = toRemove.filter((idx) => idx < i).length;
+        arenaMap.set(i, i - offset);
+      }
+    }
+
+    for (const idx of toRemove) {
+      statsArr.splice(idx, 1);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await syncArenaIndices(tx, user.uid, cardId, arenaMap);
+
+      if (invItem.amount - dupAmount <= 0) {
+        await tx.inventoryItem.delete({ where: { userId_cardId: { userId: user.uid, cardId } } });
+        await sanitizeShowcases(tx, user.uid, cardId, 0);
+      } else {
+        await tx.inventoryItem.update({
+          where: { userId_cardId: { userId: user.uid, cardId } },
+          data: { amount: { decrement: dupAmount }, gameStats: statsArr },
+        });
+        await sanitizeShowcases(tx, user.uid, cardId, invItem.amount - dupAmount);
+      }
+      await tx.user.update({
+        where: { uid: user.uid },
+        data: { totalCards: { decrement: dupAmount } },
+      });
+      await tx.marketListing.create({
+        data: {
+          price: totalPrice,
+          sellerId: user.uid,
+          cardId,
+          status: 'active',
+          isDuplicate: true,
+          duplicateAmount: dupAmount,
+          power: null,
+          hp: null,
+        },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
+    const updatedDefending = await getDefendingInstances(req.user.uid);
+    res.json({ success: true, profile: { ...updatedUser, defendingInstances: updatedDefending } });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Помилка виставлення дублікатів.' });
+  }
+});
+
 // 4. Зняти лот з продажу
 app.post('/api/game/market/cancel', authenticate, async (req, res) => {
   const { listingId } = req.body;
@@ -1953,10 +2223,11 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'У вас немає прав зняти цей лот.' });
 
     await prisma.$transaction(async (tx) => {
+      const qty = listing.isDuplicate ? listing.duplicateAmount : 1;
       await tx.marketListing.delete({ where: { id: listingId } });
       await tx.user.update({
         where: { uid: listing.sellerId },
-        data: { totalCards: { increment: 1 } },
+        data: { totalCards: { increment: qty } },
       });
 
       const sellerInv = await tx.inventoryItem.findUnique({
@@ -1970,7 +2241,15 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
             : sellerInv.gameStats;
       }
 
-      if (listing.power !== null) {
+      if (listing.isDuplicate) {
+        // Return qty base-stat instances
+        const catalogCard = await tx.cardCatalog.findUnique({ where: { id: listing.cardId } });
+        const basePower = catalogCard?.minPower || 10;
+        const baseHp = catalogCard?.minHp || 50;
+        for (let i = 0; i < qty; i++) {
+          currentStats.push({ power: basePower, hp: baseHp, maxHp: baseHp, level: 1 });
+        }
+      } else if (listing.power !== null) {
         if (listing.hp !== null) {
           currentStats.push({ power: listing.power, hp: listing.hp });
         } else {
@@ -1980,11 +2259,11 @@ app.post('/api/game/market/cancel', authenticate, async (req, res) => {
 
       await tx.inventoryItem.upsert({
         where: { userId_cardId: { userId: listing.sellerId, cardId: listing.cardId } },
-        update: { amount: { increment: 1 }, gameStats: currentStats },
+        update: { amount: { increment: qty }, gameStats: currentStats },
         create: {
           userId: listing.sellerId,
           cardId: listing.cardId,
-          amount: 1,
+          amount: qty,
           gameStats: currentStats,
         },
       });
@@ -2496,6 +2775,14 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
     const pScore = getHandScore(playerHand);
     const dScore = getHandScore(dealerHand);
 
+    // Перевірка миттєвого блекджеку у гравця
+    if (pScore === 21) {
+      playerState.gameState = 'game_over';
+      playerState.gameResult = 'blackjack';
+      // Виплата як звичайна перемога (2x ставки), щоб бути консистентними з stand()
+      playerState.earnedCoins = parsedBet * 2;
+    }
+
     let updatedUser;
 
     // We use updateMany for atomic operation. Prevent race condition by ensuring user.blackjackState is null exactly when we start the game,
@@ -2506,10 +2793,19 @@ app.post('/api/game/blackjack/start', authenticate, async (req, res) => {
         blackjackState: { equals: Prisma.AnyNull }, // Only start if no active game
         coins: { gte: parsedBet }, // Only start if they have enough coins at this exact moment
       },
-      data: {
-        coins: { decrement: pScore === 21 ? parsedBet - playerState.earnedCoins : parsedBet },
-        blackjackState: pScore === 21 ? Prisma.DbNull : playerState,
-      },
+      data: pScore === 21
+        ? {
+            // Спочатку списуємо ставку, потім одразу нараховуємо виграш
+            coins: {
+              decrement: parsedBet,
+              increment: playerState.earnedCoins,
+            },
+            blackjackState: Prisma.DbNull, // гра миттєво завершена
+          }
+        : {
+            coins: { decrement: parsedBet },
+            blackjackState: playerState,
+          },
     });
 
     if (startResult.count === 0) {
@@ -2873,7 +3169,7 @@ app.get('/api/game/arena/points', authenticate, async (req, res) => {
 });
 
 app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) => {
-  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, battleMode, chipDamageChance } = req.body;
+  const { x, y, name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, battleMode, chipDamageChance, cardSwapCost } = req.body;
   try {
     const newPoint = await prisma.arenaPoint.create({
       data: {
@@ -2890,6 +3186,7 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
         neighborIds: Array.isArray(neighborIds) ? neighborIds : [],
         battleMode: battleMode || 'FULL',
         chipDamageChance: chipDamageChance ? Number(chipDamageChance) : 0,
+        cardSwapCost: cardSwapCost ? Number(cardSwapCost) : 0,
       },
     });
     res.json({ success: true, point: newPoint });
@@ -2900,7 +3197,7 @@ app.post('/api/admin/arena/points', authenticate, checkAdmin, async (req, res) =
 
 app.put('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, ownerId, ownerNickname, defendingCards, capturedAt, crystalsLastClaimedAt, battleMode, chipDamageChance } = req.body;
+  const { name, icon, color, entryFee, cooldownMinutes, crystalRatePerHour, areaPolygon, isLandingZone, neighborIds, ownerId, ownerNickname, defendingCards, capturedAt, crystalsLastClaimedAt, battleMode, chipDamageChance, cardSwapCost } = req.body;
   try {
     const updateData = {
       name: name || 'Точка Арени',
@@ -2916,6 +3213,7 @@ app.put('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, res
 
     if (battleMode !== undefined) updateData.battleMode = battleMode;
     if (chipDamageChance !== undefined) updateData.chipDamageChance = Number(chipDamageChance);
+    if (cardSwapCost !== undefined) updateData.cardSwapCost = Number(cardSwapCost);
 
     if (ownerId !== undefined) updateData.ownerId = ownerId;
     if (ownerNickname !== undefined) updateData.ownerNickname = ownerNickname;
@@ -2943,12 +3241,135 @@ app.delete('/api/admin/arena/points/:id', authenticate, checkAdmin, async (req, 
   }
 });
 
+// Заміна захисних карток власника на захопленій точці
+app.post('/api/game/arena/points/:id/swap-cards', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { cards } = req.body;
+
+  if (!Array.isArray(cards) || cards.length !== 4) {
+    return res.status(400).json({ error: 'Необхідно обрати рівно 4 карти!' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: true },
+    });
+    if (!user) return res.status(404).json({ error: 'Користувача не знайдено.' });
+
+    const point = await prisma.arenaPoint.findUnique({ where: { id } });
+    if (!point) return res.status(404).json({ error: 'Точку не знайдено.' });
+
+    if (point.ownerId !== user.uid) {
+      return res.status(403).json({ error: 'Ви не є власником цієї точки!' });
+    }
+
+    const swapCost = point.cardSwapCost || 0;
+    if (swapCost > 0 && user.coins < swapCost) {
+      return res.status(400).json({ error: `Недостатньо монет. Потрібно ${swapCost}.` });
+    }
+
+    const cardIds = [...new Set(cards.map((c) => c.id))];
+    const catalogCards = await prisma.cardCatalog.findMany({ where: { id: { in: cardIds } } });
+
+    const RARITY_MIN_POWER_SWAP = { Унікальна: 100, Легендарна: 50, Епічна: 25, Рідкісна: 10, Звичайна: 5 };
+    const validatedCards = [];
+    const usedIndicesByCard = {};
+
+    for (const c of cards) {
+      const invItem = user.inventory.find((item) => item.cardId === c.id);
+      if (!invItem) return res.status(400).json({ error: 'Картку не знайдено в інвентарі.' });
+
+      const catalogCard = catalogCards.find((cat) => cat.id === c.id);
+      if (!catalogCard) return res.status(400).json({ error: 'Недійсна картка.' });
+
+      let currentStats = [];
+      if (typeof invItem.gameStats === 'string') {
+        try { currentStats = JSON.parse(invItem.gameStats); } catch (e) {}
+      } else if (Array.isArray(invItem.gameStats)) {
+        currentStats = invItem.gameStats;
+      }
+
+      const minPower = RARITY_MIN_POWER_SWAP[catalogCard.rarity] || 5;
+      const minHp = minPower * 2;
+
+      const effectiveStats = currentStats.map((s) => ({
+        power: s.power !== undefined && s.power !== null ? Number(s.power) : minPower,
+        hp: s.hp !== undefined && s.hp !== null ? Number(s.hp) : minHp,
+        maxHp: s.maxHp !== undefined && s.maxHp !== null ? Number(s.maxHp) : (s.hp !== undefined && s.hp !== null ? Number(s.hp) : minHp),
+      }));
+      while (effectiveStats.length < invItem.amount) effectiveStats.push({ power: minPower, hp: minHp });
+      effectiveStats.length = invItem.amount;
+
+      const idx = c.statsIndex;
+      if (idx === undefined || idx === null || idx < 0 || idx >= effectiveStats.length) {
+        return res.status(400).json({ error: `Недійсний індекс картки "${catalogCard.name}".` });
+      }
+
+      if (!usedIndicesByCard[c.id]) usedIndicesByCard[c.id] = new Set();
+      if (usedIndicesByCard[c.id].has(idx)) {
+        return res.status(400).json({ error: 'Не можна використовувати одну картку двічі.' });
+      }
+      usedIndicesByCard[c.id].add(idx);
+
+      validatedCards.push({
+        ...catalogCard,
+        id: c.id,
+        power: effectiveStats[idx].power,
+        hp: effectiveStats[idx].hp,
+        maxHp: effectiveStats[idx].maxHp || effectiveStats[idx].hp,
+        currentHp: effectiveStats[idx].hp,
+        statsIndex: idx,
+      });
+    }
+
+    // Перевірка: картки не захищають ІНШУ точку (поточна точка дозволена)
+    const currentDefenderKeys = new Set(
+      (point.defendingCards || []).map((c) => `${c.id}:${c.statsIndex}`)
+    );
+    const allDefendingInstances = await getDefendingInstances(user.uid);
+    for (const vc of validatedCards) {
+      const key = `${vc.id}:${vc.statsIndex}`;
+      const isDefendingElsewhere = allDefendingInstances.some(
+        (inst) => inst.cardId === vc.id && inst.statsIndex === vc.statsIndex
+      ) && !currentDefenderKeys.has(key);
+      if (isDefendingElsewhere) {
+        return res.status(400).json({ error: `Карта "${vc.name}" вже захищає іншу точку Арени!` });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (swapCost > 0) {
+        await tx.user.update({ where: { uid: user.uid }, data: { coins: { decrement: swapCost } } });
+      }
+      await tx.arenaPoint.update({
+        where: { id },
+        data: { defendingCards: validatedCards.map((c) => ({ ...c, hp: c.currentHp })) },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({ where: { uid: user.uid }, include: { inventory: true } });
+    const updatedPoint = await prisma.arenaPoint.findUnique({ where: { id } });
+    const updatedDefending = await getDefendingInstances(user.uid);
+
+    return res.json({
+      success: true,
+      message: 'Захисники успішно замінені!',
+      profile: { ...updatedUser, defendingInstances: updatedDefending },
+      point: updatedPoint,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка заміни карток.' });
+  }
+});
+
 app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { cards } = req.body; // Expect an array of exactly 5 cards
+  const { cards } = req.body; // Expect an array of exactly 4 cards
 
-  if (!Array.isArray(cards) || cards.length !== 5) {
-    return res.status(400).json({ error: 'Для захоплення точки необхідно обрати рівно 5 карт!' });
+  if (!Array.isArray(cards) || cards.length !== 4) {
+    return res.status(400).json({ error: 'Для захоплення точки необхідно обрати рівно 4 карти!' });
   }
 
   const pointMutex = getArenaMutex(id);
@@ -2983,6 +3404,10 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
 
     const cardIds = [...new Set(cards.map((c) => c.id))];
     const catalogCards = await prisma.cardCatalog.findMany({ where: { id: { in: cardIds } } });
+
+    // Load perk catalog once — used by computeFinalStats for feeding-boosted stats
+    const perkCatalogForCapture = await getPerkCatalog();
+    const emeraldCatalogForCapture = await getEmeraldCatalog();
 
     const RARITY_MIN_POWER = {
       Унікальна: 100,
@@ -3024,10 +3449,11 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
             : s.hp !== undefined && s.hp !== null
               ? Number(s.hp)
               : minHp,
+        perks: Array.isArray(s.perks) ? s.perks : [],
       }));
 
       while (effectiveStats.length < invItem.amount) {
-        effectiveStats.push({ power: minPower, hp: minHp });
+        effectiveStats.push({ power: minPower, hp: minHp, perks: [] });
       }
 
       // Truncate to actual amount (gameStats may have stale entries from sold/traded copies)
@@ -3046,13 +3472,19 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
       }
       usedIndicesByCard[c.id].add(idx);
 
+      // Apply feeding-system perk bonuses (finalPower / finalHp)
+      const { finalPower, finalHp } = computeFinalStats(effectiveStats[idx], perkCatalogForCapture);
+      // Apply emerald perk boost to perkValue / bonusPerkValue
+      const captureEmeraldId = currentStats[idx]?.emerald;
+      const boostedCatalogCard = applyEmeraldBoost(catalogCard, captureEmeraldId, emeraldCatalogForCapture);
+
       validatedCards.push({
-        ...catalogCard,
+        ...boostedCatalogCard,
         id: c.id,
-        power: effectiveStats[idx].power,
-        hp: effectiveStats[idx].hp,
-        maxHp: effectiveStats[idx].maxHp || effectiveStats[idx].hp,
-        currentHp: effectiveStats[idx].hp,
+        power: finalPower,
+        hp: finalHp,
+        maxHp: finalHp,
+        currentHp: finalHp,
         statsIndex: idx,
       });
     }
@@ -3156,9 +3588,9 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
   const { id } = req.params;
   const { cards } = req.body;
   console.log('[BATTLE START REQUEST]', { pointId: id, uid: req.user.uid, cardsCount: cards ? cards.length : 'undefined', cardsIsArray: Array.isArray(cards) });
-  if (!cards || !Array.isArray(cards) || cards.length !== 5) {
-    console.log('[BATTLE START ERROR] Forcing 400: Для бою необхідно обрати рівно 5 карт!');
-    return res.status(400).json({ error: 'Для бою необхідно обрати рівно 5 карт!' });
+  if (!cards || !Array.isArray(cards) || cards.length !== 4) {
+    console.log('[BATTLE START ERROR] Forcing 400: Для бою необхідно обрати рівно 4 карти!');
+    return res.status(400).json({ error: 'Для бою необхідно обрати рівно 4 карти!' });
   }
 
   const pointMutex = getArenaMutex(id);
@@ -3193,6 +3625,10 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
 
     const cardIds = [...new Set(cards.map((c) => c.id))];
     const catalogCards = await prisma.cardCatalog.findMany({ where: { id: { in: cardIds } } });
+
+    // Load perk catalog for feeding-system stat bonuses
+    const perkCatalogForBattle = await getPerkCatalog();
+    const emeraldCatalogForBattle = await getEmeraldCatalog();
 
     const RARITY_MIN_POWER = {
       Унікальна: 100,
@@ -3239,10 +3675,12 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
             : s.hp !== undefined && s.hp !== null
               ? Number(s.hp)
               : minHp,
+        level: Number(s.level) || 1,
+        perks: Array.isArray(s.perks) ? s.perks : [],
       }));
 
       while (effectiveStats.length < invItem.amount) {
-        effectiveStats.push({ power: minPower, hp: minHp });
+        effectiveStats.push({ power: minPower, hp: minHp, level: 1, perks: [] });
       }
 
       // Truncate to actual amount (gameStats may have stale entries from sold/traded copies)
@@ -3263,14 +3701,25 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       }
       usedIndicesByCard[c.id].add(idx);
 
+      const cardLevel = effectiveStats[idx].level || 1;
+      const cardBonusPerk = cardLevel >= (catalogCard.bonusPerkLevel || 999) ? catalogCard.bonusPerk : null;
+
+      // Apply feeding-system perk bonuses (level multiplier + instance perk bonuses)
+      const { finalPower, finalHp } = computeFinalStats(effectiveStats[idx], perkCatalogForBattle);
+      // Apply emerald perk boost to perkValue / bonusPerkValue
+      const battleEmeraldId = currentStats[idx]?.emerald;
+      const boostedCatalogCard = applyEmeraldBoost(catalogCard, battleEmeraldId, emeraldCatalogForBattle);
+
       validatedCards.push({
-        ...catalogCard,
+        ...boostedCatalogCard,
         id: c.id,
-        power: effectiveStats[idx].power,
-        hp: effectiveStats[idx].hp,
-        maxHp: effectiveStats[idx].maxHp || effectiveStats[idx].hp,
-        currentHp: effectiveStats[idx].hp,
+        power: finalPower,
+        hp: finalHp,
+        maxHp: finalHp,
+        currentHp: finalHp,
         statsIndex: idx,
+        level: cardLevel,
+        bonusPerk: cardBonusPerk,
       });
     }
 
@@ -3337,40 +3786,92 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     }
 
     // Симуляція бою (Perk-aware)
-    const attackerCards = validatedCards;
+    const attackerCards = validatedCards.map((c) => ({
+      id: c.id,
+      name: c.name,
+      image: c.image,
+      rarity: c.rarity,
+      power: c.power,
+      hp: c.hp,
+      maxHp: c.maxHp || c.hp,
+      currentHp: c.currentHp || c.hp,
+      perk: c.perk,
+      perkValue: c.perkValue,
+      bonusPerk: c.bonusPerk,
+      bonusPerkValue: c.bonusPerkValue,
+      level: c.level || 1,
+      statsIndex: c.statsIndex,
+    }));
+
     const defenderCards = (point.defendingCards || []).map((c) => {
-      const maxHp = (c.maxHp !== undefined && c.maxHp !== null && c.maxHp > 0)
-        ? c.maxHp
-        : (c.hp !== undefined && c.hp !== null && c.hp > 0)
-          ? c.hp
-          : c.power || 1;
-      const currentHp = (c.hp !== undefined && c.hp !== null && c.hp > 0)
-        ? c.hp
-        : maxHp;
-      return { ...c, currentHp, maxHp };
+      const level = c.level || 1;
+      const bonusPerk = level >= (c.bonusPerkLevel || 999) ? c.bonusPerk : null;
+      return {
+        id: c.id,
+        name: c.name,
+        image: c.image,
+        rarity: c.rarity,
+        power: c.power || 0,
+        hp: c.hp || 50,
+        maxHp: c.maxHp || c.hp || 50,
+        currentHp: c.currentHp || c.hp || 50,
+        perk: c.perk,
+        perkValue: c.perkValue,
+        bonusPerk,
+        bonusPerkValue: c.bonusPerkValue,
+        level,
+        statsIndex: c.statsIndex,
+      };
     });
 
-    const initialDefenderCards = defenderCards.map(c => ({ ...c }));
+    // Snapshot before battle simulation (for client animation)
+    const initialDefenderCards = defenderCards.map((c) => ({ ...c }));
 
     const battleLog = [];
     const isTeamDead = (team) => team.every((c) => c.currentHp <= 0);
 
-    if (isTeamDead(attackerCards)) {
+    if (attackerCards.some(c => c.currentHp <= 0)) {
       return res.status(400).json({ error: "Ваші картки не мають здоров'я (0 ХП) для бою!" });
     }
     if (isTeamDead(defenderCards)) {
       battleLog.push({ note: 'Захисники не мали HP — автоматична перемога атакуючого.' });
     }
 
+    // Helper to check if a card has a perk (either base or bonus)
+    const hasPerk = (card, perkName) => {
+      return card.perk === perkName || card.bonusPerk === perkName;
+    };
+    
+    const getPerkValue = (card, perkName) => {
+      if (card.bonusPerk === perkName) return card.bonusPerkValue || 25;
+      if (card.perk === perkName) return card.perkValue || 25;
+      return 0;
+    };
+
     // Perk state tracking
     const lastStandUsed = { attacker: new Array(attackerCards.length).fill(false), defender: new Array(defenderCards.length).fill(false) };
-    const poisonStacks = { attacker: new Array(attackerCards.length).fill(null), defender: new Array(defenderCards.length).fill(null) };
+    const poisonStacks  = { attacker: new Array(attackerCards.length).fill(null),  defender: new Array(defenderCards.length).fill(null) };
+    const burnStacks    = { attacker: new Array(attackerCards.length).fill(null),  defender: new Array(defenderCards.length).fill(null) };
+    // Shield pool per card (flat HP-absorb, recharged each round for cards with 'shield' perk)
+    const shieldAmounts = { attacker: new Array(attackerCards.length).fill(0), defender: new Array(defenderCards.length).fill(0) };
+
+    // Initialise shields for cards that have the perk
+    const initShields = (side, team) => {
+      for (let i = 0; i < team.length; i++) {
+        if (hasPerk(team[i], 'shield')) {
+          const sv = getPerkValue(team[i], 'shield') || 15;
+          shieldAmounts[side][i] = Math.max(1, Math.floor((team[i].maxHp || team[i].hp || 1) * sv / 100));
+        }
+      }
+    };
+    initShields('attacker', attackerCards);
+    initShields('defender', defenderCards);
 
     // Target selection with Taunt priority
     const getTargetIndex = (attackerIndex, defenders) => {
       const taunters = [];
       for (let i = 0; i < defenders.length; i++) {
-        if (defenders[i].currentHp > 0 && defenders[i].perk === 'taunt') taunters.push(i);
+        if (defenders[i].currentHp > 0 && hasPerk(defenders[i], 'taunt')) taunters.push(i);
       }
       if (taunters.length > 0) {
         let best = taunters[0];
@@ -3404,19 +3905,51 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       return idx;
     };
 
-    // Poison ticks at start of turn
-    const applyPoisonTicks = (side, team) => {
+    // Status ticks (poison + burn) and shield regeneration at start of each round
+    const applyStatusTicks = (side, team) => {
+      const oppSide = side === 'attacker' ? 'defender' : 'attacker';
+
+      // Regenerate shields for living cards that have the shield perk (50% of max per round)
+      for (let i = 0; i < team.length; i++) {
+        if (team[i].currentHp > 0 && hasPerk(team[i], 'shield')) {
+          const sv = getPerkValue(team[i], 'shield') || 15;
+          const maxShield = Math.max(1, Math.floor((team[i].maxHp || team[i].hp || 1) * sv / 100));
+          const regenAmt = Math.max(1, Math.floor(maxShield * 0.5));
+          shieldAmounts[side][i] = Math.min(maxShield, shieldAmounts[side][i] + regenAmt);
+          if (regenAmt > 0) {
+            battleLog.push({ attackerSide: oppSide, attackerIndex: -1, targetIndex: i, damage: 0, isTargetDead: false, events: ['shield_regen'], msg: `«${team[i].name}» [Щит] частково відновив захист (+${regenAmt} HP)` });
+          }
+        }
+      }
+
+      // Poison ticks
       for (let i = 0; i < team.length; i++) {
         const ps = poisonStacks[side][i];
         if (ps && ps.turnsLeft > 0 && team[i].currentHp > 0) {
           team[i].currentHp -= ps.damage;
           ps.turnsLeft--;
           if (ps.turnsLeft <= 0) poisonStacks[side][i] = null;
-          if (team[i].currentHp <= 0 && team[i].perk === 'laststand' && !lastStandUsed[side][i]) {
+          if (team[i].currentHp <= 0 && hasPerk(team[i], 'laststand') && !lastStandUsed[side][i]) {
             team[i].currentHp = 1; lastStandUsed[side][i] = true;
-            battleLog.push({ attackerSide: side === 'attacker' ? 'defender' : 'attacker', attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: false, events: ['poison_tick', 'laststand'] });
+            battleLog.push({ attackerSide: oppSide, attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: false, events: ['poison_tick', 'laststand'], msg: `«${team[i].name}» отримав ${ps.damage} від Отрути та вижив з 1HP!` });
           } else {
-            battleLog.push({ attackerSide: side === 'attacker' ? 'defender' : 'attacker', attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: team[i].currentHp <= 0, events: ['poison_tick'] });
+            battleLog.push({ attackerSide: oppSide, attackerIndex: -1, targetIndex: i, damage: ps.damage, isTargetDead: team[i].currentHp <= 0, events: ['poison_tick'], msg: `«${team[i].name}» отримав ${ps.damage} від Отрути` });
+          }
+        }
+      }
+
+      // Burn ticks — deals % maxHp fire damage
+      for (let i = 0; i < team.length; i++) {
+        const bs = burnStacks[side][i];
+        if (bs && bs.turnsLeft > 0 && team[i].currentHp > 0) {
+          team[i].currentHp -= bs.damage;
+          bs.turnsLeft--;
+          if (bs.turnsLeft <= 0) burnStacks[side][i] = null;
+          if (team[i].currentHp <= 0 && hasPerk(team[i], 'laststand') && !lastStandUsed[side][i]) {
+            team[i].currentHp = 1; lastStandUsed[side][i] = true;
+            battleLog.push({ attackerSide: oppSide, attackerIndex: -1, targetIndex: i, damage: bs.damage, isTargetDead: false, events: ['burn_tick', 'laststand'], msg: `🔥 «${team[i].name}» горить! ${bs.damage} вогняної шкоди — та вижив з 1HP!` });
+          } else {
+            battleLog.push({ attackerSide: oppSide, attackerIndex: -1, targetIndex: i, damage: bs.damage, isTargetDead: team[i].currentHp <= 0, events: ['burn_tick'], msg: `🔥 «${team[i].name}» горить! ${bs.damage} вогняної шкоди` });
           }
         }
       }
@@ -3429,14 +3962,16 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       const dSide = aSide === 'attacker' ? 'defender' : 'attacker';
 
       // Healer perk
-      if (atk.perk === 'healer') {
+      if (hasPerk(atk, 'healer')) {
         const hIdx = findHealTarget(aTeam);
         if (hIdx !== -1) {
-          const hAmt = Math.max(1, Math.floor(atk.power * ((atk.perkValue || 30) / 100)));
+          const hVal = getPerkValue(atk, 'healer') || 30;
+          const hAmt = Math.max(1, Math.floor(atk.power * (hVal / 100)));
           const mxHp = aTeam[hIdx].maxHp || aTeam[hIdx].hp || 1;
           const old = aTeam[hIdx].currentHp;
           aTeam[hIdx].currentHp = Math.min(mxHp, aTeam[hIdx].currentHp + hAmt);
-          battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: hIdx, damage: 0, isTargetDead: false, events: ['healer'], healAmount: aTeam[hIdx].currentHp - old, healTargetSide: aSide });
+          const healed = aTeam[hIdx].currentHp - old;
+          battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: hIdx, damage: 0, isTargetDead: false, events: ['healer'], healAmount: healed, healTargetSide: aSide, msg: `«${atk.name}» [Хілер] зцілив «${aTeam[hIdx].name}» на ${healed} HP` });
           return true;
         }
       }
@@ -3450,56 +3985,111 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       let dmg = Math.max(1, Math.floor(base - rng + Math.random() * (rng * 2)));
 
       // Dodge
-      if (tgt.perk === 'dodge' && Math.random() * 100 < (tgt.perkValue || 20)) {
-        battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: 0, isTargetDead: false, events: ['dodge'] });
+      const doVal = getPerkValue(tgt, 'dodge') || 20;
+      if (hasPerk(tgt, 'dodge') && Math.random() * 100 < doVal) {
+        battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: 0, isTargetDead: false, events: ['dodge'], msg: `«${atk.name}» атакував «${tgt.name}», але промахнувся!` });
         return true;
       }
-      // Crit
-      if (atk.perk === 'crit' && Math.random() * 100 < (atk.perkValue || 20)) { dmg *= 2; ev.push('crit'); }
-      // Armor
-      if (tgt.perk === 'armor') { dmg = Math.max(1, dmg - Math.floor(dmg * ((tgt.perkValue || 20) / 100))); ev.push('armor'); }
 
+      // Crit
+      const crVal = getPerkValue(atk, 'crit') || 20;
+      if (hasPerk(atk, 'crit') && Math.random() * 100 < crVal) { dmg *= 2; ev.push('crit'); }
+
+      // Armor (% damage reduction)
+      let armorBlocked = 0;
+      if (hasPerk(tgt, 'armor')) {
+        const arVal = getPerkValue(tgt, 'armor') || 20;
+        armorBlocked = Math.max(0, Math.floor(dmg * (arVal / 100)));
+        dmg = Math.max(1, dmg - armorBlocked);
+        ev.push('armor');
+      }
+
+      // Shield (flat absorb pool, recharged each round)
+      let shieldBlocked = 0;
+      if (shieldAmounts[dSide][tIdx] > 0) {
+        shieldBlocked = Math.min(shieldAmounts[dSide][tIdx], dmg);
+        dmg = Math.max(0, dmg - shieldBlocked);
+        shieldAmounts[dSide][tIdx] -= shieldBlocked;
+        if (shieldBlocked > 0) ev.push('shield_block');
+      }
+
+      // Apply damage to HP (may be 0 if fully absorbed)
       tgt.currentHp -= dmg;
 
       // Last Stand
-      if (tgt.currentHp <= 0 && tgt.perk === 'laststand' && !lastStandUsed[dSide][tIdx]) {
+      if (tgt.currentHp <= 0 && hasPerk(tgt, 'laststand') && !lastStandUsed[dSide][tIdx]) {
         tgt.currentHp = 1; lastStandUsed[dSide][tIdx] = true; ev.push('laststand');
       }
       const dead = tgt.currentHp <= 0;
 
       // Lifesteal
       let heal = 0;
-      if (atk.perk === 'lifesteal') {
-        heal = Math.max(1, Math.floor(dmg * ((atk.perkValue || 25) / 100)));
+      if (hasPerk(atk, 'lifesteal') && dmg > 0) {
+        const lsVal = getPerkValue(atk, 'lifesteal') || 25;
+        heal = Math.max(1, Math.floor(dmg * (lsVal / 100)));
         atk.currentHp = Math.min(atk.maxHp || atk.hp || 1, atk.currentHp + heal);
         ev.push('lifesteal');
       }
+
       // Poison
       let poisoned = false;
-      if (atk.perk === 'poison' && !dead) {
-        poisonStacks[dSide][tIdx] = { damage: atk.perkValue || 5, turnsLeft: 3 };
+      if (hasPerk(atk, 'poison') && !dead) {
+        const pVal = getPerkValue(atk, 'poison') || 5;
+        poisonStacks[dSide][tIdx] = { damage: pVal, turnsLeft: 3 };
         ev.push('poison'); poisoned = true;
       }
+
+      // Burn (fire DoT: % maxHp per turn for 2 turns)
+      let burned = false;
+      if (hasPerk(atk, 'burn') && !dead) {
+        const buVal = getPerkValue(atk, 'burn') || 8;
+        const burnDmg = Math.max(1, Math.floor((tgt.maxHp || tgt.hp || 1) * buVal / 100));
+        burnStacks[dSide][tIdx] = { damage: burnDmg, turnsLeft: 2 };
+        ev.push('burn'); burned = true;
+      }
+
       // Thorns
       let thorns = 0;
-      if (tgt.perk === 'thorns') {
-        thorns = Math.max(1, Math.floor(dmg * ((tgt.perkValue || 25) / 100)));
+      if (hasPerk(tgt, 'thorns') && dmg > 0) {
+        const thVal = getPerkValue(tgt, 'thorns') || 25;
+        thorns = Math.max(1, Math.floor(dmg * (thVal / 100)));
         atk.currentHp -= thorns; ev.push('thorns');
-        if (atk.currentHp <= 0 && atk.perk === 'laststand' && !lastStandUsed[aSide][aIdx]) {
+        if (atk.currentHp <= 0 && hasPerk(atk, 'laststand') && !lastStandUsed[aSide][aIdx]) {
           atk.currentHp = 1; lastStandUsed[aSide][aIdx] = true;
         }
       }
 
-      battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: dmg, isTargetDead: dead, events: ev, healAmount: heal || undefined, thornsDamage: thorns || undefined, poisonApplied: poisoned || undefined });
+      // Build human-readable combat log message
+      const msgParts = [];
+      if (ev.includes('crit'))         msgParts.push('КРИТ!');
+      if (armorBlocked > 0)            msgParts.push(`[Броня] заблокувала ${armorBlocked}`);
+      if (shieldBlocked > 0)           msgParts.push(`[Щит] поглинув ${shieldBlocked}`);
+      if (ev.includes('laststand'))    msgParts.push('[1HP] вижив!');
+      if (ev.includes('lifesteal'))    msgParts.push(`[Вампір] +${heal} HP`);
+      if (ev.includes('burn'))         msgParts.push('[Опік] запалено');
+      if (ev.includes('poison'))       msgParts.push('[Отрута] заражено');
+      if (ev.includes('thorns'))       msgParts.push(`[Шипи] -${thorns} назад`);
+
+      let msg;
+      if (dmg === 0 && shieldBlocked > 0 && armorBlocked === 0) {
+        msg = `«${atk.name}» → «${tgt.name}»: щит поглинув всю шкоду! [${shieldBlocked}]`;
+      } else {
+        const totalBlocked = armorBlocked + shieldBlocked;
+        const dmgStr = totalBlocked > 0 ? `${dmg} шкоди (${totalBlocked} заблоковано)` : `${dmg} шкоди`;
+        msg = `«${atk.name}» → «${tgt.name}»: ${dmgStr}${dead ? ' 💀' : ''}${msgParts.length ? ' | ' + msgParts.join(', ') : ''}`;
+      }
+
+      battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: tIdx, damage: dmg, isTargetDead: dead, events: ev, healAmount: heal || undefined, thornsDamage: thorns || undefined, shieldBlocked: shieldBlocked || undefined, armorBlocked: armorBlocked || undefined, msg });
 
       // Cleave
-      if (atk.perk === 'cleave') {
-        const splash = Math.max(1, Math.floor(dmg * ((atk.perkValue || 30) / 100)));
+      if (hasPerk(atk, 'cleave') && dmg > 0) {
+        const clVal = getPerkValue(atk, 'cleave') || 30;
+        const splash = Math.max(1, Math.floor(dmg * (clVal / 100)));
         for (const adj of [tIdx - 1, tIdx + 1]) {
           if (adj >= 0 && adj < dTeam.length && dTeam[adj].currentHp > 0) {
             dTeam[adj].currentHp -= splash;
-            if (dTeam[adj].currentHp <= 0 && dTeam[adj].perk === 'laststand' && !lastStandUsed[dSide][adj]) { dTeam[adj].currentHp = 1; lastStandUsed[dSide][adj] = true; }
-            battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: adj, damage: splash, isTargetDead: dTeam[adj].currentHp <= 0, events: ['cleave'] });
+            if (dTeam[adj].currentHp <= 0 && hasPerk(dTeam[adj], 'laststand') && !lastStandUsed[dSide][adj]) { dTeam[adj].currentHp = 1; lastStandUsed[dSide][adj] = true; }
+            battleLog.push({ attackerSide: aSide, attackerIndex: aIdx, targetIndex: adj, damage: splash, isTargetDead: dTeam[adj].currentHp <= 0, events: ['cleave'], msg: `«${atk.name}» [Сплеск] задів «${dTeam[adj].name}» на ${splash} шкоди` });
           }
         }
       }
@@ -3512,8 +4102,8 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       turnCount++;
       let anyAttack = false;
       if (turnCount > 1) {
-        applyPoisonTicks('attacker', attackerCards);
-        applyPoisonTicks('defender', defenderCards);
+        applyStatusTicks('attacker', attackerCards);
+        applyStatusTicks('defender', defenderCards);
         if (isTeamDead(attackerCards) || isTeamDead(defenderCards)) break;
       }
       const mc = Math.max(attackerCards.length, defenderCards.length);
@@ -3528,10 +4118,11 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     if (isTeamDead(defenderCards)) { attackerWon = true; }
     else if (isTeamDead(attackerCards)) { attackerWon = false; }
     else {
+      // Timeout — defender holds the point (attacker must kill all defenders to capture)
+      attackerWon = false;
       const hpPct = (t) => { const a = t.filter(c => c.currentHp > 0); return a.length === 0 ? 0 : a.reduce((s, c) => s + c.currentHp / (c.maxHp || 1), 0) / t.length; };
       const aPct = hpPct(attackerCards), dPct = hpPct(defenderCards);
-      attackerWon = aPct >= dPct;
-      battleLog.push({ note: `\u0422\u0430\u0439\u043c-\u0430\u0443\u0442 (${turnCount} \u0445\u043e\u0434\u0456\u0432). \u0410\u0442\u0430\u043a\u0443\u044e\u0447\u0438\u0439 HP: ${(aPct * 100).toFixed(1)}%, \u0417\u0430\u0445\u0438\u0441\u043d\u0438\u043a HP: ${(dPct * 100).toFixed(1)}%` });
+      battleLog.push({ note: `Таймаут (${turnCount} ходів). Захисник утримав точку. Атакуючий HP: ${(aPct * 100).toFixed(1)}%, Захисник HP: ${(dPct * 100).toFixed(1)}%` });
     }
     let updatedPoint = point;
 
@@ -3549,18 +4140,20 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
     await prisma.$transaction(async (tx) => {
       const userDataToUpdate = { coins: { decrement: point.entryFee } };
       
-      if (!attackerWon) {
-        const currentCooldowns = user.arenaCooldowns && typeof user.arenaCooldowns === 'object' 
-          ? { ...user.arenaCooldowns } 
+      {
+        const currentCooldowns = user.arenaCooldowns && typeof user.arenaCooldowns === 'object'
+          ? { ...user.arenaCooldowns }
           : {};
-        
+
         // Cleanup expired
         const now = new Date();
         for (const [key, val] of Object.entries(currentCooldowns)) {
           if (new Date(val) < now) delete currentCooldowns[key];
         }
-        
-        currentCooldowns[id] = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+        // Loss: 5-min cooldown; Win: 2-min cooldown (prevent instant re-attack chain)
+        const cooldownMs = attackerWon ? 2 * 60 * 1000 : 5 * 60 * 1000;
+        currentCooldowns[id] = new Date(Date.now() + cooldownMs).toISOString();
         userDataToUpdate.arenaCooldowns = currentCooldowns;
       }
 
@@ -3654,8 +4247,13 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         } else if (point.battleMode === 'CHIP_DAMAGE') {
           stat.hp = stat.maxHp;
           if (Math.random() * 100 < (point.chipDamageChance || 0)) {
-            stat.maxHp = Math.max(1, Math.floor(stat.maxHp * 0.95));
-            stat.power = Math.max(1, Math.floor(stat.power * 0.95));
+            // Store base stats on first degradation to enforce a 30% floor
+            if (!stat.basePower) stat.basePower = stat.power;
+            if (!stat.baseMaxHp) stat.baseMaxHp = stat.maxHp;
+            const floorPower = Math.max(1, Math.floor(stat.basePower * 0.30));
+            const floorMaxHp = Math.max(1, Math.floor(stat.baseMaxHp * 0.30));
+            stat.maxHp = Math.max(floorMaxHp, Math.floor(stat.maxHp * 0.95));
+            stat.power = Math.max(floorPower, Math.floor(stat.power * 0.95));
             stat.hp = stat.maxHp;
             cardResult.status = 'weakened';
           }
@@ -3764,12 +4362,17 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
                 });
               }
             } else if (point.battleMode === 'CHIP_DAMAGE') {
-              // Apply chip damage to defender's inventory stat
+              // Apply chip damage to defender's inventory stat (30% floor)
               if (Math.random() * 100 < (point.chipDamageChance || 0)) {
+                const ds = defStats[defStatIdx];
+                if (!ds.basePower) ds.basePower = ds.power;
+                if (!ds.baseMaxHp) ds.baseMaxHp = ds.maxHp || ds.hp;
+                const floorPower = Math.max(1, Math.floor(ds.basePower * 0.30));
+                const floorMaxHp = Math.max(1, Math.floor(ds.baseMaxHp * 0.30));
                 defStats[defStatIdx] = {
-                  ...defStats[defStatIdx],
-                  maxHp: Math.max(1, Math.floor((defStats[defStatIdx].maxHp || defStats[defStatIdx].hp || 1) * 0.95)),
-                  power: Math.max(1, Math.floor((defStats[defStatIdx].power || 1) * 0.95)),
+                  ...ds,
+                  maxHp: Math.max(floorMaxHp, Math.floor((ds.maxHp || ds.hp || 1) * 0.95)),
+                  power: Math.max(floorPower, Math.floor((ds.power || 1) * 0.95)),
                 };
                 defStats[defStatIdx].hp = defStats[defStatIdx].maxHp;
               } else {
@@ -3784,7 +4387,7 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
         }
 
         // Defender cards are all lost (point taken)
-        initialDefenderCards.forEach(c => {
+        defenderCards.forEach(c => {
           defenderResults.push({
             id: c.id,
             name: c.name,
@@ -5008,22 +5611,27 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
             }
           }
 
+          const effectiveIsGame = cardObj?.isGame && !cardObj?.blockGame;
           let newStats = [];
-          if (cardObj?.isGame || payload.power !== undefined || payload.hp !== undefined) {
+          if (effectiveIsGame || payload.power !== undefined || payload.hp !== undefined) {
             for (let i = 0; i < payload.amount; i++) {
               newStats.push({
                 power:
                   payload.power !== undefined && payload.power !== null
                     ? Number(payload.power)
-                    : cardObj?.isGame
+                    : effectiveIsGame
                       ? generatedPower
                       : 0,
                 hp:
                   payload.hp !== undefined && payload.hp !== null
                     ? Number(payload.hp)
-                    : cardObj?.isGame
+                    : effectiveIsGame
                       ? generatedHp
                       : 0,
+                level:
+                  payload.level !== undefined && payload.level !== null
+                    ? Math.max(1, Math.min(10, Number(payload.level)))
+                    : 1,
               });
             }
           }
@@ -6061,11 +6669,13 @@ app.post('/api/game/sell-cards', authenticate, async (req, res) => {
 // ----------------------------------------
 // КУЗНЯ (ФОРДЖ) - АПГРЕЙД КАРТКИ (ШАНС 70%)
 // ----------------------------------------
-app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
-  const { cardId, mainIndex, materialIndex } = req.body;
+// КУЗНЯ (ФОРДЖ) - ПІДНЯТТЯ РІВНЯ
+// ----------------------------------------
+app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
+  const { cardId, statsIndex } = req.body;
 
-  if (!cardId || mainIndex === undefined || materialIndex === undefined) {
-    return res.status(400).json({ error: 'Некоректні дані для кування.' });
+  if (!cardId || statsIndex === undefined) {
+    return res.status(400).json({ error: 'Некоректні дані для підвищення рівня.' });
   }
 
   try {
@@ -6081,121 +6691,117 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Картку не знайдено в інвентарі.' });
     }
 
-    let statsArray =
-      typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
+    let statsArray = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats) : invItem.gameStats;
 
-    if (!statsArray[mainIndex] || !statsArray[materialIndex]) {
-      return res.status(400).json({ error: 'Одну з карток не знайдено за вказаним індексом.' });
+    if (!statsArray[statsIndex]) {
+      return res.status(400).json({ error: 'Картку не знайдено за вказаним індексом.' });
     }
-
-    if (mainIndex === materialIndex) {
-      return res.status(400).json({ error: 'Не можна використовувати одну і ту саму картку як основу і матеріал.' });
-    }
-
-    // Нормалізація статів (об'єкт або число)
-    const normalize = (s) => (typeof s === 'object' && s !== null ? s : { power: s, hp: 50 });
-    
-    const mainCardStats = normalize(statsArray[mainIndex]);
-    const mP = Number(mainCardStats.power);
-    const mH = mainCardStats.hp !== undefined && mainCardStats.hp !== null ? Number(mainCardStats.hp) : 50;
 
     // Перевірка Арени
     const defInstances = await getDefendingInstances(user.uid);
-    const isMainDefending = defInstances.some(
-      (inst) => inst.cardId === cardId && inst.statsIndex === mainIndex
+    const isDefending = defInstances.some(
+      (inst) => inst.cardId === cardId && inst.statsIndex === statsIndex
     );
-    const isMaterialDefending = defInstances.some(
-      (inst) => inst.cardId === cardId && inst.statsIndex === materialIndex
-    );
-
-    if (isMainDefending || isMaterialDefending) {
-      return res.status(400).json({ error: 'Одна з карток зараз на Арені і не може бути використана.' });
+    if (isDefending) {
+      return res.status(400).json({ error: 'Ця картка зараз на Арені і не може бути використана.' });
     }
 
-    // Вартість у кристалах
-    let crystalCost = 5;
-    switch (invItem.card.rarity) {
-      case 'Звичайна':  crystalCost = 5;   break;
-      case 'Рідкісна':  crystalCost = 10;  break;
-      case 'Епічна':    crystalCost = 25;  break;
-      case 'Легендарна': crystalCost = 50; break;
-      case 'Унікальна': crystalCost = 100; break;
+    const normalize = (s) => (typeof s === 'object' && s !== null ? s : { power: s, hp: 50, level: 1 });
+    const statObj = normalize(statsArray[statsIndex]);
+    const currentLevel = statObj.level || 1;
+
+    if (currentLevel >= 10) {
+      return res.status(400).json({ error: 'Картка вже досягла максимального рівня (10).' });
     }
 
-    // Ліміти статів: пріоритет картка > пак > замовчування за рідкістю
-    const statRanges = await getStatsRangesForCard(prisma, invItem.card);
-    const maxPower = statRanges.maxPower;
-    const maxHp = statRanges.maxHp;
+    const nextLevel = currentLevel + 1;
 
-    // Перевірка лімітів: якщо ОБИДВА стати вже на максимумі, кувати не можна
-    if (mP >= maxPower && mH >= maxHp) {
-      return res.status(400).json({ error: `Ця картка вже досягла ліміту характеристик (⚡${maxPower}, ❤️${maxHp}).` });
+    // Отримання конфігурації прокачки
+    let levelingConfig = {};
+    if (invItem.card.levelingConfig) {
+      levelingConfig = typeof invItem.card.levelingConfig === 'string' ? JSON.parse(invItem.card.levelingConfig) : invItem.card.levelingConfig;
+    }
+    
+    const configForLevel = levelingConfig[nextLevel] || { dupes: 0, cost: 0, currency: 'coins', powerAdd: 0, hpAdd: 0 };
+    const requiredDupes = Number(configForLevel.dupes) || 0;
+    const requiredCost = Number(configForLevel.cost) || 0;
+    const currency = configForLevel.currency || 'coins';
+    const powerAdd = Number(configForLevel.powerAdd) || 0;
+    const hpAdd = Number(configForLevel.hpAdd) || 0;
+
+    // Перевірка наявності дублікатів
+    // Ми не можемо видаляти саму себе, та ті, що на Арені або в Сейфі
+    let availableDupesIndices = [];
+    for (let i = 0; i < statsArray.length; i++) {
+      if (i === statsIndex) continue; // Сама картка
+      
+      const s = normalize(statsArray[i]);
+      if (s.inSafe) continue; // В сейфі
+
+      const isDef = defInstances.some(inst => inst.cardId === cardId && inst.statsIndex === i);
+      if (isDef) continue; // На арені
+
+      availableDupesIndices.push(i);
     }
 
-    if (user.crystals < crystalCost) {
-      return res.status(400).json({ error: 'Недостатньо кристалів!' });
+    if (availableDupesIndices.length < requiredDupes) {
+      return res.status(400).json({ error: `Недостатньо вільних дублікатів. Потрібно ${requiredDupes}, доступно ${availableDupesIndices.length}.` });
     }
 
-    const isSuccess = Math.random() <= 0.75; // 75% успіху
-    let newPower = mP;
-    let newHp = mH;
+    // Перевірка валюти
+    if (currency === 'crystals' && user.crystals < requiredCost) {
+      return res.status(400).json({ error: `Недостатньо кристалів! Потрібно ${requiredCost}.` });
+    }
+    if (currency === 'coins' && user.coins < requiredCost) {
+      return res.status(400).json({ error: `Недостатньо монет! Потрібно ${requiredCost}.` });
+    }
 
-    const map = new Map();
-    // Логіка видалення/оновлення індексів для Арени
-    // Це складно, бо видаляємо 1 або 2 елементи. 
-    // Простіше за все: якщо неуспіх - видаляємо обидві. Якщо успіх - видаляємо матеріал і оновлюємо головну.
-
+    // Видаляємо дублікати (видаляємо з кінця, щоб не збити індекси)
+    let dupesToRemove = availableDupesIndices.slice(0, requiredDupes).sort((a, b) => b - a);
     let finalStats = [...statsArray];
 
-    if (isSuccess) {
-      // +15% статів, але не вище ліміту
-      newPower = Math.min(Math.ceil(mP * 1.15), maxPower);
-      newHp = Math.min(Math.ceil(newHp * 1.15), maxHp);
-      
-      finalStats[mainIndex] = { power: newPower, hp: newHp };
-      finalStats.splice(materialIndex, 1);
-      
-      // Створюємо мапу для зсуву індексів Арени
-      for (let i = 0; i < statsArray.length; i++) {
-        if (i === materialIndex) map.set(i, -1); // Видалено
-        else if (i > materialIndex) map.set(i, i - 1);
-        else map.set(i, i);
-      }
-    } else {
-      // Обидві видаляються
-      // Важливо видаляти з більшого індексу до меншого, щоб не збивати порядок
-      const firstToRemove = Math.max(mainIndex, materialIndex);
-      const secondToRemove = Math.min(mainIndex, materialIndex);
-      
-      finalStats.splice(firstToRemove, 1);
-      finalStats.splice(secondToRemove, 1);
+    for (const dIndex of dupesToRemove) {
+      finalStats.splice(dIndex, 1);
+    }
 
-      for (let i = 0; i < statsArray.length; i++) {
-        if (i === mainIndex || i === materialIndex) map.set(i, -1);
-        else {
-          let offset = 0;
-          if (i > firstToRemove) offset++;
-          if (i > secondToRemove) offset++;
-          map.set(i, i - offset);
-        }
+    // Рахуємо нові індекси для Арени (оскільки ми видалили елементи)
+    const map = new Map();
+    for (let i = 0; i < statsArray.length; i++) {
+      if (dupesToRemove.includes(i)) {
+        map.set(i, -1);
+      } else {
+        let offset = dupesToRemove.filter(dIndex => dIndex < i).length;
+        map.set(i, i - offset);
       }
     }
 
+    // Оновлюємо стат
+    const newStatsIndex = map.get(statsIndex);
+    const updatedStatObj = finalStats[newStatsIndex];
+    
+    updatedStatObj.level = nextLevel;
+    updatedStatObj.power = Number(updatedStatObj.power) + powerAdd;
+    updatedStatObj.hp = Number(updatedStatObj.hp || 50) + hpAdd;
+
+    // Якщо досягли 8 рівня - додаємо інформацію про перк (щоб фронт знав, або бекенд)
+    // В боях бекенд буде брати level8Perk безпосередньо з card
+    
     await prisma.$transaction(async (tx) => {
       await syncArenaIndices(tx, user.uid, cardId, map);
 
-      await tx.user.update({
-        where: { uid: user.uid },
-        data: { 
-          crystals: { decrement: crystalCost }
-        },
-      });
+      const decrementData = currency === 'crystals' ? { crystals: { decrement: requiredCost } } : { coins: { decrement: requiredCost } };
+      if (requiredCost > 0) {
+        await tx.user.update({
+          where: { uid: user.uid },
+          data: decrementData,
+        });
+      }
 
       await tx.inventoryItem.update({
         where: { userId_cardId: { userId: user.uid, cardId: cardId } },
         data: { 
           gameStats: finalStats,
-          amount: { decrement: isSuccess ? 1 : 2 }
+          amount: { decrement: requiredDupes }
         },
       });
     });
@@ -6207,14 +6813,694 @@ app.post('/api/game/forge/upgrade', authenticate, async (req, res) => {
 
     res.json({ 
       success: true, 
-      isSuccess, 
       profile: updatedUser, 
-      newPower: isSuccess ? newPower : 0, 
-      newHp: isSuccess ? newHp : 0, 
-      crystalCost 
+      newPower: updatedStatObj.power, 
+      newHp: updatedStatObj.hp, 
+      newLevel: updatedStatObj.level
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Помилка внутрішнього сервера під час кування.' });
+    res.status(500).json({ error: 'Помилка внутрішнього сервера під час підняття рівня.' });
+  }
+});
+
+// ----------------------------------------
+// FEEDING — ГОДУВАННЯ КАРТОК (ПРОКАЧКА ПЕРКІВ)
+// POST /api/game/feeding
+// Body: { mainCardId, mainCardStatsIndex, sacrifices: [{ cardId, statsIndex }] }
+// ----------------------------------------
+app.post('/api/game/feeding', authenticate, async (req, res) => {
+  const { mainCardId, mainCardStatsIndex, sacrifices } = req.body;
+
+  if (
+    !mainCardId ||
+    mainCardStatsIndex === undefined ||
+    !Array.isArray(sacrifices) ||
+    sacrifices.length === 0
+  ) {
+    return res.status(400).json({ error: 'Некоректні дані для годування.' });
+  }
+  if (sacrifices.length > 10) {
+    return res.status(400).json({ error: 'Максимум 10 жертовних карток за один раз.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+
+    // --- Load main card ---
+    const mainInvItem = await prisma.inventoryItem.findUnique({
+      where: { userId_cardId: { userId: user.uid, cardId: mainCardId } },
+      include: { card: true },
+    });
+    if (!mainInvItem) {
+      return res.status(400).json({ error: 'Основну картку не знайдено в інвентарі.' });
+    }
+    if (!mainInvItem.card.isGame) {
+      return res.status(400).json({ error: 'Годування доступне лише для ігрових карток.' });
+    }
+
+    const mainStatsArray =
+      typeof mainInvItem.gameStats === 'string'
+        ? JSON.parse(mainInvItem.gameStats)
+        : mainInvItem.gameStats || [];
+
+    if (!mainStatsArray[mainCardStatsIndex]) {
+      return res.status(400).json({ error: 'Невірний індекс основної картки.' });
+    }
+
+    // Main card must not be defending arena
+    const defInstances = await getDefendingInstances(user.uid);
+    if (defInstances.some(inst => inst.cardId === mainCardId && inst.statsIndex === mainCardStatsIndex)) {
+      return res.status(400).json({ error: 'Основна картка зараз захищає Арену.' });
+    }
+
+    // Main card must not be in safe
+    if (mainStatsArray[mainCardStatsIndex].inSafe) {
+      return res.status(400).json({ error: 'Основна картка знаходиться в Сейфі.' });
+    }
+
+    // --- Validate sacrifices & build removal plan ---
+    const sacCardIds = [...new Set(sacrifices.map(s => s.cardId))];
+    const sacInvItems = await prisma.inventoryItem.findMany({
+      where: { userId: user.uid, cardId: { in: sacCardIds } },
+      include: { card: true },
+    });
+    const sacInvMap = new Map(sacInvItems.map(item => [item.cardId, item]));
+
+    let totalXp = 0;
+    // removePlan: cardId -> array of statsIndices to remove
+    const removePlan = new Map();
+
+    for (const sac of sacrifices) {
+      // Cannot sacrifice the main card instance itself
+      if (sac.cardId === mainCardId && sac.statsIndex === mainCardStatsIndex) {
+        return res.status(400).json({ error: 'Не можна жертвувати основною карткою.' });
+      }
+
+      const invItem = sacInvMap.get(sac.cardId);
+      if (!invItem) {
+        return res.status(400).json({ error: `Картку ${sac.cardId} не знайдено в інвентарі.` });
+      }
+
+      const statsArr =
+        typeof invItem.gameStats === 'string'
+          ? JSON.parse(invItem.gameStats)
+          : invItem.gameStats || [];
+
+      if (sac.statsIndex < 0 || sac.statsIndex >= statsArr.length || !statsArr[sac.statsIndex]) {
+        return res.status(400).json({ error: 'Невірний індекс жертовної картки.' });
+      }
+
+      const statObj = statsArr[sac.statsIndex];
+      if (statObj.inSafe) {
+        return res.status(400).json({ error: `Жертовна картка "${invItem.card.name}" знаходиться в Сейфі.` });
+      }
+      if (defInstances.some(inst => inst.cardId === sac.cardId && inst.statsIndex === sac.statsIndex)) {
+        return res.status(400).json({ error: `Жертовна картка "${invItem.card.name}" захищає Арену.` });
+      }
+
+      // Accumulate XP: base rarity XP × card level
+      const cardLevel = Number(statObj.level) || 1;
+      const baseXp = FEEDING_XP_BY_RARITY[invItem.card.rarity] || 20;
+      totalXp += baseXp * cardLevel;
+
+      if (!removePlan.has(sac.cardId)) removePlan.set(sac.cardId, []);
+      removePlan.get(sac.cardId).push(sac.statsIndex);
+    }
+
+    // Check for duplicate statsIndex within same cardId in the sacrifice list
+    for (const [cid, indices] of removePlan.entries()) {
+      if (new Set(indices).size !== indices.length) {
+        return res.status(400).json({ error: 'Не можна жертвувати одним і тим же екземпляром картки двічі.' });
+      }
+    }
+
+    // --- Apply XP to main card perks ---
+    const mainStatObj = { ...(mainStatsArray[mainCardStatsIndex]) };
+
+    // Initialise perks array on this instance if absent
+    if (!Array.isArray(mainStatObj.perks) || mainStatObj.perks.length === 0) {
+      let seeds = [];
+
+      // Try availablePerks config from catalog first
+      const availablePerks = mainInvItem.card.availablePerks
+        ? (typeof mainInvItem.card.availablePerks === 'string'
+            ? JSON.parse(mainInvItem.card.availablePerks)
+            : mainInvItem.card.availablePerks)
+        : [];
+
+      if (Array.isArray(availablePerks) && availablePerks.length > 0) {
+        seeds = availablePerks;
+      } else if (mainInvItem.card.perk) {
+        // Fallback: card has a single legacy perk → make it the starting perk
+        seeds = [{ type: mainInvItem.card.perk, rarity: mainInvItem.card.rarity }];
+      }
+
+      mainStatObj.perks = seeds.map(p => ({
+        type: p.type,
+        level: 1,
+        experience: 0,
+        rarity: p.rarity || mainInvItem.card.rarity,
+      }));
+    }
+
+    if (mainStatObj.perks.length > 0) {
+      // Distribute XP evenly; remainder goes to the first perk
+      const xpPerPerk = Math.floor(totalXp / mainStatObj.perks.length);
+      const xpRemainder = totalXp % mainStatObj.perks.length;
+
+      mainStatObj.perks = mainStatObj.perks.map((perk, idx) => {
+        let p = { ...perk };
+        p.experience = (p.experience || 0) + xpPerPerk + (idx === 0 ? xpRemainder : 0);
+
+        // Level-up loop
+        while (p.level < MAX_PERK_LEVEL) {
+          const needed = PERK_LEVEL_XP[p.level - 1]; // threshold for current level
+          if (p.experience >= needed) {
+            p.experience -= needed;
+            p.level++;
+          } else {
+            break;
+          }
+        }
+
+        // At max level, cap experience at 0
+        if (p.level >= MAX_PERK_LEVEL) {
+          p.experience = 0;
+        }
+
+        return p;
+      });
+    }
+
+    // --- Persist in transaction ---
+    await prisma.$transaction(async (tx) => {
+      let totalSacrificed = 0;
+
+      for (const [sacCardId, indicesToRemove] of removePlan.entries()) {
+        const invItem = sacInvMap.get(sacCardId);
+        const statsArr =
+          typeof invItem.gameStats === 'string'
+            ? JSON.parse(invItem.gameStats)
+            : invItem.gameStats || [];
+
+        // Build remap (sorted desc so we can filter cleanly)
+        const removed = new Set(indicesToRemove);
+        const oldToNewMap = new Map();
+        let newIdx = 0;
+        for (let i = 0; i < statsArr.length; i++) {
+          if (removed.has(i)) oldToNewMap.set(i, -1);
+          else oldToNewMap.set(i, newIdx++);
+        }
+
+        await syncArenaIndices(tx, user.uid, sacCardId, oldToNewMap);
+
+        const newStatsArr = statsArr.filter((_, i) => !removed.has(i));
+        const newAmount = invItem.amount - indicesToRemove.length;
+        totalSacrificed += indicesToRemove.length;
+
+        if (newAmount <= 0) {
+          await tx.inventoryItem.delete({
+            where: { userId_cardId: { userId: user.uid, cardId: sacCardId } },
+          });
+        } else {
+          await tx.inventoryItem.update({
+            where: { userId_cardId: { userId: user.uid, cardId: sacCardId } },
+            data: { amount: newAmount, gameStats: newStatsArr },
+          });
+        }
+      }
+
+      // Update main card perks
+      const newMainStats = [...mainStatsArray];
+      newMainStats[mainCardStatsIndex] = mainStatObj;
+
+      await tx.inventoryItem.update({
+        where: { userId_cardId: { userId: user.uid, cardId: mainCardId } },
+        data: { gameStats: newMainStats },
+      });
+
+      // Decrement user's totalCards counter
+      await tx.user.update({
+        where: { uid: user.uid },
+        data: { totalCards: { decrement: totalSacrificed } },
+      });
+    });
+
+    // Compute final stats for the updated main card instance
+    const perkCatalog = await getPerkCatalog();
+    const finalStats = computeFinalStats(mainStatObj, perkCatalog);
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { uid: req.user.uid },
+      include: { inventory: { include: { card: true } } },
+    });
+    const updatedDefending = await getDefendingInstances(req.user.uid);
+
+    res.json({
+      success: true,
+      xpGained: totalXp,
+      updatedPerks: mainStatObj.perks,
+      finalPower: finalStats.finalPower,
+      finalHp: finalStats.finalHp,
+      profile: { ...updatedUser, defendingInstances: updatedDefending },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Помилка годування карток.' });
+  }
+});
+
+// ----------------------------------------
+// FEEDING — GET PERK CATALOG
+// GET /api/game/perks
+// ----------------------------------------
+app.get('/api/game/perks', async (req, res) => {
+  try {
+    const perks = await prisma.perk.findMany({ orderBy: { createdAt: 'asc' } });
+    res.json(perks);
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження каталогу перків.' });
+  }
+});
+
+// ----------------------------------------
+// FEEDING — GET COMPUTED STATS FOR ONE CARD INSTANCE
+// GET /api/game/cards/:cardId/stats/:statsIndex
+// Returns base + final (level+perk) stats for one card instance
+// ----------------------------------------
+app.get('/api/game/cards/:cardId/stats/:statsIndex', authenticate, async (req, res) => {
+  const { cardId, statsIndex } = req.params;
+  const idx = Number(statsIndex);
+  try {
+    const invItem = await prisma.inventoryItem.findUnique({
+      where: { userId_cardId: { userId: req.user.uid, cardId } },
+      include: { card: true },
+    });
+    if (!invItem) return res.status(404).json({ error: 'Картку не знайдено.' });
+
+    const statsArr =
+      typeof invItem.gameStats === 'string'
+        ? JSON.parse(invItem.gameStats)
+        : invItem.gameStats || [];
+
+    if (idx < 0 || idx >= statsArr.length) {
+      return res.status(400).json({ error: 'Невірний індекс.' });
+    }
+
+    const statEntry = statsArr[idx];
+    const perkCatalog = await getPerkCatalog();
+    const { finalPower, finalHp } = computeFinalStats(statEntry, perkCatalog);
+
+    res.json({
+      cardId,
+      statsIndex: idx,
+      basePower: statEntry.power,
+      baseHp: statEntry.hp,
+      level: statEntry.level || 1,
+      perks: statEntry.perks || [],
+      finalPower,
+      finalHp,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка отримання статів картки.' });
+  }
+});
+
+// ========================================
+// EMERALDS
+// ========================================
+
+const DEFAULT_EMERALD_TYPES = [
+  { name: 'Смарагд Новачка',  color: '#6ee7b7', perkBoostPercent: 5.0,  dropWeight: 50 },
+  { name: 'Смарагд Учня',     color: '#34d399', perkBoostPercent: 10.0, dropWeight: 30 },
+  { name: 'Смарагд Майстра',  color: '#10b981', perkBoostPercent: 20.0, dropWeight: 15 },
+  { name: 'Смарагд Мудреця',  color: '#0d9488', perkBoostPercent: 35.0, dropWeight: 4  },
+  { name: 'Смарагд Легенди',  color: '#f59e0b', perkBoostPercent: 60.0, dropWeight: 1  },
+];
+
+const ensureEmeraldDefaults = async () => {
+  const count = await prisma.emeraldType.count();
+  if (count === 0) {
+    await prisma.emeraldType.createMany({ data: DEFAULT_EMERALD_TYPES });
+  }
+  const sCount = await prisma.emeraldSettings.count();
+  if (sCount === 0) {
+    await prisma.emeraldSettings.create({
+      data: { id: 1, boxCostAmount: 100, boxCostCurrency: 'coins', maxDailyOpens: 3 },
+    });
+  }
+};
+
+// GET /api/game/emerald-types  (public — used by CardModal without auth)
+app.get('/api/game/emerald-types', async (req, res) => {
+  try {
+    const types = await prisma.emeraldType.findMany({ orderBy: { id: 'asc' } });
+    res.json(types);
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження типів смарагдів.' });
+  }
+});
+
+// GET /api/game/emerald-info
+app.get('/api/game/emerald-info', authenticate, async (req, res) => {
+  try {
+    await ensureEmeraldDefaults();
+    const [types, settings, user] = await Promise.all([
+      prisma.emeraldType.findMany({ orderBy: { id: 'asc' } }),
+      prisma.emeraldSettings.findUnique({ where: { id: 1 } }),
+      prisma.user.findUnique({
+        where: { uid: req.user.uid },
+        select: { emeraldInventory: true, emeraldBoxOpens: true },
+      }),
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    const boxOpens = user?.emeraldBoxOpens || {};
+    const opensToday = boxOpens.date === today ? boxOpens.count || 0 : 0;
+    res.json({
+      types,
+      settings: settings || { boxCostAmount: 100, boxCostCurrency: 'coins', maxDailyOpens: 3 },
+      inventory: user?.emeraldInventory || {},
+      opensToday,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка завантаження смарагдів.' });
+  }
+});
+
+// POST /api/game/open-emerald-box
+app.post('/api/game/open-emerald-box', authenticate, async (req, res) => {
+  try {
+    await ensureEmeraldDefaults();
+    const [settings, user, types] = await Promise.all([
+      prisma.emeraldSettings.findUnique({ where: { id: 1 } }),
+      prisma.user.findUnique({ where: { uid: req.user.uid } }),
+      prisma.emeraldType.findMany({ orderBy: { id: 'asc' } }),
+    ]);
+    if (!settings) return res.status(400).json({ error: 'Налаштування смарагдів не знайдено.' });
+    if (types.length === 0) return res.status(400).json({ error: 'Типи смарагдів не налаштовані.' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const boxOpens = user.emeraldBoxOpens || {};
+    const opensToday = boxOpens.date === today ? boxOpens.count || 0 : 0;
+    if (opensToday >= settings.maxDailyOpens) {
+      return res.status(400).json({
+        error: `Ліміт відкриттів на сьогодні вичерпано (${settings.maxDailyOpens}/${settings.maxDailyOpens}).`,
+      });
+    }
+
+    if (settings.boxCostCurrency === 'crystals' && user.crystals < settings.boxCostAmount) {
+      return res.status(400).json({ error: `Недостатньо кристалів. Потрібно: ${settings.boxCostAmount}.` });
+    }
+    if (settings.boxCostCurrency === 'coins' && user.coins < settings.boxCostAmount) {
+      return res.status(400).json({ error: `Недостатньо монет. Потрібно: ${settings.boxCostAmount}.` });
+    }
+
+    // Roll emerald by drop weight
+    const totalWeight = types.reduce((s, t) => s + t.dropWeight, 0);
+    let roll = Math.random() * totalWeight;
+    let obtained = types[types.length - 1];
+    for (const t of types) {
+      roll -= t.dropWeight;
+      if (roll <= 0) { obtained = t; break; }
+    }
+
+    const newInventory = { ...(user.emeraldInventory || {}) };
+    const key = String(obtained.id);
+    newInventory[key] = (newInventory[key] || 0) + 1;
+
+    const updateData = {
+      emeraldInventory: newInventory,
+      emeraldBoxOpens: { date: today, count: opensToday + 1 },
+    };
+    if (settings.boxCostCurrency === 'crystals') updateData.crystals = { decrement: settings.boxCostAmount };
+    else updateData.coins = { decrement: settings.boxCostAmount };
+
+    const updatedUser = await prisma.user.update({ where: { uid: req.user.uid }, data: updateData });
+
+    res.json({
+      success: true,
+      obtained,
+      inventory: updatedUser.emeraldInventory,
+      opensToday: opensToday + 1,
+      coins: updatedUser.coins,
+      crystals: updatedUser.crystals,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка відкриття скриньки.' });
+  }
+});
+
+// POST /api/game/install-emerald
+app.post('/api/game/install-emerald', authenticate, async (req, res) => {
+  const { cardId, statsIndex, emeraldTypeId } = req.body;
+  if (!cardId || statsIndex == null || !emeraldTypeId) {
+    return res.status(400).json({ error: 'Невірні параметри.' });
+  }
+  try {
+    const [user, invItem, emeraldType] = await Promise.all([
+      prisma.user.findUnique({ where: { uid: req.user.uid } }),
+      prisma.inventoryItem.findUnique({
+        where: { userId_cardId: { userId: req.user.uid, cardId } },
+        include: { card: true },
+      }),
+      prisma.emeraldType.findUnique({ where: { id: Number(emeraldTypeId) } }),
+    ]);
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+    if (!invItem) return res.status(404).json({ error: 'Картку не знайдено.' });
+    if (!emeraldType) return res.status(404).json({ error: 'Тип смарагду не знайдено.' });
+
+    // Перевірка Арени
+    const defInstEmrld = await getDefendingInstances(req.user.uid);
+    if (defInstEmrld.some((inst) => inst.cardId === cardId && inst.statsIndex === Number(statsIndex))) {
+      return res.status(400).json({ error: 'Ця картка зараз захищає точку Арени. Спочатку заберіть її з точки.' });
+    }
+
+    // Check card has a perk with a numeric value — emerald boosts perkValue %
+    if (!invItem.card.perk) {
+      return res.status(400).json({ error: 'Ця картка не має перку. Смарагд підсилює ефект перку, тому встановити його можна лише на картку з перком.' });
+    }
+    if (invItem.card.perkValue == null || invItem.card.perkValue <= 0) {
+      return res.status(400).json({ error: 'Перк цієї картки не має числового значення (відсотка). Смарагд не можна встановити.' });
+    }
+
+    const inventory = user.emeraldInventory || {};
+    const key = String(emeraldTypeId);
+    if (!inventory[key] || inventory[key] <= 0) {
+      return res.status(400).json({ error: 'У вас немає цього смарагду.' });
+    }
+
+    const statsArr = typeof invItem.gameStats === 'string'
+      ? JSON.parse(invItem.gameStats)
+      : invItem.gameStats || [];
+    const idx = Number(statsIndex);
+    if (idx < 0 || idx >= statsArr.length) return res.status(400).json({ error: 'Невірний індекс картки.' });
+    if (statsArr[idx].emerald) {
+      return res.status(400).json({ error: 'На цій картці вже встановлено смарагд. Спочатку видаліть поточний.' });
+    }
+
+    statsArr[idx] = { ...statsArr[idx], emerald: Number(emeraldTypeId) };
+    const newInventory = { ...inventory };
+    newInventory[key] = newInventory[key] - 1;
+    if (newInventory[key] <= 0) delete newInventory[key];
+
+    await prisma.$transaction([
+      prisma.inventoryItem.update({
+        where: { userId_cardId: { userId: req.user.uid, cardId } },
+        data: { gameStats: statsArr },
+      }),
+      prisma.user.update({ where: { uid: req.user.uid }, data: { emeraldInventory: newInventory } }),
+    ]);
+
+    res.json({ success: true, emeraldType, inventory: newInventory });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка встановлення смарагду.' });
+  }
+});
+
+// POST /api/game/remove-emerald
+app.post('/api/game/remove-emerald', authenticate, async (req, res) => {
+  const { cardId, statsIndex } = req.body;
+  if (!cardId || statsIndex == null) return res.status(400).json({ error: 'Невірні параметри.' });
+  try {
+    const [user, invItem] = await Promise.all([
+      prisma.user.findUnique({ where: { uid: req.user.uid } }),
+      prisma.inventoryItem.findUnique({ where: { userId_cardId: { userId: req.user.uid, cardId } } }),
+    ]);
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+    if (!invItem) return res.status(404).json({ error: 'Картку не знайдено.' });
+
+    // Перевірка Арени
+    const defInstRmv = await getDefendingInstances(req.user.uid);
+    if (defInstRmv.some((inst) => inst.cardId === cardId && inst.statsIndex === Number(statsIndex))) {
+      return res.status(400).json({ error: 'Ця картка зараз захищає точку Арени. Спочатку заберіть її з точки.' });
+    }
+
+    const statsArr = typeof invItem.gameStats === 'string'
+      ? JSON.parse(invItem.gameStats)
+      : invItem.gameStats || [];
+    const idx = Number(statsIndex);
+    if (idx < 0 || idx >= statsArr.length) return res.status(400).json({ error: 'Невірний індекс картки.' });
+    const installedId = statsArr[idx].emerald;
+    if (!installedId) return res.status(400).json({ error: 'На цій картці немає смарагду.' });
+
+    const { emerald: _removed, ...rest } = statsArr[idx];
+    const newStatsArr = [...statsArr];
+    newStatsArr[idx] = rest;
+
+    const inventory = user.emeraldInventory || {};
+    const key = String(installedId);
+    const newInventory = { ...inventory, [key]: (inventory[key] || 0) + 1 };
+
+    await prisma.$transaction([
+      prisma.inventoryItem.update({
+        where: { userId_cardId: { userId: req.user.uid, cardId } },
+        data: { gameStats: newStatsArr },
+      }),
+      prisma.user.update({ where: { uid: req.user.uid }, data: { emeraldInventory: newInventory } }),
+    ]);
+
+    res.json({ success: true, inventory: newInventory });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка видалення смарагду.' });
+  }
+});
+
+// POST /api/game/repair-card — restore card HP to maxHp (costs coins or crystals)
+// Body: { cardId, statsIndex, currency }  currency = 'coins' | 'crystals'
+const REPAIR_COST_COINS = 200;
+const REPAIR_COST_CRYSTALS = 5;
+app.post('/api/game/repair-card', authenticate, async (req, res) => {
+  const { cardId, statsIndex, currency } = req.body;
+  if (!cardId || statsIndex == null || !['coins', 'crystals'].includes(currency)) {
+    return res.status(400).json({ error: 'Невірні параметри.' });
+  }
+  try {
+    const [user, invItem] = await Promise.all([
+      prisma.user.findUnique({ where: { uid: req.user.uid } }),
+      prisma.inventoryItem.findUnique({ where: { userId_cardId: { userId: req.user.uid, cardId } } }),
+    ]);
+    if (!user) return res.status(404).json({ error: 'Гравця не знайдено.' });
+    if (!invItem) return res.status(404).json({ error: 'Картку не знайдено.' });
+
+    // Перевірка Арени
+    const defInstRepair = await getDefendingInstances(req.user.uid);
+    if (defInstRepair.some((inst) => inst.cardId === cardId && inst.statsIndex === Number(statsIndex))) {
+      return res.status(400).json({ error: 'Ця картка зараз захищає точку Арени. Спочатку заберіть її з точки.' });
+    }
+
+    const statsArr = typeof invItem.gameStats === 'string'
+      ? JSON.parse(invItem.gameStats)
+      : invItem.gameStats || [];
+    const idx = Number(statsIndex);
+    if (idx < 0 || idx >= statsArr.length) return res.status(400).json({ error: 'Невірний індекс картки.' });
+
+    const stat = statsArr[idx];
+    const maxHp = stat.maxHp || stat.hp || 1;
+    if ((stat.hp || 0) >= maxHp) {
+      return res.status(400).json({ error: 'Картка вже має повне здоров\'я.' });
+    }
+
+    const cost = currency === 'crystals' ? REPAIR_COST_CRYSTALS : REPAIR_COST_COINS;
+    const userBalance = currency === 'crystals' ? user.crystals : user.coins;
+    if (userBalance < cost) {
+      const label = currency === 'crystals' ? 'кристалів' : 'монет';
+      return res.status(400).json({ error: `Недостатньо ${label}. Потрібно ${cost}.` });
+    }
+
+    const newStatsArr = [...statsArr];
+    newStatsArr[idx] = { ...stat, hp: maxHp };
+
+    const userUpdate = currency === 'crystals'
+      ? { crystals: { decrement: cost } }
+      : { coins: { decrement: cost } };
+
+    await prisma.$transaction([
+      prisma.inventoryItem.update({
+        where: { userId_cardId: { userId: req.user.uid, cardId } },
+        data: { gameStats: newStatsArr },
+      }),
+      prisma.user.update({ where: { uid: req.user.uid }, data: userUpdate }),
+    ]);
+
+    res.json({ success: true, newHp: maxHp });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Помилка ремонту картки.' });
+  }
+});
+
+// GET /api/admin/emerald-types
+app.get('/api/admin/emerald-types', authenticate, checkAdmin, async (req, res) => {
+  try {
+    await ensureEmeraldDefaults();
+    const types = await prisma.emeraldType.findMany({ orderBy: { id: 'asc' } });
+    res.json(types);
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження типів смарагдів.' });
+  }
+});
+
+// POST /api/admin/emerald-types
+app.post('/api/admin/emerald-types', authenticate, checkAdmin, async (req, res) => {
+  const { id, name, color, perkBoostPercent, dropWeight } = req.body;
+  try {
+    let emeraldType;
+    if (id) {
+      emeraldType = await prisma.emeraldType.update({
+        where: { id: Number(id) },
+        data: { name, color, perkBoostPercent: Number(perkBoostPercent), dropWeight: Number(dropWeight) },
+      });
+    } else {
+      emeraldType = await prisma.emeraldType.create({
+        data: { name, color, perkBoostPercent: Number(perkBoostPercent), dropWeight: Number(dropWeight) },
+      });
+    }
+    _emeraldCatalogCache = null; // invalidate cache
+    res.json({ success: true, emeraldType });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка збереження типу смарагду.' });
+  }
+});
+
+// DELETE /api/admin/emerald-types/:id
+app.delete('/api/admin/emerald-types/:id', authenticate, checkAdmin, async (req, res) => {
+  try {
+    await prisma.emeraldType.delete({ where: { id: Number(req.params.id) } });
+    _emeraldCatalogCache = null; // invalidate cache
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка видалення типу смарагду.' });
+  }
+});
+
+// GET /api/admin/emerald-settings
+app.get('/api/admin/emerald-settings', authenticate, checkAdmin, async (req, res) => {
+  try {
+    await ensureEmeraldDefaults();
+    const settings = await prisma.emeraldSettings.findUnique({ where: { id: 1 } });
+    res.json(settings || { id: 1, boxCostAmount: 100, boxCostCurrency: 'coins', maxDailyOpens: 3 });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження налаштувань смарагдів.' });
+  }
+});
+
+// PUT /api/admin/emerald-settings
+app.put('/api/admin/emerald-settings', authenticate, checkAdmin, async (req, res) => {
+  const { boxCostAmount, boxCostCurrency, maxDailyOpens } = req.body;
+  try {
+    const settings = await prisma.emeraldSettings.upsert({
+      where: { id: 1 },
+      update: { boxCostAmount: Number(boxCostAmount), boxCostCurrency, maxDailyOpens: Number(maxDailyOpens) },
+      create: { id: 1, boxCostAmount: Number(boxCostAmount), boxCostCurrency, maxDailyOpens: Number(maxDailyOpens) },
+    });
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка оновлення налаштувань смарагдів.' });
   }
 });

@@ -45,10 +45,14 @@ export const getCardStyle = (rName, raritiesList) => {
   const r = raritiesList?.find((x) => x.name === rName);
   return r && COLOR_PRESETS[r.color] ? COLOR_PRESETS[r.color] : COLOR_PRESETS['gray'];
 };
-
 export const parseGameStat = (stat, rarity) => {
   if (typeof stat === 'object' && stat !== null && stat.power !== undefined) {
-    return { power: Number(stat.power) || 0, hp: Number(stat.hp) || 0 };
+    return {
+      power: Number(stat.power) || 0,
+      hp: Number(stat.hp) || 0,
+      boostCount: Number(stat.boostCount) || 0,
+      level: Number(stat.level) || 1
+    };
   }
   const power = Number(stat) || 0;
   let hp = 50; // default average
@@ -59,7 +63,7 @@ export const parseGameStat = (stat, rarity) => {
     case 'Рідкісна': hp = 150; break;
     case 'Звичайна': hp = 75; break;
   }
-  return { power, hp };
+  return { power, hp, boostCount: 0, level: 1 };
 };
 
 // --- ГЛОБАЛЬНИЙ ГОДИННИК ---

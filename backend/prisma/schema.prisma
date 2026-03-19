@@ -59,6 +59,8 @@ model User {
   resetToken           String?
   resetTokenExpiry     DateTime?
   arenaCooldowns       Json?    @default("{}")
+  emeraldInventory     Json?    @default("{}")
+  emeraldBoxOpens      Json?    @default("{}")
 
   inventory      InventoryItem[]
   marketListings MarketListing[]
@@ -107,6 +109,7 @@ model CardCatalog {
   weight      Float?
   frame       String?  @default("normal")
   isGame      Boolean  @default(false)
+  blockGame   Boolean  @default(false)
   minPower    Int?
   maxPower    Int?
   minHp       Int?
@@ -114,8 +117,31 @@ model CardCatalog {
   perk        String?
   perkValue   Int?
 
+  levelingConfig Json?
+  bonusPerkLevel  Int?
+  bonusPerk       String?
+  bonusPerkValue  Int?
+
+  // Perks available on each instance of this card (for the Feeding system)
+  // Array of { type: string, rarity: string } — e.g. [{ "type": "attack_boost", "rarity": "Рідкісна" }]
+  availablePerks  Json?
+
   inventoryItems InventoryItem[]
   marketListings MarketListing[]
+}
+
+// Perk catalog: defines every perk type, its effect logic and max level.
+// effectType: "power_percent" | "hp_percent" | "power_flat" | "hp_flat"
+// effectPerLevel: bonus per perk level (e.g. 0.05 means +5% per level)
+model Perk {
+  id             String   @id @default(uuid())
+  type           String   @unique
+  name           String
+  description    String   @db.Text
+  effectType     String   @default("power_percent")
+  effectPerLevel Float    @default(0.05)
+  maxLevel       Int      @default(5)
+  createdAt      DateTime @default(now())
 }
 
 model PackCatalog {
@@ -154,10 +180,12 @@ model MarketListing {
   soldAt    DateTime?
   power     Int?
   hp        Int?
+  isDuplicate     Boolean @default(false)
+  duplicateAmount Int     @default(1)
 
   sellerId  String
   seller    User     @relation(fields: [sellerId], references: [uid], onDelete: Cascade)
-  
+
   cardId    String
   card      CardCatalog @relation(fields: [cardId], references: [id], onDelete: Cascade)
   buyerId       String?
@@ -229,6 +257,21 @@ model Notification {
   user               User     @relation(fields: [userId], references: [uid], onDelete: Cascade)
 }
 
+model EmeraldType {
+  id               Int    @id @default(autoincrement())
+  name             String @default("Смарагд")
+  color            String @default("#10b981")
+  perkBoostPercent Float  @default(5.0)
+  dropWeight       Int    @default(100)
+}
+
+model EmeraldSettings {
+  id              Int    @id @default(1)
+  boxCostAmount   Int    @default(100)
+  boxCostCurrency String @default("coins")
+  maxDailyOpens   Int    @default(3)
+}
+
 model ArenaPoint {
   id                 String    @id @default(uuid())
   x                  Float
@@ -250,5 +293,6 @@ model ArenaPoint {
   neighborIds        Json?     @default("[]")
   battleMode         String    @default("FULL") // "FULL", "CHIP_DAMAGE", "HARDCORE"
   chipDamageChance   Int       @default(0) // % chance to lose stats in CHIP_DAMAGE mode
+  cardSwapCost       Int       @default(0) // Cost to replace defending cards
   createdAt          DateTime  @default(now())
 }

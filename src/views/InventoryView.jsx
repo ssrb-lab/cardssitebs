@@ -11,6 +11,8 @@ import {
   Volume2,
   Lock,
   Unlock,
+  Store,
+  RefreshCw,
 } from 'lucide-react';
 import { getCardStyle, getCardWeight, playCardSound, parseGameStat } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
@@ -30,14 +32,14 @@ const RARITY_MIN_POWER = {
 function getEffectivePowers(item, packsCatalog = []) {
   const recorded = Array.isArray(item.gameStats) ? item.gameStats.map((s, idx) => ({ ...parseGameStat(s, item.card.rarity), statsIndex: idx, inSafe: !!s?.inSafe })) : [];
   const pack = packsCatalog.find((p) => p.id === item.card.packId);
-  const isGameCard = item.card.isGame || (pack && pack.isGame);
+  const isGameCard = (item.card.isGame || (pack && pack.isGame)) && !item.card.blockGame;
   if (!isGameCard) return [];
   const minPower = RARITY_MIN_POWER[item.card.rarity] || 5;
   const parsedDefault = parseGameStat(minPower, item.card.rarity);
   
-  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, isRecorded: true, statsIndex: v.statsIndex, inSafe: v.inSafe }));
+  const powers = recorded.map((v) => ({ power: v.power, hp: v.hp, level: v.level || 1, isRecorded: true, statsIndex: v.statsIndex, inSafe: v.inSafe }));
   while (powers.length < item.amount) {
-    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, isRecorded: false, statsIndex: powers.length, inSafe: false });
+    powers.push({ power: parsedDefault.power, hp: parsedDefault.hp, level: 1, isRecorded: false, statsIndex: powers.length, inSafe: false });
   }
   return powers;
 }
@@ -62,8 +64,11 @@ export default function InventoryView({
   cardsCatalog,
   cardStats,
   toggleSafe,
+  listDuplicatesOnMarket,
+  showToast,
 }) {
   const [tab, setTab] = useState('cards'); // "cards" or "showcases"
+  const [showPackPicker, setShowPackPicker] = useState(true);
 
   // Фільтри для карток
   const [sortBy, setSortBy] = useState('rarity');
@@ -74,26 +79,15 @@ export default function InventoryView({
   const [selectedShowcaseId, setSelectedShowcaseId] = useState(null);
   const [builderCards, setBuilderCards] = useState([]);
 
-  // Стейт для вікна дублікатів ігрових карток
-  const [viewingGameCard, setViewingGameCard] = useState(null);
-  const [gameCardSortBy, setGameCardSortBy] = useState('power'); // 'power', 'hp', 'recorded'
-
   // Стейт для Сейфу
   const [isSafeOpen, setIsSafeOpen] = useState(false);
   const [safeTransferModal, setSafeTransferModal] = useState(null);
 
-  // СИНХРОНІЗАЦІЯ ВІДКРИТОЇ КАРТКИ З ОСНОВНИМ ІНВЕНТАРЕМ
-  useEffect(() => {
-    if (viewingGameCard) {
-      const updatedItem = inventory.find(i => i.card.id === viewingGameCard.card.id);
-      if (updatedItem) {
-        // Зберігаємо відкрите вікно, але з новими даними
-        setViewingGameCard(updatedItem);
-      } else {
-        setViewingGameCard(null);
-      }
-    }
-  }, [inventory]);
+  // Стейт для продажу ігрових карток на ринок
+  const [sellGameDupeModal, setSellGameDupeModal] = useState(null);
+  const [sellGameDupeAmount, setSellGameDupeAmount] = useState(1);
+  const [sellGameDupePrice, setSellGameDupePrice] = useState('');
+  const [isSellGameDupes, setIsSellGameDupes] = useState(false);
 
   const categories = ['all', ...new Set(packsCatalog.map((p) => p.category || 'Базові'))];
   const relevantPacks =
@@ -103,29 +97,54 @@ export default function InventoryView({
 
   // Витягуємо картки з Сейфу
   const safeCards = [];
-  const inventoryMinusSafe = inventory.map(item => {
-    const pack = packsCatalog.find(p => p.id === item.card.packId);
-    const isGame = item.card.isGame || (pack && pack.isGame);
+  const inventoryWithMeta = inventory.map((item) => {
+    const pack = packsCatalog.find((p) => p.id === item.card.packId);
+    const isGame = (item.card.isGame || (pack && pack.isGame)) && !item.card.blockGame;
+
+    let safeCount = 0;
     let playableAmount = item.amount;
 
     if (isGame) {
       const powers = getEffectivePowers(item, packsCatalog);
-      const safePowers = powers.filter(p => p.inSafe);
-      safePowers.forEach(sp => {
-        safeCards.push({ card: item.card, isGameCard: true, power: sp.power, hp: sp.hp, statsIndex: sp.statsIndex, isRecorded: sp.isRecorded, count: 1 });
+      const safePowers = powers.filter((p) => p.inSafe);
+      safeCount = safePowers.length;
+      safePowers.forEach((sp) => {
+        safeCards.push({
+          card: item.card,
+          isGameCard: true,
+          power: sp.power,
+          hp: sp.hp,
+          statsIndex: sp.statsIndex,
+          isRecorded: sp.isRecorded,
+          count: 1,
+        });
       });
-      playableAmount = powers.filter(p => !p.inSafe).length;
-      return { ...item, amount: playableAmount };
+      playableAmount = powers.filter((p) => !p.inSafe).length;
     } else {
-      const statsArray = Array.isArray(item.gameStats) ? item.gameStats : (typeof item.gameStats === 'string' ? JSON.parse(item.gameStats) : []);
-      const safeCount = statsArray.filter(s => s && s.inSafe).length;
+      const statsArray = Array.isArray(item.gameStats)
+        ? item.gameStats
+        : typeof item.gameStats === 'string'
+          ? JSON.parse(item.gameStats)
+          : [];
+      safeCount = statsArray.filter((s) => s && s.inSafe).length;
       if (safeCount > 0) {
         safeCards.push({ card: item.card, isGameCard: false, count: safeCount });
       }
       playableAmount = Math.max(0, item.amount - safeCount);
-      return { ...item, amount: playableAmount };
     }
-  }).filter(i => i.amount > 0);
+
+    return {
+      ...item,
+      isGameCard: !!isGame,
+      safeCount,
+      totalAmount: item.amount,
+      playableAmount,
+    };
+  });
+
+  const inventoryMinusSafe = inventoryWithMeta
+    .map((item) => ({ ...item, amount: item.playableAmount }))
+    .filter((i) => i.amount > 0);
 
   let filteredInventory = inventoryMinusSafe.filter((item) => {
     const pack = packsCatalog.find((p) => p.id === item.card.packId);
@@ -157,12 +176,39 @@ export default function InventoryView({
   });
 
   const duplicatesEarnedCoins = filteredInventory.reduce((sum, item) => {
-    if (item.amount > 1) {
-      const cardPrice = item.card.sellPrice ? Number(item.card.sellPrice) : sellPrice;
-      return sum + cardPrice * (item.amount - 1);
-    }
-    return sum;
+    const meta = inventoryWithMeta.find((m) => m.card.id === item.card.id);
+    const isGame = meta?.isGameCard || getEffectivePowers(item, packsCatalog).length > 0;
+    if (isGame) return sum;
+
+    const totalAmount = meta?.totalAmount ?? item.amount;
+    const safeCount = meta?.safeCount ?? 0;
+    const defendingCount =
+      profile?.defendingInstances?.filter((inst) => inst.cardId === item.card.id).length || 0;
+
+    const totalDuplicates = Math.max(0, totalAmount - 1);
+    const sellableDuplicates = Math.max(0, totalDuplicates - safeCount - defendingCount);
+    const cardPrice = item.card.sellPrice ? Number(item.card.sellPrice) : sellPrice;
+    return sum + cardPrice * sellableDuplicates;
   }, 0);
+
+  const hasBlockedDuplicatesInView = filteredInventory.some((item) => {
+    const meta = inventoryWithMeta.find((m) => m.card.id === item.card.id);
+    const isGame = meta?.isGameCard || getEffectivePowers(item, packsCatalog).length > 0;
+
+    const totalAmount = meta?.totalAmount ?? item.amount;
+    if (totalAmount <= 1) return false;
+
+    // Якщо є дублікати ігрового типу — їх не можна продавати
+    if (isGame) return true;
+
+    const safeCount = meta?.safeCount ?? 0;
+    const defendingCount =
+      profile?.defendingInstances?.filter((inst) => inst.cardId === item.card.id).length || 0;
+
+    const totalDuplicates = Math.max(0, totalAmount - 1);
+    const sellableDuplicates = Math.max(0, totalDuplicates - safeCount - defendingCount);
+    return sellableDuplicates !== totalDuplicates;
+  });
 
   const activeShowcase = showcases.find((s) => s.id === selectedShowcaseId);
 
@@ -173,6 +219,11 @@ export default function InventoryView({
       setBuilderCards([]);
     }
   }, [selectedShowcaseId, showcases]);
+
+  useEffect(() => {
+    if (tab !== 'cards') return;
+    setShowPackPicker(filterPack === 'all');
+  }, [tab, filterPack]);
 
   const handleCreateShowcaseSubmit = (e) => {
     e.preventDefault();
@@ -264,7 +315,7 @@ export default function InventoryView({
             </h2>
 
             <div className="flex flex-wrap justify-center md:justify-end items-center gap-3 w-full">
-              {duplicatesEarnedCoins > 0 && (
+              {!showPackPicker && duplicatesEarnedCoins > 0 && !hasBlockedDuplicatesInView && (
                 <button
                   onClick={() => {
                     if (
@@ -282,11 +333,29 @@ export default function InventoryView({
                 </button>
               )}
 
+              {tab === 'cards' && (
+                <button
+                  onClick={() => {
+                    setFilterCategory('all');
+                    setFilterPack('all');
+                    setShowPackPicker(true);
+                  }}
+                  className={`bg-neutral-950 border border-neutral-700 text-sm font-bold rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full ${
+                    showPackPicker ? 'hidden' : ''
+                  }`}
+                  title="Повернутись до вибору паку"
+                >
+                  <ArrowLeft size={16} className="inline mr-2" />
+                  До паків
+                </button>
+              )}
+
               <select
                 value={filterCategory}
                 onChange={(e) => {
                   setFilterCategory(e.target.value);
                   setFilterPack('all');
+                  setShowPackPicker(true);
                 }}
                 className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full"
               >
@@ -297,34 +366,163 @@ export default function InventoryView({
                 ))}
               </select>
 
-              <select
-                value={filterPack}
-                onChange={(e) => setFilterPack(e.target.value)}
-                className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full"
-              >
-                <option value="all">Всі Паки</option>
-                {relevantPacks.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              {!showPackPicker && (
+                <select
+                  value={filterPack}
+                  onChange={(e) => setFilterPack(e.target.value)}
+                  className="bg-neutral-950 border border-neutral-700 text-sm font-medium rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-white cursor-pointer hover:bg-neutral-800 h-full"
+                >
+                  <option value="all">Всі Паки</option>
+                  {relevantPacks.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="bg-neutral-950 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800 h-full"
-              >
-                <option value="rarity">За Рідкістю</option>
-                <option value="power">За Силою</option>
-                <option value="pack">За Паком</option>
-                <option value="amount">За Дублікатами</option>
-                <option value="name">За Алфавітом</option>
-              </select>
+              {!showPackPicker && (
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-neutral-950 border border-purple-900/50 text-sm font-bold rounded-xl px-4 py-3 w-full sm:w-auto focus:outline-none text-purple-400 cursor-pointer hover:bg-neutral-800 h-full"
+                >
+                  <option value="rarity">За Рідкістю</option>
+                  <option value="power">За Силою</option>
+                  <option value="pack">За Паком</option>
+                  <option value="amount">За Дублікатами</option>
+                  <option value="name">За Алфавітом</option>
+                </select>
+              )}
             </div>
           </div>
 
-          {filteredInventory.length === 0 ? (
+          {showPackPicker ? (
+            <div className="animate-in fade-in">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
+                <div className="text-neutral-400 text-sm">
+                  Оберіть пак, щоб подивитись картки всередині.
+                </div>
+                <button
+                  onClick={() => {
+                    setFilterCategory('all');
+                    setFilterPack('all');
+                    setShowPackPicker(false);
+                  }}
+                  className="bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-800/50 px-4 py-3 rounded-xl font-bold transition-colors w-full sm:w-auto"
+                >
+                  Показати всі картки
+                </button>
+              </div>
+
+              {relevantPacks.filter((p) => !p.isHidden).length === 0 ? (
+                <div className="text-center py-24 text-neutral-500 bg-neutral-900/30 rounded-3xl border-2 border-dashed border-neutral-800">
+                  <PackageOpen size={80} className="mx-auto mb-6 opacity-20" />
+                  <p className="text-xl font-medium mb-2 text-neutral-400">Паків не знайдено.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {relevantPacks
+                    .filter((p) => !p.isHidden)
+                    .map((p) => {
+                      const totalInPack = cardsCatalog
+                        ? cardsCatalog.filter((c) => c.packId === p.id).length
+                        : 0;
+                      const ownedInPack = inventoryWithMeta.filter(
+                        (i) => i.card?.packId === p.id && (i.totalAmount || 0) > 0
+                      ).length;
+                      const pct = totalInPack > 0 ? Math.round((ownedInPack / totalInPack) * 100) : 0;
+
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setFilterPack(p.id);
+                            setShowPackPicker(false);
+                          }}
+                          className="group text-left bg-neutral-900 border border-neutral-800 hover:border-blue-600/50 rounded-2xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(0,0,0,0.55)] relative min-h-[360px]"
+                        >
+                          <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-blue-600/10 via-transparent to-purple-600/10" />
+
+                          <div className="relative flex flex-col h-full">
+                            <div className="h-40 sm:h-52 bg-neutral-950">
+                              {p.image ? (
+                                <img
+                                  src={p.image}
+                                  alt={p.name}
+                                  className="w-full h-full object-cover opacity-85 group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-500"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-neutral-700">
+                                  <PackageOpen size={42} className="opacity-50" />
+                                </div>
+                              )}
+                              <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 via-black/20 to-transparent pointer-events-none" />
+                              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-neutral-950 via-neutral-950/30 to-transparent pointer-events-none" />
+
+                              <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                                <div className="bg-black/60 backdrop-blur text-white text-[10px] px-2 py-1 rounded-lg border border-white/10 font-black uppercase tracking-widest">
+                                  {p.category || 'Базові'}
+                                </div>
+                                {p.isPremiumOnly && (
+                                  <div className="bg-fuchsia-900/60 backdrop-blur text-fuchsia-200 text-[10px] px-2 py-1 rounded-lg border border-fuchsia-500/20 font-black uppercase tracking-widest">
+                                    Преміум
+                                  </div>
+                                )}
+                                {p.isGame && (
+                                  <div className="bg-green-900/60 backdrop-blur text-green-200 text-[10px] px-2 py-1 rounded-lg border border-green-500/20 font-black uppercase tracking-widest">
+                                    Ігровий
+                                  </div>
+                                )}
+                              </div>
+
+                            </div>
+
+                            <div className="p-5 flex-1">
+                              <div className="text-white font-black text-lg leading-tight line-clamp-2 min-h-[2.5rem] mb-3">
+                                {p.name}
+                              </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <div className="text-xs text-neutral-500 font-bold uppercase tracking-wider">
+                                    Прогрес
+                                  </div>
+                                  <div className="text-sm text-neutral-200 font-black">
+                                    {ownedInPack}/{totalInPack || '—'} карток
+                                    {totalInPack > 0 && (
+                                      <span className="text-neutral-500 font-bold"> • {pct}%</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 px-3 py-2 rounded-xl text-neutral-300 font-black text-xs">
+                                  <PackageOpen size={16} className="text-purple-400" />
+                                  Відкрити
+                                </div>
+                              </div>
+
+                              <div className="mt-4">
+                                <div className="h-2.5 bg-neutral-950 border border-neutral-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all duration-700"
+                                    style={{ width: `${totalInPack > 0 ? (ownedInPack / totalInPack) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                {totalInPack > 0 && ownedInPack === totalInPack && (
+                                  <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-yellow-500">
+                                    Зібрано повністю
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          ) : filteredInventory.length === 0 ? (
             <div className="text-center py-32 text-neutral-500 bg-neutral-900/30 rounded-3xl border-2 border-dashed border-neutral-800">
               <PackageOpen size={80} className="mx-auto mb-6 opacity-20" />
               <p className="text-xl font-medium mb-2 text-neutral-400">Картки не знайдено.</p>
@@ -346,6 +544,15 @@ export default function InventoryView({
                   const defendingCountForCard = profile?.defendingInstances?.filter(inst => inst.cardId === item.card.id).length || 0;
                   const basicDefendingDisabled = !isGameItem && (item.amount - 1 < defendingCountForCard);
                   const allBasicDefending = !isGameItem && item.amount <= defendingCountForCard;
+                  const defendingStatsSet = new Set(
+                    (profile?.defendingInstances || [])
+                      .filter((inst) => inst.cardId === item.card.id)
+                      .map((inst) => inst.statsIndex)
+                  );
+                  const sellableGameCount = isGameItem
+                    ? powers.filter((p) => !p.inSafe && !defendingStatsSet.has(p.statsIndex)).length
+                    : 0;
+                  const canSellGameToMarket = isGameItem && sellableGameCount > 0;
 
                   return (
                     <div
@@ -357,13 +564,9 @@ export default function InventoryView({
                       onClick={() => {
                         if (allBasicDefending) return;
                         if (isSafeOpen) {
-                          if (!isGameItem) {
-                            setSafeTransferModal({ item, isEnteringSafe: true, maxAmount: item.amount });
-                          } else {
-                            setViewingGameCard({ ...item });
-                          }
+                          setSafeTransferModal({ item, isEnteringSafe: true, maxAmount: item.amount });
                         } else {
-                          setViewingCard({ card: item.card, amount: item.amount });
+                          setViewingCard({ card: item.card, amount: item.amount, instancePerks: Array.isArray(item.gameStats) ? (item.gameStats[0]?.perks || []) : [], emerald: Array.isArray(item.gameStats) ? (item.gameStats[0]?.emerald ?? null) : null });
                         }
                       }}
                       className={`relative w-full aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-900 mb-3 transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] ${style.border} ${effectClass} transform-gpu will-change-transform isolate z-0 ${allBasicDefending ? 'grayscale opacity-80' : ''}`}
@@ -396,6 +599,7 @@ export default function InventoryView({
                           />
                         </CardFrame>
                         <PerkBadge perk={item.card.perk} />
+                        
 
                         {item.card.soundUrl && (
                           <button
@@ -425,6 +629,15 @@ export default function InventoryView({
 
                         {isGameItem && (
                           <div className="flex flex-col items-center justify-center gap-0.5 mb-2">
+                            {powers[0] && (() => {
+                              const maxLv = Math.max(...powers.map(p => p.level || 1));
+                              const isMax = maxLv >= 10;
+                              return (
+                                <div className={`inline-flex items-center gap-1 text-white font-black text-[9px] px-2 py-0.5 rounded-full mb-0.5 ${isMax ? 'bg-gradient-to-r from-yellow-600 to-amber-500 shadow-[0_0_8px_rgba(234,179,8,0.5)] border border-yellow-400/40' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_6px_rgba(99,102,241,0.5)] border border-blue-400/30'}`}>
+                                  {isMax ? '★ ' : ''}Lv.{maxLv}
+                                </div>
+                              );
+                            })()}
                             <div className="flex items-center gap-1 text-xs font-bold text-yellow-500">
                               <Zap size={12} strokeWidth={2.5} />
                               {powers.length === 1
@@ -470,12 +683,12 @@ export default function InventoryView({
                                     </button>
                                   )}
                                   <button
-                                    disabled={allBasicDefending}
+                                    disabled={allBasicDefending || item.card.isGame}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setListingCard(item.card);
                                     }}
-                                    className={`flex-1 ${allBasicDefending ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
+                                    className={`flex-1 ${allBasicDefending || item.card.isGame ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed hidden' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
                                   >
                                     На Ринок
                                   </button>
@@ -483,46 +696,81 @@ export default function InventoryView({
                               </>
                             ) : (
                               <div className="flex flex-col gap-1.5 w-full">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setViewingGameCard({ ...item });
-                                  }}
-                                  className="w-full bg-blue-900/40 hover:bg-blue-600 text-[10px] py-2 rounded-lg text-blue-400 hover:text-white font-bold transition-all border border-blue-800/50"
-                                >
-                                  Управління (Ігрова)
-                                </button>
-                                {item.amount > 2 && (
-                                  <button
-                                    disabled={defendingCountForCard >= item.amount - 1}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      sellAllDuplicates(item.card.id);
-                                    }}
-                                    className={`w-full ${defendingCountForCard >= item.amount - 1 ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-neutral-800/80 hover:bg-red-900/50 text-neutral-400 hover:border-red-900/50 border-neutral-700'} text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
-                                    title="Продати всі дублікати, залишити найсильнішу"
-                                  >
-                                    Всі (-1) 🗡
-                                  </button>
-                                )}
+                                {(() => {
+                                  const gameDupesAvailable = item.amount - defendingCountForCard;
+                                  const maxGameSellable = Math.max(0, gameDupesAvailable - 1);
+                                  // Якщо дублікатів для "залишити 1" немає — але 1 екземпляр продати можна,
+                                  // даємо кнопку звичайного виставлення (зберігає power/hp).
+                                  if (maxGameSellable === 0) {
+                                    if (!canSellGameToMarket) return null;
+                                    return (
+                                      <button
+                                        disabled={!canSellGameToMarket}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setListingCard(item.card);
+                                        }}
+                                        className={`w-full ${
+                                          !canSellGameToMarket
+                                            ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed'
+                                            : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'
+                                        } text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
+                                      >
+                                        На Ринок
+                                      </button>
+                                    );
+                                  }
+
+                                  return (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSellGameDupeModal({ item, maxSellable: maxGameSellable });
+                                        setSellGameDupeAmount(1);
+                                        setSellGameDupePrice('');
+                                      }}
+                                      className="w-full bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-800/50 text-[10px] py-1.5 rounded-lg font-bold transition-all"
+                                    >
+                                      <Store size={10} className="inline mr-1" />На Ринок
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <div className="w-full flex flex-col gap-1.5 mt-0.5">
-                            <button
-                              disabled={!isGameItem && allBasicDefending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                isGameItem
-                                  ? setViewingGameCard({ ...item })
-                                  : setListingCard(item.card);
-                              }}
-                              className={`w-full ${!isGameItem && allBasicDefending ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
-                            >
-                              {isGameItem ? 'Управління (Ігрова)' : 'Виставити на Ринок'}
-                            </button>
-                          </div>
+                          (isGameItem ? (
+                            <div className="w-full flex flex-col gap-1.5 mt-0.5">
+                              <button
+                                disabled={!canSellGameToMarket}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setListingCard(item.card);
+                                }}
+                                className={`w-full ${
+                                  !canSellGameToMarket
+                                    ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed'
+                                    : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'
+                                } text-xs py-2 rounded-lg font-bold transition-all border`}
+                                title={!canSellGameToMarket ? 'Не можна виставити (сейф або захист точки)' : 'Виставити на Ринок'}
+                              >
+                                Виставити на Ринок
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-full flex flex-col gap-1.5 mt-0.5">
+                              <button
+                                disabled={allBasicDefending}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setListingCard(item.card);
+                                }}
+                                className={`w-full ${allBasicDefending ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
+                              >
+                                Виставити на Ринок
+                              </button>
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
@@ -553,7 +801,7 @@ export default function InventoryView({
                   />
                   <button
                     type="submit"
-                    className="bg-yellow-600 hover:bg-yellow-500 text-yellow-950 font-bold py-3 px-6 rounded-xl transition-colors"
+                    className="btn-game-primary py-3 px-6"
                   >
                     Створити
                   </button>
@@ -754,186 +1002,7 @@ export default function InventoryView({
         </div>
       )}
 
-      {/* Модал дублікатів ігрових карток */}
-      {viewingGameCard &&
-        (() => {
-          const powers = getEffectivePowers(viewingGameCard, packsCatalog);
-          const price = viewingGameCard.card.sellPrice
-            ? Number(viewingGameCard.card.sellPrice)
-            : sellPrice;
-          return (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
-              onClick={() => setViewingGameCard(null)}
-            >
-              <div
-                className="bg-neutral-900 border border-neutral-700 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 border-b border-neutral-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
-                  <h3 className="text-xl font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                    <Zap className="text-green-500" /> {viewingGameCard.card.name} (
-                    {viewingGameCard.amount} шт.)
-                  </h3>
-                  <button
-                    onClick={() => setViewingGameCard(null)}
-                    className="text-neutral-500 hover:text-white transition-colors p-2 text-xl"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-6">
-                  {/* Sorting for Game Cards */}
-                  <div className="flex items-center gap-3 mb-6 bg-neutral-950/50 p-3 rounded-2xl border border-neutral-800">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500 ml-1">Сортувати:</span>
-                    <button 
-                      onClick={() => setGameCardSortBy('power')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'power' ? 'bg-yellow-600 text-white shadow-lg shadow-yellow-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
-                    >
-                      Сила
-                    </button>
-                    <button 
-                      onClick={() => setGameCardSortBy('hp')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'hp' ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
-                    >
-                      ХП
-                    </button>
-                    <button 
-                      onClick={() => setGameCardSortBy('recorded')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${gameCardSortBy === 'recorded' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
-                    >
-                      Тип (Прокачані)
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {powers
-                      .filter(p => !p.inSafe)
-                      .sort((a, b) => {
-                        if (gameCardSortBy === 'power') return b.power - a.power;
-                        if (gameCardSortBy === 'hp') return b.hp - a.hp;
-                        if (gameCardSortBy === 'recorded') {
-                          if (a.isRecorded !== b.isRecorded) return b.isRecorded ? 1 : -1;
-                          return b.power - a.power;
-                        }
-                        return 0;
-                      })
-                      .map((powerObj, displayIdx) => {
-                      const idx = powerObj.statsIndex; // <- ВИКОРИСТОВУЄМО ОРИГІНАЛЬНИЙ ІНДЕКС
-                      const powerVal = powerObj.power;
-                      const hpVal = powerObj.hp;
-                      const isRec = powerObj.isRecorded;
-                      const isDefending = profile?.defendingInstances?.some(
-                        inst => inst.cardId === viewingGameCard.card.id && inst.statsIndex === idx
-                      );
-                      return (
-                        <div
-                          key={displayIdx}
-                          className={`bg-neutral-950 border ${isDefending ? 'border-red-900/50 grayscale opacity-70' : 'border-neutral-800'} rounded-2xl p-4 flex flex-col items-center text-center relative`}
-                        >
-                          {isDefending && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10 shadow-lg">
-                              Захищає Арену
-                            </div>
-                          )}
-                          <div className="flex justify-center gap-4 mb-2">
-                            <div className="flex flex-col items-center">
-                              <div className="text-3xl font-black text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.5)]">
-                                {powerVal}
-                              </div>
-                              <Zap size={14} className="text-yellow-600 mt-1" />
-                            </div>
-                            <div className="flex flex-col items-center">
-                              <div className="text-3xl font-black text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-                                {hpVal}
-                              </div>
-                              <span className="text-red-700 mt-1 text-sm font-black">❤️</span>
-                            </div>
-                          </div>
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mb-4">
-                            {isRec ? 'Характеристики' : 'Базові'}
-                          </div>
-                          <div className="flex flex-col gap-2 w-full mt-auto">
-                            <button
-                              disabled={isDefending}
-                              onClick={async () => {
-                                const success = await sellDuplicate(
-                                  viewingGameCard.card.id,
-                                  isRec ? powerVal : undefined,
-                                  isRec ? hpVal : undefined
-                                );
-                                if (success) {
-                                  const newPowers = [...powers];
-                                  newPowers.splice(idx, 1);
-                                  if (viewingGameCard.amount <= 1) {
-                                    setViewingGameCard(null);
-                                  } else {
-                                    setViewingGameCard({
-                                      ...viewingGameCard,
-                                      amount: viewingGameCard.amount - 1,
-                                      gameStats: newPowers
-                                        .filter((p) => p.isRecorded)
-                                        .map((p) => ({ power: p.power, hp: p.hp })),
-                                    });
-                                  }
-                                }
-                              }}
-                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed' : 'bg-neutral-800 hover:bg-neutral-700 text-white'} text-xs py-2 rounded-lg font-bold transition-all`}
-                            >
-                              Продати (+{price}{' '}
-                              <Coins size={10} className="inline text-yellow-500" />)
-                            </button>
-                            <button
-                              disabled={isDefending}
-                              onClick={() => {
-                                setListingCard({
-                                  ...viewingGameCard.card,
-                                  targetPowerToSell: isRec ? powerVal : null,
-                                  targetHpToSell: isRec ? hpVal : null,
-                                });
-                                setViewingGameCard(null);
-                              }}
-                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 border-neutral-700 cursor-not-allowed' : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
-                            >
-                              На Ринок
-                            </button>
-                            <button
-                              disabled={isDefending}
-                              onClick={async () => {
-                                await toggleSafe(viewingGameCard.card.id, idx, 1, true);
-                                const newPowers = [...powers];
-                                newPowers[idx].inSafe = true;
-                                const remaining = newPowers.filter(p => !p.inSafe).length;
-
-                                if (remaining <= 0) {
-                                  setViewingGameCard(null);
-                                } else {
-                                  setViewingGameCard({
-                                    ...viewingGameCard,
-                                    amount: remaining,
-                                    gameStats: newPowers
-                                      .filter(p => p.isRecorded)
-                                      .map(p => ({ power: p.power, hp: p.hp, inSafe: p.inSafe })),
-                                  });
-                                }
-                              }}
-                              className={`w-full ${isDefending ? 'bg-neutral-800 text-neutral-500 border-neutral-700 cursor-not-allowed' : 'bg-yellow-900/40 hover:bg-yellow-600 text-yellow-400 hover:text-white border-yellow-800/50'} text-xs py-2 rounded-lg font-bold transition-all border`}
-                            >
-                              <Lock size={12} className="inline mr-1 mb-0.5" /> В Сейф
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-      {/* МОДАЛКА ПЕРЕКАЗУ В СЕЙФ/З СЕЙФУ ДЛЯ НЕІГРОВИХ КАРТОК */}
+      {/* МОДАЛКА ПЕРЕКАЗУ В СЕЙФ/З СЕЙФУ */}
       {safeTransferModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
@@ -966,7 +1035,7 @@ export default function InventoryView({
                 <button type="button" onClick={() => setSafeTransferModal(null)} className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 rounded-xl transition-colors">
                   Скасувати
                 </button>
-                <button type="submit" className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-xl transition-colors">
+                <button type="submit" className="flex-1 btn-game-primary py-3">
                   Підтвердити
                 </button>
               </div>
@@ -1044,6 +1113,94 @@ export default function InventoryView({
         </div>
       )}
 
+      {/* Модаль продажу ігрових карток-дублікатів на ринок */}
+      {sellGameDupeModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => !isSellGameDupes && setSellGameDupeModal(null)}
+        >
+          <div
+            className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white font-black text-lg mb-1 flex items-center gap-2">
+              <Store size={18} className="text-blue-400" />
+              Продати на Ринок
+            </h3>
+            <p className="text-neutral-400 text-sm mb-4 font-bold">{sellGameDupeModal.item.card.name}</p>
+            <p className="text-neutral-500 text-xs mb-4 leading-relaxed">
+              Дублікати продаються без характеристик. Покупець отримає картку з базовими параметрами.
+            </p>
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">
+                  Кількість (макс {sellGameDupeModal.maxSellable})
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={sellGameDupeModal.maxSellable}
+                  value={sellGameDupeAmount}
+                  onChange={(e) =>
+                    setSellGameDupeAmount(
+                      Math.min(sellGameDupeModal.maxSellable, Math.max(1, Number(e.target.value) || 1))
+                    )
+                  }
+                  className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">
+                  Ціна (разом)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="монет"
+                  value={sellGameDupePrice}
+                  onChange={(e) => setSellGameDupePrice(e.target.value)}
+                  className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            {sellGameDupePrice && Number(sellGameDupePrice) > 0 && sellGameDupeAmount > 0 && (
+              <div className="text-[10px] text-neutral-500 mb-4">
+                По {Math.round(Number(sellGameDupePrice) / sellGameDupeAmount)} монет за дублікат
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                disabled={isSellGameDupes}
+                onClick={() => setSellGameDupeModal(null)}
+                className="flex-1 py-2.5 text-sm font-bold bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-neutral-400 rounded-xl transition-colors"
+              >
+                Скасувати
+              </button>
+              <button
+                disabled={isSellGameDupes || !sellGameDupePrice || Number(sellGameDupePrice) < 1}
+                onClick={async () => {
+                  const price = Number(sellGameDupePrice);
+                  const amt = Number(sellGameDupeAmount);
+                  if (!price || price < 1) {
+                    if (showToast) showToast('Введіть коректну ціну.', 'error');
+                    return;
+                  }
+                  setIsSellGameDupes(true);
+                  try {
+                    await listDuplicatesOnMarket(sellGameDupeModal.item.card.id, amt, price);
+                    setSellGameDupeModal(null);
+                  } finally {
+                    setIsSellGameDupes(false);
+                  }
+                }}
+                className="flex-1 py-2.5 text-sm font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center justify-center gap-1.5"
+              >
+                {isSellGameDupes ? <RefreshCw size={13} className="animate-spin" /> : 'Виставити'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

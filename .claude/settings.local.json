@@ -3,7 +3,12 @@
     "allow": [
       "Bash(node:*)",
       "Bash(grep:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(cd:*)",
+      "Bash(npx prisma:*)",
+      "Bash(node --input-type=module --eval \"import\\(''''./src/components/GameArena.jsx''''\\)\")",
+      "Bash(npx --no-install eslint src/components/GameArena.jsx --no-eslintrc --rule '{}')",
+      "Bash(npx vite:*)"
     ]
   }
 }

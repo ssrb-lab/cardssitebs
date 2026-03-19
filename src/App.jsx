@@ -37,6 +37,7 @@ import {
   sellCardsRequest,
   fetchMarket,
   listCardRequest,
+  listDuplicatesRequest,
   buyCardRequest,
   cancelListingRequest,
   fetchSettings,
@@ -525,6 +526,30 @@ export default function App() {
     }
   };
 
+  const listDuplicatesOnMarket = async (cardId, amount, priceTotal) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setIsProcessing(true);
+    try {
+      const data = await listDuplicatesRequest(getToken(), cardId, amount, priceTotal);
+      setProfile((prev) => ({ ...data.profile, defendingInstances: data.profile.defendingInstances ?? prev?.defendingInstances ?? [], autoSoundEnabled: prev?.autoSoundEnabled }));
+      setDbInventory(
+        data.profile.inventory.map((i) => ({
+          id: i.cardId,
+          amount: i.amount,
+          gameStats: i.gameStats,
+        }))
+      );
+      showToast(`${amount} дублікатів виставлено на Ринок!`, 'success');
+      await reloadMarket();
+    } catch (e) {
+      showToast(`Помилка: ${e.message}`);
+    } finally {
+      actionLock.current = false;
+      setIsProcessing(false);
+    }
+  };
+
   const buyFromMarket = async (listing) => {
     if (actionLock.current) return;
     actionLock.current = true;
@@ -697,12 +722,13 @@ export default function App() {
     const itemsToSell = [];
 
     for (const [id, pulledAmount] of Object.entries(countsMap)) {
+      const pulledCard = pulledCards.find((c) => c.id === id);
+      const isGameCard = pulledCard?.isGame && !pulledCard?.blockGame;
+      if (isGameCard) continue; // Ігрові картки заборонено продавати при відкритті паку
+
       const invItem = dbInventory.find((i) => i.id === id || i.cardId === id);
       const invAmount = invItem ? invItem.amount : 0;
-
-      const isGameCard = pulledCards.find((c) => c.id === id)?.isGame;
-      const keepAmount = isGameCard ? 3 : 1;
-      const duplicateCount = Math.max(0, invAmount - keepAmount);
+      const duplicateCount = Math.max(0, invAmount - 1);
       const sellAmount = Math.min(pulledAmount, duplicateCount);
 
       if (sellAmount > 0) {
@@ -753,6 +779,11 @@ export default function App() {
 
   const sellSinglePulledCard = async (card) => {
     if (actionLock.current) return;
+
+    if (card.isGame && !card.blockGame) {
+      showToast('Ігрові картки не можна продавати при відкритті паку.', 'error');
+      return;
+    }
 
     const countInPack = pulledCards.filter((c) => c.id === card.id).length;
     const invItem = dbInventory.find((i) => i.id === card.id || i.cardId === card.id);
@@ -869,7 +900,7 @@ export default function App() {
         return;
       }
 
-      const isGameCard = cardData?.isGame;
+      const isGameCard = cardData?.isGame && !cardData?.blockGame;
       const keepAmount = isGameCard ? 3 : 1;
 
       if (!existing || existing.amount <= keepAmount) {
@@ -924,7 +955,7 @@ export default function App() {
           .filter(Boolean);
 
       const duplicates = baseList.filter((item) => {
-        const keepAmount = item.card?.isGame ? 3 : 1;
+        const keepAmount = (item.card?.isGame && !item.card?.blockGame) ? 3 : 1;
         // Ігноруємо лімітовані картки (вони продаються лише на ринку)
         if (item.card?.maxSupply > 0) return false;
         return item.amount > keepAmount;
@@ -937,7 +968,7 @@ export default function App() {
       }
 
       const itemsToSell = duplicates.map((item) => {
-        const keepAmount = item.card?.isGame ? 3 : 1;
+        const keepAmount = (item.card?.isGame && !item.card?.blockGame) ? 3 : 1;
         return {
           cardId: item.card?.id || item.id,
           amount: item.amount - keepAmount,
@@ -1249,7 +1280,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
-      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-50 shadow-sm">
+      <header className="bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
           <div
             className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer shrink-0"
@@ -1327,19 +1358,19 @@ export default function App() {
                 )}
               </button>
 
-              <div className="bg-neutral-950 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-neutral-800 flex gap-1.5 sm:gap-2 items-center shrink-0">
-                <Coins size={16} className="text-yellow-500 sm:w-[18px] sm:h-[18px]" />
-                <span className="text-yellow-500 font-black text-xs sm:text-base">{(profile?.coins || 0).toLocaleString()}</span>
+              <div className="bg-yellow-950/30 backdrop-blur-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-yellow-700/50 flex gap-1.5 sm:gap-2 items-center shrink-0 shadow-inner">
+                <Coins size={16} className="text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)] sm:w-[18px] sm:h-[18px]" />
+                <span className="text-yellow-400 font-black text-xs sm:text-base drop-shadow-md">{(profile?.coins || 0).toLocaleString()}</span>
               </div>
-              <div className="bg-neutral-950 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-neutral-800 flex gap-1.5 sm:gap-2 items-center shrink-0">
-                <Gem size={16} className="text-fuchsia-500 sm:w-[18px] sm:h-[18px]" />
-                <span className="text-fuchsia-500 font-black text-xs sm:text-base">{(profile?.crystals || 0).toLocaleString()}</span>
+              <div className="bg-fuchsia-950/30 backdrop-blur-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-fuchsia-700/50 flex gap-1.5 sm:gap-2 items-center shrink-0 shadow-inner">
+                <Gem size={16} className="text-fuchsia-400 drop-shadow-[0_0_5px_rgba(217,70,239,0.8)] sm:w-[18px] sm:h-[18px]" />
+                <span className="text-fuchsia-400 font-black text-xs sm:text-base drop-shadow-md">{(profile?.crystals || 0).toLocaleString()}</span>
               </div>
               <button
                 onClick={() => navigate('/premium')}
-                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border bg-neutral-950 border-neutral-800 text-fuchsia-400 shrink-0"
+                className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border bg-gradient-to-r from-fuchsia-600/20 to-purple-600/20 hover:from-fuchsia-500/30 hover:to-purple-500/30 border-fuchsia-500/30 text-fuchsia-300 shrink-0 transition-all active:scale-[0.97] shadow-[0_0_10px_rgba(217,70,239,0.1)]"
               >
-                <Gem size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:block font-bold text-sm">Преміум</span>
+                <Gem size={16} className="sm:w-[18px] sm:h-[18px] drop-shadow-[0_0_5px_rgba(217,70,239,0.8)]" /> <span className="hidden sm:block font-bold text-sm drop-shadow-md">Преміум</span>
               </button>
             </div>
           </div>
@@ -1458,6 +1489,8 @@ export default function App() {
               deleteShowcase={deleteShowcase}
               setMainShowcase={setMainShowcase}
               saveShowcaseCards={saveShowcaseCards}
+              listDuplicatesOnMarket={listDuplicatesOnMarket}
+              showToast={showToast}
             />
           } />
 
@@ -1471,6 +1504,7 @@ export default function App() {
               showToast={showToast}
               getToken={getToken}
               reloadProfile={reloadProfile}
+              listDuplicatesOnMarket={listDuplicatesOnMarket}
             />
           } />
 
@@ -1690,7 +1724,7 @@ export default function App() {
 
       <DonateModal isOpen={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
-      <nav className="fixed bottom-0 w-full bg-neutral-900 border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
+      <nav className="fixed bottom-0 w-full bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
         <div className="min-w-max mx-auto flex justify-center sm:gap-2">
           <NavButton
             icon={<Swords size={22} />}

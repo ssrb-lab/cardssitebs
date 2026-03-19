@@ -42,5 +42,8 @@ jobs:
             # Запускаємо міграцію характеристик карток
             node backend/scripts/migrate-card-stats.js
 
+            # Міграція формату gameStats (level, maxHp, числовий → об'єкт)
+            node backend/scripts/migrate-gamestats-format.js
+
             # Перезапускаємо бекенд через PM2
             pm2 restart backend || pm2 start server.js --name backend

@@ -424,9 +424,8 @@ export default function ProfileView({
                 <button
                   onClick={handleCropAndUpload}
                   disabled={isProcessing}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-4 rounded-xl transition-colors shadow-[0_0_15px_rgba(37,99,235,0.3)] shadow-blue-500/20"
-                >
-                  {isProcessing ? 'Завантаження...' : 'Застосувати та Зберегти'}
+                  className="w-full btn-game-secondary py-4 shadow-blue-500/20"
+                >                  {isProcessing ? 'Завантаження...' : 'Застосувати та Зберегти'}
                 </button>
               </div>
             </div>
@@ -487,7 +486,7 @@ export default function ProfileView({
                     <button
                       type="submit"
                       disabled={isProcessing || !avatarInput.trim()}
-                      className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-4 py-3 rounded-xl transition-colors text-sm w-full"
+                      className="btn-game-secondary py-3 text-sm w-full"
                     >
                       Зберегти URL аватар
                     </button>
@@ -524,7 +523,7 @@ export default function ProfileView({
                     <button
                       type="submit"
                       disabled={isProcessing || !oldPassword || !newPassword || !confirmPassword}
-                      className="bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm whitespace-nowrap"
+                      className="btn-game-secondary px-6 py-3 text-sm whitespace-nowrap"
                     >
                       Оновити
                     </button>

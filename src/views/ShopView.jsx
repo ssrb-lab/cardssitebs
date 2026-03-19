@@ -160,6 +160,10 @@ export default function ShopView({
     let hasDuplicates = false;
 
     Object.entries(countsMap).forEach(([id, pulledAmount]) => {
+      const cardDef = pulledCards.find((c) => c.id === id);
+      const isGameCard = cardDef?.isGame && !cardDef?.blockGame;
+      if (isGameCard) return; // Ігрові картки заборонено продавати при відкритті паку
+
       const invItem = profile?.inventory?.find((i) => i.cardId === id || i.id === id);
       const invAmount = invItem ? invItem.amount : 0;
       const duplicateCount = Math.max(0, invAmount - 1);
@@ -167,7 +171,6 @@ export default function ShopView({
 
       if (sellAmount > 0) {
         hasDuplicates = true;
-        const cardDef = pulledCards.find((c) => c.id === id);
         const price = cardDef?.sellPrice ? Number(cardDef.sellPrice) : SELL_PRICE;
         duplicateSellPrice += price * sellAmount;
       }
@@ -223,16 +226,18 @@ export default function ShopView({
                       {cardStats[card.id] || 0} / {card.maxSupply}
                     </div>
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      sellSinglePulledCard(card);
-                    }}
-                    className="absolute top-2 right-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
-                    title="Продати картку"
-                  >
-                    <Coins size={14} className="sm:w-4 sm:h-4 w-[14px] h-[14px]" />
-                  </button>
+                  {!(card.isGame && !card.blockGame) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sellSinglePulledCard(card);
+                      }}
+                      className="absolute top-2 right-2 bg-red-600/90 text-white p-1.5 sm:p-2 rounded-lg hover:bg-red-500 z-30 transition-colors shadow-lg"
+                      title="Продати картку"
+                    >
+                      <Coins size={14} className="sm:w-4 sm:h-4 w-[14px] h-[14px]" />
+                    </button>
+                  )}
                   {card.soundUrl && (
                     <button
                       onClick={(e) => {
@@ -253,14 +258,14 @@ export default function ShopView({
                     <Sparkles size={12} /> {card.rarity}
                   </div>
                   {(card.generatedPower || card.generatedHp) && (
-                    <div className="flex flex-col items-center justify-center gap-1 mt-1 mb-1">
+                    <div className="flex flex-col items-center justify-center gap-1 mt-1 mb-1 w-full">
                       {card.generatedPower && (
-                        <div className="text-xs sm:text-sm font-bold text-yellow-500 flex items-center justify-center gap-1 shadow-sm">
-                          <Zap size={14} strokeWidth={2.5} /> {card.generatedPower}
+                        <div className="glass-badge w-full max-w-[80%] text-yellow-400 border-yellow-500/20">
+                          <Zap size={12} strokeWidth={2.5} className="drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]" /> {card.generatedPower}
                         </div>
                       )}
                       {card.generatedHp && (
-                        <div className="text-xs sm:text-sm font-bold text-red-500 flex items-center justify-center gap-1 shadow-sm">
+                        <div className="glass-badge w-full max-w-[80%] text-red-400 border-red-500/20">
                           ❤️ {card.generatedHp}
                         </div>
                       )}
@@ -278,17 +283,19 @@ export default function ShopView({
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto px-4 sm:px-0">
           <button
             onClick={() => setPulledCards([])}
-            className="px-6 sm:px-8 py-3 sm:py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg border border-neutral-700 w-full sm:w-auto text-sm sm:text-base"
+            className="px-6 sm:px-8 py-3 sm:py-4 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all shadow-lg border border-neutral-700 w-full sm:w-auto text-sm sm:text-base active:scale-95"
           >
             Забрати картки
           </button>
-          <button
-            onClick={sellPulledCards}
-            disabled={isProcessing || !hasDuplicates}
-            className="px-6 sm:px-8 py-3 sm:py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-lg flex items-center justify-center gap-2 w-full sm:w-auto text-sm sm:text-base"
-          >
-            Продати дублікати (+{duplicateSellPrice} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5" />)
-          </button>
+          {hasDuplicates && (
+            <button
+              onClick={sellPulledCards}
+              disabled={isProcessing}
+              className={`px-6 sm:px-8 py-3 sm:py-4 font-bold w-full sm:w-auto text-sm sm:text-base ${isProcessing ? 'bg-neutral-800 text-neutral-500 rounded-xl cursor-not-allowed opacity-70 flex items-center justify-center gap-2' : 'btn-game-secondary'}`}
+            >
+              Продати дублікати (+{duplicateSellPrice} <Coins size={14} className="sm:w-4 sm:h-4 w-3.5 h-3.5 text-yellow-400" />)
+            </button>
+          )}
         </div>
       </div>
     );
@@ -531,22 +538,22 @@ export default function ShopView({
                          }
                       }
                       
-                      if (card.minPower !== null && card.maxPower !== null) {
-                         minP = card.minPower; maxP = card.maxPower;
-                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minPower !== undefined && packRanges[card.rarity].maxPower !== undefined && packRanges[card.rarity].minPower !== '' && packRanges[card.rarity].maxPower !== '') {
+                      if (card.minPower !== null) {
+                         minP = card.minPower; maxP = card.maxPower !== null ? card.maxPower : card.minPower;
+                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minPower !== undefined && packRanges[card.rarity].minPower !== '') {
                          minP = Number(packRanges[card.rarity].minPower);
-                         maxP = Number(packRanges[card.rarity].maxPower);
+                         maxP = (packRanges[card.rarity].maxPower !== undefined && packRanges[card.rarity].maxPower !== '') ? Number(packRanges[card.rarity].maxPower) : minP;
                       } else {
                          const RARITY_POWER_RANGES = { Звичайна: [5, 50], Рідкісна: [10, 80], Епічна: [25, 100], Легендарна: [50, 125], Унікальна: [100, 150] };
                          const rng = RARITY_POWER_RANGES[card.rarity] || [5, 50];
                          minP = rng[0]; maxP = rng[1];
                       }
                       
-                      if (card.minHp !== null && card.maxHp !== null) {
-                         minH = card.minHp; maxH = card.maxHp;
-                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minHp !== undefined && packRanges[card.rarity].maxHp !== undefined && packRanges[card.rarity].minHp !== '' && packRanges[card.rarity].maxHp !== '') {
+                      if (card.minHp !== null) {
+                         minH = card.minHp; maxH = card.maxHp !== null ? card.maxHp : card.minHp;
+                      } else if (packRanges && packRanges[card.rarity] && packRanges[card.rarity].minHp !== undefined && packRanges[card.rarity].minHp !== '') {
                          minH = Number(packRanges[card.rarity].minHp);
-                         maxH = Number(packRanges[card.rarity].maxHp);
+                         maxH = (packRanges[card.rarity].maxHp !== undefined && packRanges[card.rarity].maxHp !== '') ? Number(packRanges[card.rarity].maxHp) : minH;
                       } else {
                          minH = minP * 2;
                          maxH = maxP * 2;
@@ -555,10 +562,10 @@ export default function ShopView({
                       return (
                         <div className="flex flex-col items-center justify-center gap-0.5 mt-0.5 mb-1 opacity-80">
                            <div className="text-[10px] sm:text-xs font-bold text-yellow-500 flex items-center justify-center gap-0.5 shadow-sm">
-                             <Zap size={10} strokeWidth={2.5} /> {minP}–{maxP}
+                             <Zap size={10} strokeWidth={2.5} /> {minP === maxP ? minP : `${minP}–${maxP}`}
                            </div>
                            <div className="text-[10px] sm:text-xs font-bold text-red-500 flex items-center justify-center gap-0.5 shadow-sm">
-                             ❤️ {minH}–{maxH}
+                             ❤️ {minH === maxH ? minH : `${minH}–${maxH}`}
                            </div>
                         </div>
                       );
@@ -692,22 +699,37 @@ function OpenButton({
   currency = 'coins',
   onClick,
   opening,
-  color = 'bg-yellow-500 hover:bg-yellow-400 text-white',
+  color,
   label,
 }) {
   const disabled = opening;
+  
+  // Визначаємо клас на основі валюти та кількості
+  let btnClass = 'btn-game-primary';
+  if (currency === 'crystals') {
+    btnClass = 'btn-game-epic';
+  } else if (amount === 5) {
+    btnClass = 'btn-game bg-gradient-to-b from-orange-400 to-orange-600 text-orange-950 border-orange-300/50 hover:from-orange-300 hover:to-orange-500 hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]';
+  } else if (amount === 10) {
+    btnClass = 'btn-game-danger';
+  } else if (amount === 100) {
+    btnClass = 'btn-game bg-gradient-to-b from-indigo-500 to-purple-700 text-white border-indigo-400/50 hover:from-indigo-400 hover:to-purple-600 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]';
+  } else if (amount > 100) {
+    btnClass = 'btn-game bg-gradient-to-b from-emerald-500 to-green-700 text-white border-green-400/50 hover:from-emerald-400 hover:to-green-600 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]';
+  }
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-2 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all shadow-lg text-xs sm:text-base ${disabled
-          ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70'
-          : `${color} transform hover:-translate-y-1`
-        } flex-1 sm:flex-none`}
+      className={`px-2 py-2 sm:px-6 sm:py-3 font-black flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-xs sm:text-base flex-1 sm:flex-none ${disabled
+          ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-70 rounded-xl'
+          : btnClass
+        }`}
     >
-      <span className="text-center">{label ? label : `Відкрити ${amount}x`}</span>
-      <span className="flex items-center text-[10px] sm:text-sm bg-black/20 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded sm:ml-1 mt-0.5 sm:mt-0">
-        {cost * amount} {currency === 'crystals' ? <Gem size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" /> : <Coins size={12} className="ml-1 sm:w-[14px] sm:h-[14px]" />}
+      <span className="text-center drop-shadow-md">{label ? label : `Відкрити ${amount}x`}</span>
+      <span className="flex items-center text-[10px] sm:text-sm bg-black/40 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-md sm:ml-1 mt-0.5 sm:mt-0 shadow-inner">
+        {cost * amount} {currency === 'crystals' ? <Gem size={12} className="ml-1 sm:w-[14px] sm:h-[14px] text-fuchsia-400 drop-shadow-[0_0_5px_rgba(217,70,239,0.8)]" /> : <Coins size={12} className="ml-1 sm:w-[14px] sm:h-[14px] text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]" />}
       </span>
     </button>
   );

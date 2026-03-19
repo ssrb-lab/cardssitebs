@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, Tag, Volume2, User, Coins, Trash2, RefreshCw } from 'lucide-react';
+import { Store, Tag, Volume2, User, Coins, Trash2, RefreshCw, Layers } from 'lucide-react';
 import { getCardStyle, playCardSound } from '../utils/helpers';
 import CardFrame from '../components/CardFrame';
 import { PerkBadge } from '../components/PerkBadge';
@@ -91,6 +91,8 @@ export default function MarketView({
             const style = getCardStyle(card.rarity, rarities);
             const effectClass = card.effect ? `effect-${card.effect}` : '';
             const isMine = listing.sellerUid === currentUserUid;
+            const isDupe = !!listing.isDuplicate;
+            const dupeAmt = listing.duplicateAmount || 1;
 
             return (
               <div
@@ -106,13 +108,23 @@ export default function MarketView({
                       <img
                         src={card.image}
                         alt={card.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 transform-gpu will-change-transform"
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 transform-gpu will-change-transform ${isDupe ? 'grayscale-[30%]' : ''}`}
                         loading="lazy"
                       />
                     </CardFrame>
-                    <PerkBadge perk={card.perk} />
+                    {!isDupe && <PerkBadge perk={card.perk} />}
                   </div>
-                  {card.soundUrl && (
+
+                  {/* Duplicate badge */}
+                  {isDupe && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 z-20">
+                      <Layers size={28} className="text-blue-400 mb-1 drop-shadow-lg" />
+                      <span className="text-white font-black text-lg drop-shadow-lg">×{dupeAmt}</span>
+                      <span className="text-blue-300 text-[10px] font-bold uppercase tracking-widest mt-0.5">Дублікати</span>
+                    </div>
+                  )}
+
+                  {!isDupe && card.soundUrl && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -127,23 +139,17 @@ export default function MarketView({
                 </div>
 
                 <div className="w-full px-1 text-center flex flex-col items-center">
-                  <div className="font-bold text-xs text-white truncate w-full mb-1">
+                  <div className="font-bold text-xs text-white truncate w-full mb-0.5">
                     {card.name}
                   </div>
-                  <div className="text-[10px] text-neutral-500 mb-2 truncate w-full flex items-center justify-center gap-1">
+                  {isDupe ? (
+                    <div className="text-[10px] text-blue-400 font-bold mb-0.5">
+                      Базові характеристики · ×{dupeAmt} шт.
+                    </div>
+                  ) : null}
+                  <div className="text-[10px] text-neutral-500 mb-3 truncate w-full flex items-center justify-center gap-1">
                     <User size={10} /> {listing.sellerNickname}
                   </div>
-
-                  {listing.power !== null && (
-                    <div className="flex gap-1 justify-center mb-2">
-                      <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-yellow-500">
-                        ⚡ {listing.power}
-                      </div>
-                      <div className="flex bg-neutral-950/80 border border-neutral-700/50 rounded-lg px-2 py-1 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-red-500">
-                        ❤️ {listing.hp ?? 50}
-                      </div>
-                    </div>
-                  )}
 
                   {isMine ? (
                     <button
@@ -158,7 +164,10 @@ export default function MarketView({
                         onClick={() => buyFromMarket(listing)}
                         className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-lg shadow-blue-900/20 flex justify-center items-center gap-1"
                       >
-                        Купити ({listing.price} <Coins size={10} />)
+                        {isDupe
+                          ? <>{dupeAmt} шт. ({listing.price} <Coins size={10} />)</>
+                          : <>Купити ({listing.price} <Coins size={10} />)</>
+                        }
                       </button>
                       {isAdmin && (
                         <button
@@ -169,6 +178,11 @@ export default function MarketView({
                           <Trash2 size={14} />
                         </button>
                       )}
+                    </div>
+                  )}
+                  {isDupe && (
+                    <div className="text-[10px] text-neutral-600 mt-1">
+                      ~{Math.round(listing.price / dupeAmt)} монет / шт.
                     </div>
                   )}
                 </div>

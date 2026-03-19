@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .btn-game {
+    @apply flex items-center justify-center gap-2 font-bold rounded-xl transition-all duration-300 active:scale-[0.97] shadow-lg border relative overflow-hidden;
+  }
+  .btn-game-primary {
+    @apply btn-game bg-gradient-to-b from-yellow-400 to-yellow-600 text-yellow-950 border-yellow-300/50 hover:from-yellow-300 hover:to-yellow-500 hover:shadow-[0_0_20px_rgba(250,204,21,0.4)];
+  }
+  .btn-game-secondary {
+    @apply btn-game bg-gradient-to-b from-blue-500 to-blue-700 text-white border-blue-400/50 hover:from-blue-400 hover:to-blue-600 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)];
+  }
+  .btn-game-danger {
+    @apply btn-game bg-gradient-to-b from-red-600 to-red-800 text-white border-red-500/50 hover:from-red-500 hover:to-red-700 hover:shadow-[0_0_20px_rgba(239,68,68,0.4)];
+  }
+  .btn-game-epic {
+    @apply btn-game bg-gradient-to-b from-fuchsia-600 to-purple-800 text-white border-fuchsia-400/50 hover:from-fuchsia-500 hover:to-purple-700 hover:shadow-[0_0_20px_rgba(217,70,239,0.4)];
+  }
+  .glass-panel {
+    @apply bg-neutral-900/60 backdrop-blur-md border border-white/10 rounded-2xl shadow-xl;
+  }
+  .glass-badge {
+    @apply bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1 shadow-inner border border-white/5;
+  }
+}
+
 @layer utilities {
   @keyframes flyInTop {
     0% {

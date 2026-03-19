@@ -199,21 +199,16 @@ export const toggleSafeRequest = async (token, cardId, statsIndex, amount, isSaf
   if (!res.ok) throw new Error(data.error || 'Помилка сейфу');
   return data;
 };
-
-export const upgradeCardRequest = async (token, cardId, mainIndex, materialIndex) => {
-  const response = await safeFetch(`${API_URL}/game/forge/upgrade`, {
+export const levelUpCardRequest = async (token, cardId, statsIndex) => {
+  const response = await safeFetch(`${API_URL}/game/forge/levelup`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ cardId, mainIndex, materialIndex }),
+    body: JSON.stringify({ cardId, statsIndex }),
   });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || 'Помилка кування.');
-  }
-  return await response.json();
+  return response.json();
 };
 
 // --- CRASH ---
@@ -271,6 +266,17 @@ export const buyCardRequest = async (token, listingId) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ listingId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const listDuplicatesRequest = async (token, cardId, amount, priceTotal) => {
+  const res = await safeFetch(`${API_URL}/game/market/list-duplicates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, amount, priceTotal }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -885,10 +891,125 @@ export const battleArenaPointRequest = async (token, pointId, cards = [], expect
   return data;
 };
 
+export const swapArenaCardsRequest = async (token, pointId, cards = []) => {
+  const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/swap-cards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cards }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 export const claimArenaCrystalsRequest = async (token, pointId) => {
   const res = await safeFetch(`${API_URL}/game/arena/points/${pointId}/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+// --- СМАРАГДИ ---
+export const fetchEmeraldInfo = async (token) => {
+  const res = await safeFetch(`${API_URL}/game/emerald-info`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const openEmeraldBoxRequest = async (token) => {
+  const res = await safeFetch(`${API_URL}/game/open-emerald-box`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const installEmeraldRequest = async (token, cardId, statsIndex, emeraldTypeId) => {
+  const res = await safeFetch(`${API_URL}/game/install-emerald`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, statsIndex, emeraldTypeId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const removeEmeraldRequest = async (token, cardId, statsIndex) => {
+  const res = await safeFetch(`${API_URL}/game/remove-emerald`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, statsIndex }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const fetchAdminEmeraldTypes = async (token) => {
+  const res = await safeFetch(`${API_URL}/admin/emerald-types`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const saveEmeraldTypeRequest = async (token, typeData) => {
+  const res = await safeFetch(`${API_URL}/admin/emerald-types`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(typeData),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const deleteEmeraldTypeRequest = async (token, id) => {
+  const res = await safeFetch(`${API_URL}/admin/emerald-types/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const fetchAdminEmeraldSettings = async (token) => {
+  const res = await safeFetch(`${API_URL}/admin/emerald-settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const saveEmeraldSettingsRequest = async (token, settings) => {
+  const res = await safeFetch(`${API_URL}/admin/emerald-settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(settings),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+// --- РЕМОНТ КАРТОК ---
+export const repairCardRequest = async (token, cardId, statsIndex, currency) => {
+  const res = await safeFetch(`${API_URL}/game/repair-card`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ cardId, statsIndex, currency }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
