@@ -1092,6 +1092,56 @@ async function getMinStatsForCard(tx, card) {
   return { power: Number(minP), hp: Number(minH) };
 }
 
+// ── Auto-balance constants (mirrors frontend AdminView) ──────────────────────
+const AB_BASE_SRV = {
+  'Звичайна':   { power:  60, hp:  120 },
+  'Рідкісна':   { power:  85, hp:  170 },
+  'Епічна':     { power: 120, hp:  240 },
+  'Легендарна': { power: 170, hp:  340 },
+  'Унікальна':  { power: 230, hp:  460 },
+};
+const AB_LVL_PCT_SRV  = [0.08, 0.10, 0.12, 0.15, 0.18, 0.22, 0.26, 0.30, 0.35];
+const AB_DUPES_SRV = {
+  'Звичайна':   [1,  1,  1,  2,  2,   2,   3,   3,   3 ],
+  'Рідкісна':   [1,  1,  2,  3,  4,   5,   5,   5,   5 ],
+  'Епічна':     [2,  2,  3,  4,  5,   6,   7,   8,   8 ],
+  'Легендарна': [3,  4,  5,  7,  9,  11,  13,  15,  15 ],
+  'Унікальна':  [4,  5,  7,  9, 12,  15,  18,  22,  25 ],
+};
+const AB_COST_SRV = {
+  'Звичайна':   [500,    800,    1500,    2500,    4000,    6000,    100,  200,  500  ],
+  'Рідкісна':   [1000,   2000,   4000,    7000,    12000,   20000,   300,  700,  1500 ],
+  'Епічна':     [4000,   8000,   14000,   25000,   45000,   75000,   1200, 2500, 4000 ],
+  'Легендарна': [12000,  20000,  35000,   60000,   100000,  180000,  1500, 3000, 5000 ],
+  'Унікальна':  [30000,  60000,  100000,  180000,  300000,  500000,  3000, 5000, 8000 ],
+};
+const AB_CURRENCY_SRV = ['coins','coins','coins','coins','coins','coins','crystals','crystals','crystals'];
+
+/**
+ * Compute levelingConfig for a card based on rarity and base stats.
+ * baseP/baseH: card's level-1 power/hp (from card fields or pack statsRanges).
+ */
+function computeLevelingConfig(rarity, baseP, baseH) {
+  const base     = AB_BASE_SRV[rarity] || AB_BASE_SRV['Звичайна'];
+  const dupeArr  = AB_DUPES_SRV[rarity]  || AB_DUPES_SRV['Звичайна'];
+  const costArr  = AB_COST_SRV[rarity]   || AB_COST_SRV['Звичайна'];
+  const p = baseP || base.power;
+  const h = baseH || base.hp;
+  const cfg = {};
+  for (let lvl = 2; lvl <= 10; lvl++) {
+    const pct = AB_LVL_PCT_SRV[lvl - 2];
+    cfg[lvl] = {
+      powerAdd: Math.max(1, Math.round(p * pct)),
+      hpAdd:    Math.max(1, Math.round(h * pct)),
+      dupes:    dupeArr[lvl - 2],
+      cost:     costArr[lvl - 2],
+      currency: AB_CURRENCY_SRV[lvl - 2],
+    };
+  }
+  return cfg;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function handleIsGameStatusChange(tx, cardIds, isGame) {
   if (!cardIds || cardIds.length === 0) return;
   if (!isGame) {
@@ -1233,64 +1283,83 @@ async function handleCardStatsUpdate(tx, cardId) {
   if (!isGame) return;
 
   const ranges = await getStatsRangesForCard(tx, card);
-  
+  const baseP = ranges.maxPower;
+  const baseH = ranges.maxHp;
+
+  let levelConfig = typeof card.levelingConfig === 'object' && card.levelingConfig
+    ? card.levelingConfig
+    : (card.levelingConfig ? JSON.parse(card.levelingConfig) : {});
+  // Якщо картка не має власного levelingConfig — обчислюємо з авто-балансу
+  if (!levelConfig || Object.keys(levelConfig).length === 0) {
+    levelConfig = computeLevelingConfig(card.rarity, baseP, baseH);
+  }
+
+  // Детерміновано розраховує статки за рівнем (без рандому)
+  function computeStatsForLevel(level) {
+    let power = baseP;
+    let hp = baseH;
+    const lvl = Math.max(1, Math.min(10, Number(level) || 1));
+    for (let l = 2; l <= lvl; l++) {
+      const cfg = levelConfig[l] || levelConfig[String(l)];
+      if (cfg) {
+        power += Number(cfg.powerAdd) || 0;
+        hp    += Number(cfg.hpAdd)    || 0;
+      }
+    }
+    return { power, hp };
+  }
+
   // 1. Інвентар
   const items = await tx.inventoryItem.findMany({ where: { cardId } });
   for (const item of items) {
     if (item.amount > 0 && Array.isArray(item.gameStats) && item.gameStats.length > 0) {
       let changed = false;
       const newStats = item.gameStats.map(s => {
-         let p = typeof s === 'object' ? (s.power || 0) : Number(s);
-         let h = typeof s === 'object' ? (s.hp || p * 2) : p * 2;
-         let inSafe = typeof s === 'object' ? !!s.inSafe : false;
-         
-         let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, p));
-         let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, h));
-         
-         if (newP !== p || newH !== h || (typeof s !== 'object')) {
-            changed = true;
-         }
-         return { power: newP, hp: newH, inSafe };
+        const level  = typeof s === 'object' ? (s.level || 1) : 1;
+        const inSafe = typeof s === 'object' ? !!s.inSafe : false;
+        const { power: newP, hp: newH } = computeStatsForLevel(level);
+        const oldP = typeof s === 'object' ? s.power : Number(s);
+        const oldH = typeof s === 'object' ? (s.hp || 0) : 0;
+        if (newP !== oldP || newH !== oldH || typeof s !== 'object') changed = true;
+        return { ...(typeof s === 'object' ? s : {}), power: newP, hp: newH, level, inSafe };
       });
       if (changed) {
-         await tx.inventoryItem.update({ where: { id: item.id }, data: { gameStats: newStats } });
+        await tx.inventoryItem.update({ where: { id: item.id }, data: { gameStats: newStats } });
       }
     }
   }
-  
-  // 2. Ринок
-  const listings = await tx.marketListing.findMany({ where: { cardId } });
+
+  // 2. Ринок (використовуємо збережений рівень оголошення)
+  const listings = await tx.marketListing.findMany({ where: { cardId, status: 'active' } });
   for (const listing of listings) {
-     if (listing.power !== null && listing.hp !== null) {
-         let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, listing.power));
-         let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, listing.hp));
-         if (newP !== listing.power || newH !== listing.hp) {
-             await tx.marketListing.update({ where: { id: listing.id }, data: { power: newP, hp: newH } });
-         }
-     }
+    if (listing.power !== null) {
+      const level = listing.level || 1;
+      const { power: newP, hp: newH } = computeStatsForLevel(level);
+      if (newP !== listing.power || newH !== (listing.hp || 0)) {
+        await tx.marketListing.update({ where: { id: listing.id }, data: { power: newP, hp: newH } });
+      }
+    }
   }
-  
+
   // 3. Арена
   const points = await tx.arenaPoint.findMany();
   for (const point of points) {
-     if (point.defendingCards && Array.isArray(point.defendingCards)) {
-        let changed = false;
-        const newCards = point.defendingCards.map(c => {
-           if (c.id === cardId) {
-              changed = true;
-              let currentP = c.power !== undefined ? c.power : ranges.minPower;
-              let currentH = c.maxHp !== undefined ? c.maxHp : (c.hp !== undefined ? c.hp : ranges.minHp);
-              let newP = Math.max(ranges.minPower, Math.min(ranges.maxPower, currentP));
-              let newH = Math.max(ranges.minHp, Math.min(ranges.maxHp, currentH));
-              let currentHp = Math.min(c.currentHp !== undefined ? c.currentHp : newH, newH);
-              return { ...c, power: newP, hp: newH, maxHp: newH, currentHp, perk: card.perk, perkValue: card.perkValue };
-           }
-           return c;
-        });
-        if (changed) {
-           await tx.arenaPoint.update({ where: { id: point.id }, data: { defendingCards: newCards } });
+    if (point.defendingCards && Array.isArray(point.defendingCards)) {
+      let changed = false;
+      const newCards = point.defendingCards.map(c => {
+        if (c.id === cardId) {
+          changed = true;
+          const level = c.level || 1;
+          const { power: newP, hp: newH } = computeStatsForLevel(level);
+          const currentHp = Math.min(c.currentHp !== undefined ? c.currentHp : newH, newH);
+          return { ...c, power: newP, hp: newH, maxHp: newH, currentHp, perk: card.perk, perkValue: card.perkValue };
         }
-     }
+        return c;
+      });
+      if (changed) {
+        await tx.arenaPoint.update({ where: { id: point.id }, data: { defendingCards: newCards } });
+      }
+    }
   }
 }
 
@@ -1300,7 +1369,42 @@ app.get('/api/catalog', async (req, res) => {
     const cards = await prisma.cardCatalog.findMany();
     const packs = await prisma.packCatalog.findMany();
     const achievements = await prisma.achievementSettings.findMany();
-    res.json({ cards, packs, achievements });
+
+    // Build pack lookup for statsRanges fallback
+    const packMap = {};
+    for (const p of packs) {
+      try {
+        packMap[p.id] = {
+          isGame: p.isGame,
+          statsRanges: typeof p.statsRanges === 'string' ? JSON.parse(p.statsRanges) : (p.statsRanges || null),
+        };
+      } catch(e) { packMap[p.id] = { isGame: p.isGame, statsRanges: null }; }
+    }
+
+    // For game cards missing levelingConfig, compute it on-the-fly from pack statsRanges
+    const enrichedCards = cards.map(card => {
+      if (!card.isGame) return card;
+      let lc = card.levelingConfig;
+      if (typeof lc === 'string') { try { lc = JSON.parse(lc); } catch(e) { lc = null; } }
+      if (lc && Object.keys(lc).length > 0) return card; // already has config
+
+      // Determine base stats
+      let baseP = card.maxPower;
+      let baseH  = card.maxHp;
+      const pm = packMap[card.packId];
+      if ((baseP === null || baseP === undefined) && pm?.statsRanges?.[card.rarity]) {
+        baseP = pm.statsRanges[card.rarity].maxPower;
+      }
+      if ((baseH === null || baseH === undefined) && pm?.statsRanges?.[card.rarity]) {
+        baseH = pm.statsRanges[card.rarity].maxHp;
+      }
+      if (!baseP) baseP = (AB_BASE_SRV[card.rarity] || AB_BASE_SRV['Звичайна']).power;
+      if (!baseH) baseH = (AB_BASE_SRV[card.rarity] || AB_BASE_SRV['Звичайна']).hp;
+
+      return { ...card, levelingConfig: computeLevelingConfig(card.rarity, baseP, baseH) };
+    });
+
+    res.json({ cards: enrichedCards, packs, achievements });
   } catch (error) {
     res.status(500).json({ error: 'Помилка завантаження каталогу.' });
   }
@@ -1370,12 +1474,14 @@ app.post(
         if (effectiveStatusOld !== effectiveStatusNew) {
            await handleIsGameStatusChange(prisma, [card.id], effectiveStatusNew);
         } else if (effectiveStatusNew) {
-           const statsChanged = existing.minPower !== card.minPower || 
-                                existing.maxPower !== card.maxPower || 
-                                existing.minHp !== card.minHp || 
-                                existing.maxHp !== card.maxHp || 
-                                existing.perk !== card.perk || 
-                                existing.perkValue !== card.perkValue;
+           const levelingConfigChanged = JSON.stringify(existing.levelingConfig) !== JSON.stringify(card.levelingConfig);
+           const statsChanged = existing.minPower !== card.minPower ||
+                                existing.maxPower !== card.maxPower ||
+                                existing.minHp    !== card.minHp    ||
+                                existing.maxHp    !== card.maxHp    ||
+                                existing.perk     !== card.perk     ||
+                                existing.perkValue !== card.perkValue ||
+                                levelingConfigChanged;
            if (statsChanged) {
                await handleCardStatsUpdate(prisma, card.id);
            }
@@ -1450,6 +1556,14 @@ app.post(
       let pack;
       if (existing) {
         pack = await prisma.packCatalog.update({ where: { id: packData.id }, data: packData });
+        // Коли змінюються statsRanges — перераховуємо всі ігрові картки паку
+        const packStatsRangesChanged = JSON.stringify(existing.statsRanges) !== JSON.stringify(pack.statsRanges);
+        if (packStatsRangesChanged && pack.isGame) {
+          const packCards = await prisma.cardCatalog.findMany({ where: { packId: pack.id, blockGame: false } });
+          for (const pc of packCards) {
+            await handleCardStatsUpdate(prisma, pc.id);
+          }
+        }
         if (existing.isGame !== pack.isGame) {
            const packCards = await prisma.cardCatalog.findMany({
                where: { packId: pack.id, isGame: false, blockGame: false }
@@ -1458,8 +1572,44 @@ app.post(
            if (cardIds.length > 0) {
               await handleIsGameStatusChange(prisma, cardIds, pack.isGame);
 
-              // AUTO-RETURN MARKET LISTINGS IF CHANGED TO GAME CARD
+              // AUTO-BALANCE: коли пак стає ігровим — застосовуємо levelingConfig і isGame на кожну картку
               if (existing.isGame === false && pack.isGame === true) {
+                // Parse pack statsRanges once
+                let packRanges = null;
+                try {
+                  packRanges = typeof pack.statsRanges === 'string'
+                    ? JSON.parse(pack.statsRanges) : pack.statsRanges;
+                } catch(e) {}
+
+                for (const card of packCards) {
+                  // Determine base stats: prefer card's own fields, fall back to pack statsRanges
+                  let baseP = card.maxPower;
+                  let baseH = card.maxHp;
+                  if ((baseP === null || baseP === undefined) && packRanges && packRanges[card.rarity]) {
+                    baseP = packRanges[card.rarity].maxPower;
+                  }
+                  if ((baseH === null || baseH === undefined) && packRanges && packRanges[card.rarity]) {
+                    baseH = packRanges[card.rarity].maxHp;
+                  }
+                  // Fall back to AB_BASE defaults
+                  if (!baseP) baseP = (AB_BASE_SRV[card.rarity] || AB_BASE_SRV['Звичайна']).power;
+                  if (!baseH) baseH = (AB_BASE_SRV[card.rarity] || AB_BASE_SRV['Звичайна']).hp;
+
+                  const levelingConfig = computeLevelingConfig(card.rarity, baseP, baseH);
+                  await prisma.cardCatalog.update({
+                    where: { id: card.id },
+                    data: {
+                      isGame: true,
+                      minPower: baseP,
+                      maxPower: baseP,
+                      minHp: baseH,
+                      maxHp: baseH,
+                      levelingConfig,
+                    },
+                  });
+                }
+
+                // AUTO-RETURN MARKET LISTINGS IF CHANGED TO GAME CARD
                  const activeListings = await prisma.marketListing.findMany({
                    where: { cardId: { in: cardIds }, status: 'active' }
                  });
@@ -1869,7 +2019,8 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
       }
 
       let removedPower = null;
-      let removedHp = null;
+      let removedHp    = null;
+      let removedLevel = 1;
 
       if (power !== undefined && power !== null) {
         const parsedPower = Number(power);
@@ -1902,7 +2053,8 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           await syncArenaIndices(tx, user.uid, cardId, map);
 
           removedPower = typeof removed === 'object' ? removed.power : removed;
-          removedHp = typeof removed === 'object' ? removed.hp : null;
+          removedHp    = typeof removed === 'object' ? removed.hp    : null;
+          removedLevel = typeof removed === 'object' ? (removed.level || 1) : 1;
         } else if (statsArray.length > 0) {
           // Fallback
           let closestIndex = 0;
@@ -1923,7 +2075,8 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           await syncArenaIndices(tx, user.uid, cardId, map);
 
           removedPower = typeof removed === 'object' ? removed.power : removed;
-          removedHp = typeof removed === 'object' ? removed.hp : null;
+          removedHp    = typeof removed === 'object' ? removed.hp    : null;
+          removedLevel = typeof removed === 'object' ? (removed.level || 1) : 1;
         } else {
           removedPower = parsedPower;
           removedHp = parsedHp;
@@ -1953,7 +2106,8 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
         await syncArenaIndices(tx, user.uid, cardId, map);
 
         removedPower = typeof removed === 'object' ? removed.power : removed;
-        removedHp = typeof removed === 'object' ? removed.hp : null;
+        removedHp    = typeof removed === 'object' ? removed.hp    : null;
+        removedLevel = typeof removed === 'object' ? (removed.level || 1) : 1;
       }
 
       if (invItem.amount === 1) {
@@ -1975,6 +2129,7 @@ app.post('/api/game/market/list', authenticate, async (req, res) => {
           status: 'active',
           power: removedPower,
           hp: removedHp,
+          level: removedLevel,
         },
       });
     });
@@ -3965,9 +4120,10 @@ app.post('/api/game/arena/points/:id/battle', authenticate, async (req, res) => 
       if (hasPerk(atk, 'healer')) {
         const hIdx = findHealTarget(aTeam);
         if (hIdx !== -1) {
-          const hVal = getPerkValue(atk, 'healer') || 30;
-          const hAmt = Math.max(1, Math.floor(atk.power * (hVal / 100)));
+          const hVal = getPerkValue(atk, 'healer') || 20;
           const mxHp = aTeam[hIdx].maxHp || aTeam[hIdx].hp || 1;
+          // Хілер лікує % від макс.HP цілі (не від своєї сили) — значно відчутніше
+          const hAmt = Math.max(1, Math.floor(mxHp * (hVal / 100)));
           const old = aTeam[hIdx].currentHp;
           aTeam[hIdx].currentHp = Math.min(mxHp, aTeam[hIdx].currentHp + hAmt);
           const healed = aTeam[hIdx].currentHp - old;
@@ -5431,6 +5587,9 @@ app.get('/api/admin/users', authenticate, checkAdmin, async (req, res) => {
         lastIp: true,
         autoSoundEnabled: true,
         farmLevel: true,
+        crystals: true,
+        uniqueCardsCount: true,
+        emeraldInventory: true,
       },
     });
     res.json(users);
@@ -5596,18 +5755,41 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
         {
           const cardObj = await prisma.cardCatalog.findUnique({ where: { id: payload.cardId } });
 
-          let generatedPower = 50;
-          let generatedHp = 100;
+          // Без рандому — фіксовані статки, прив'язані до рівня
+          // Якщо у картки немає власних параметрів — беремо з паку або авто-балансу
+          let generatedPower = cardObj?.maxPower;
+          let generatedHp    = cardObj?.maxHp;
 
-          if (cardObj) {
-            if (cardObj.minPower !== null && cardObj.maxPower !== null) {
-              generatedPower =
-                Math.floor(Math.random() * (cardObj.maxPower - cardObj.minPower + 1)) +
-                cardObj.minPower;
+          if ((generatedPower === null || generatedPower === undefined || generatedHp === null || generatedHp === undefined) && cardObj) {
+            const pack = await prisma.packCatalog.findUnique({ where: { id: cardObj.packId } });
+            if (pack?.statsRanges) {
+              const ranges = typeof pack.statsRanges === 'string' ? JSON.parse(pack.statsRanges) : pack.statsRanges;
+              if (ranges?.[cardObj.rarity]) {
+                if (generatedPower === null || generatedPower === undefined) generatedPower = ranges[cardObj.rarity].maxPower;
+                if (generatedHp === null || generatedHp === undefined) generatedHp = ranges[cardObj.rarity].maxHp;
+              }
             }
-            if (cardObj.minHp !== null && cardObj.maxHp !== null) {
-              generatedHp =
-                Math.floor(Math.random() * (cardObj.maxHp - cardObj.minHp + 1)) + cardObj.minHp;
+          }
+          if (!generatedPower) generatedPower = cardObj ? (AB_BASE_SRV[cardObj.rarity] || AB_BASE_SRV['Звичайна']).power : 50;
+          if (!generatedHp)    generatedHp    = cardObj ? (AB_BASE_SRV[cardObj.rarity] || AB_BASE_SRV['Звичайна']).hp    : 100;
+
+          const targetLevel = payload.level !== undefined && payload.level !== null
+            ? Math.max(1, Math.min(10, Number(payload.level))) : 1;
+
+          // Накопичуємо бонуси рівнів (з картки або авто-баланс)
+          if (cardObj && targetLevel > 1) {
+            let lvlCfg = typeof cardObj.levelingConfig === 'object' && cardObj.levelingConfig
+              ? cardObj.levelingConfig
+              : (cardObj.levelingConfig ? JSON.parse(cardObj.levelingConfig) : {});
+            if (!lvlCfg || Object.keys(lvlCfg).length === 0) {
+              lvlCfg = computeLevelingConfig(cardObj.rarity, generatedPower, generatedHp);
+            }
+            for (let l = 2; l <= targetLevel; l++) {
+              const cfg = lvlCfg[l] || lvlCfg[String(l)];
+              if (cfg) {
+                generatedPower += Number(cfg.powerAdd) || 0;
+                generatedHp    += Number(cfg.hpAdd)    || 0;
+              }
             }
           }
 
@@ -5616,22 +5798,11 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
           if (effectiveIsGame || payload.power !== undefined || payload.hp !== undefined) {
             for (let i = 0; i < payload.amount; i++) {
               newStats.push({
-                power:
-                  payload.power !== undefined && payload.power !== null
-                    ? Number(payload.power)
-                    : effectiveIsGame
-                      ? generatedPower
-                      : 0,
-                hp:
-                  payload.hp !== undefined && payload.hp !== null
-                    ? Number(payload.hp)
-                    : effectiveIsGame
-                      ? generatedHp
-                      : 0,
-                level:
-                  payload.level !== undefined && payload.level !== null
-                    ? Math.max(1, Math.min(10, Number(payload.level)))
-                    : 1,
+                power: payload.power !== undefined && payload.power !== null
+                  ? Number(payload.power) : effectiveIsGame ? generatedPower : 0,
+                hp:    payload.hp    !== undefined && payload.hp    !== null
+                  ? Number(payload.hp)    : effectiveIsGame ? generatedHp    : 0,
+                level: targetLevel,
               });
             }
           }
@@ -5771,6 +5942,80 @@ app.post('/api/admin/users/action', authenticate, checkAdmin, async (req, res) =
           }
         }
         break;
+      case 'updateCardDef': {
+        // Оновлює перки/perkValue на рівні каталогу, потім синкає стати всіх гравців
+        const { cardId: cdCardId, perk: cdPerk, perkValue: cdPerkValue,
+                bonusPerk: cdBonusPerk, bonusPerkValue: cdBonusPerkValue,
+                bonusPerkLevel: cdBonusPerkLevel } = payload;
+        if (!cdCardId) break;
+        await prisma.cardCatalog.update({
+          where: { id: cdCardId },
+          data: {
+            perk:           cdPerk       || null,
+            perkValue:      cdPerk && cdPerkValue !== '' && cdPerkValue !== null && cdPerkValue !== undefined ? Number(cdPerkValue) : null,
+            bonusPerk:      cdBonusPerk  || null,
+            bonusPerkValue: cdBonusPerk  && cdBonusPerkValue !== '' && cdBonusPerkValue !== null ? Number(cdBonusPerkValue) : null,
+            bonusPerkLevel: cdBonusPerkLevel ? Number(cdBonusPerkLevel) : null,
+          },
+        });
+        await handleCardStatsUpdate(prisma, cdCardId);
+        break;
+      }
+      case 'setEmeraldInventory': {
+        // Встановлює весь emeraldInventory гравця (об'єкт { typeId: count })
+        const { emeraldInventory: newEmeraldInv } = payload;
+        await prisma.user.update({
+          where: { uid: targetUid },
+          data: { emeraldInventory: newEmeraldInv || {} },
+        });
+        break;
+      }
+      case 'adminSetEmerald': {
+        // Встановлює або знімає смарагд на конкретному примірнику картки (без перевірки наявності)
+        const { cardId: aeCardId, statsIndex: aeIdx, emeraldTypeId } = payload;
+        if (!aeCardId || aeIdx === undefined) break;
+        const aeInv = await prisma.inventoryItem.findUnique({
+          where: { userId_cardId: { userId: targetUid, cardId: aeCardId } },
+        });
+        if (!aeInv) break;
+        let aeStats = typeof aeInv.gameStats === 'string' ? JSON.parse(aeInv.gameStats) : (aeInv.gameStats || []);
+        const aeI = Number(aeIdx);
+        if (aeI < 0 || aeI >= aeStats.length) break;
+        if (emeraldTypeId) {
+          aeStats[aeI] = { ...aeStats[aeI], emerald: Number(emeraldTypeId) };
+        } else {
+          const { emerald: _rm, ...aeRest } = aeStats[aeI];
+          aeStats[aeI] = aeRest;
+        }
+        await prisma.inventoryItem.update({
+          where: { userId_cardId: { userId: targetUid, cardId: aeCardId } },
+          data: { gameStats: aeStats },
+        });
+        break;
+      }
+      case 'updateCardStat': {
+        const { cardId: ucCardId, statsIndex: ucIdx, power: ucPower, hp: ucHp, level: ucLevel } = payload;
+        if (!ucCardId || ucIdx === undefined) break;
+        const ucInv = await prisma.inventoryItem.findUnique({
+          where: { userId_cardId: { userId: targetUid, cardId: ucCardId } },
+        });
+        if (!ucInv) break;
+        let ucStats = typeof ucInv.gameStats === 'string'
+          ? JSON.parse(ucInv.gameStats)
+          : (ucInv.gameStats || []);
+        if (ucIdx < 0 || ucIdx >= ucStats.length) break;
+        ucStats[ucIdx] = {
+          ...ucStats[ucIdx],
+          ...(ucPower !== undefined ? { power: Number(ucPower) } : {}),
+          ...(ucHp    !== undefined ? { hp:    Number(ucHp)    } : {}),
+          ...(ucLevel !== undefined ? { level: Math.max(1, Math.min(10, Number(ucLevel))) } : {}),
+        };
+        await prisma.inventoryItem.update({
+          where: { userId_cardId: { userId: targetUid, cardId: ucCardId } },
+          data: { gameStats: ucStats },
+        });
+        break;
+      }
       default:
         return res.status(400).json({ error: 'Невідома дія.' });
     }
@@ -6716,12 +6961,30 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
 
     const nextLevel = currentLevel + 1;
 
-    // Отримання конфігурації прокачки
+    // Отримання конфігурації прокачки (пріоритет: картка > авто-баланс від паку)
     let levelingConfig = {};
     if (invItem.card.levelingConfig) {
       levelingConfig = typeof invItem.card.levelingConfig === 'string' ? JSON.parse(invItem.card.levelingConfig) : invItem.card.levelingConfig;
     }
-    
+    if (!levelingConfig || Object.keys(levelingConfig).length === 0) {
+      // Картка не має власного levelingConfig — обчислюємо автоматично
+      let baseP = invItem.card.maxPower;
+      let baseH = invItem.card.maxHp;
+      if (baseP === null || baseP === undefined || baseH === null || baseH === undefined) {
+        const pack = await prisma.packCatalog.findUnique({ where: { id: invItem.card.packId } });
+        if (pack?.statsRanges) {
+          const ranges = typeof pack.statsRanges === 'string' ? JSON.parse(pack.statsRanges) : pack.statsRanges;
+          if (ranges?.[invItem.card.rarity]) {
+            if (baseP === null || baseP === undefined) baseP = ranges[invItem.card.rarity].maxPower;
+            if (baseH === null || baseH === undefined) baseH = ranges[invItem.card.rarity].maxHp;
+          }
+        }
+      }
+      if (!baseP) baseP = (AB_BASE_SRV[invItem.card.rarity] || AB_BASE_SRV['Звичайна']).power;
+      if (!baseH) baseH = (AB_BASE_SRV[invItem.card.rarity] || AB_BASE_SRV['Звичайна']).hp;
+      levelingConfig = computeLevelingConfig(invItem.card.rarity, baseP, baseH);
+    }
+
     const configForLevel = levelingConfig[nextLevel] || { dupes: 0, cost: 0, currency: 'coins', powerAdd: 0, hpAdd: 0 };
     const requiredDupes = Number(configForLevel.dupes) || 0;
     const requiredCost = Number(configForLevel.cost) || 0;

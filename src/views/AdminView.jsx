@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   Layers,
@@ -28,6 +28,9 @@ import {
   Mail,
   Play,
   Volume2,
+  Shield,
+  Heart,
+  Star,
 } from 'lucide-react';
 import {
   fetchPromosRequest,
@@ -61,7 +64,107 @@ import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, FRAME_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
 import PlayerAvatar from '../components/PlayerAvatar';
 import CardFrame from '../components/CardFrame';
+import { PERK_META } from '../components/PerkBadge';
 import AchievementIcon, { ACHIEVEMENT_PRESETS } from '../components/AchievementIcon';
+
+// ============================================================
+// AUTO-BALANCE SYSTEM
+// ============================================================
+
+/** Базові статки на 1 рівні для кожної рідкості (HP ≈ 2.5× Сили) */
+const AB_BASE = {
+  'Звичайна':   { power: 10,  hp: 25  },
+  'Рідкісна':   { power: 22,  hp: 55  },
+  'Епічна':     { power: 50,  hp: 125 },
+  'Легендарна': { power: 100, hp: 250 },
+  'Унікальна':  { power: 200, hp: 500 },
+};
+
+/**
+ * Модифікатори статків залежно від перку.
+ * pMod — корекція Сили, hMod — корекція HP (відносні, напр. -0.10 = -10%)
+ * val  — дефолтне значення ефективності перку (null = авто, без поля)
+ */
+const AB_PERK_MOD = {
+  crit:      { pMod: -0.10, hMod: -0.10, val: 20  }, // Скляна гармата
+  cleave:    { pMod: -0.05, hMod: -0.05, val: 30  }, // Помірне AoE
+  poison:    { pMod: -0.10, hMod: -0.10, val: 10  }, // DoT атакер
+  lifesteal: { pMod: -0.10, hMod: -0.05, val: 25  }, // Вампір
+  burn:      { pMod: -0.10, hMod: -0.10, val: 10  }, // DoT атакер
+  dodge:     { pMod: -0.15, hMod: +0.15, val: 20  }, // Ухильник
+  thorns:    { pMod: -0.15, hMod: +0.10, val: 25  }, // Шипи-танк
+  armor:     { pMod: -0.15, hMod: +0.20, val: 25  }, // Броньований танк
+  laststand: { pMod: +0.05, hMod: -0.15, val: null }, // Берсерк
+  shield:    { pMod: -0.10, hMod: +0.15, val: 15  }, // Щитовик
+  taunt:     { pMod: -0.20, hMod: +0.25, val: null }, // Провокатор
+  healer:    { pMod: -0.25, hMod: +0.10, val: 20  }, // Підтримка (20% maxHp цілі)
+};
+
+/** % приросту від maxStat на кожному рівні 2–10 (агресивне прискорення) */
+const AB_LVL_PCT = [0.08, 0.10, 0.12, 0.15, 0.18, 0.22, 0.26, 0.30, 0.35];
+
+/** Кількість дублікатів для кожного рівня 2–10 */
+const AB_DUPES = {
+  'Звичайна':   [1,  1,  1,  2,  2,   2,   3,   3,   3  ],  // ~18 total
+  'Рідкісна':   [1,  1,  2,  3,  4,   5,   5,   5,   5  ],  // ~31 total
+  'Епічна':     [2,  2,  3,  4,  5,   6,   7,   8,   8  ],  // ~45 total
+  'Легендарна': [3,  4,  5,  7,  9,  11,  13,  15,  15  ],  // ~82 total
+  'Унікальна':  [4,  5,  7,  9, 12,  15,  18,  22,  25  ],  // ~117 total
+};
+
+/** Вартість прокачки для кожного рівня 2–10 (останні 3 — кристали) */
+const AB_COST = {
+  'Звичайна':   [500,    800,    1500,    2500,    4000,    6000,    100,  200,  500  ],
+  'Рідкісна':   [1000,   2000,   4000,    7000,    12000,   20000,   300,  700,  1500 ],
+  'Епічна':     [4000,   8000,   14000,   25000,   45000,   75000,   1200, 2500, 4000 ],
+  'Легендарна': [12000,  20000,  35000,   60000,   100000,  180000,  1500, 3000, 5000 ],
+  'Унікальна':  [30000,  60000,  100000,  180000,  300000,  500000,  3000, 5000, 8000 ],
+};
+
+/** Валюта для рівнів 2–10: перші 6 — монети, останні 3 — кристали */
+const AB_CURRENCY = ['coins','coins','coins','coins','coins','coins','crystals','crystals','crystals'];
+
+/**
+ * Розраховує збалансований набір ігрових параметрів.
+ * @param {string} rarity - рідкість картки
+ * @param {string|null} perk - основний перк
+ * @returns об'єкт з minPower, maxPower, minHp, maxHp, perkValue, levelingConfig
+ */
+function computeAutoBalance(rarity, perk) {
+  const base    = AB_BASE[rarity]    || AB_BASE['Звичайна'];
+  const mod     = (perk && AB_PERK_MOD[perk]) ? AB_PERK_MOD[perk] : { pMod: 0, hMod: 0, val: '' };
+  const dupeArr = AB_DUPES[rarity]   || AB_DUPES['Звичайна'];
+  const costArr = AB_COST[rarity]    || AB_COST['Звичайна'];
+
+  // Фіксовані значення — без рандому
+  const maxPower = Math.round(base.power * (1 + mod.pMod));
+  const maxHp    = Math.round(base.hp    * (1 + mod.hMod));
+  const minPower = maxPower;
+  const minHp    = maxHp;
+
+  const levelingConfig = {};
+  for (let lvl = 2; lvl <= 10; lvl++) {
+    const pct = AB_LVL_PCT[lvl - 2];
+    levelingConfig[lvl] = {
+      powerAdd: Math.max(1, Math.round(maxPower * pct)),
+      hpAdd:    Math.max(1, Math.round(maxHp    * pct)),
+      dupes:    dupeArr[lvl - 2],
+      cost:     costArr[lvl - 2],
+      currency: AB_CURRENCY[lvl - 2],
+    };
+  }
+
+  return {
+    minPower,
+    maxPower,
+    minHp,
+    maxHp,
+    perkValue:     mod.val !== undefined && mod.val !== null ? mod.val : '',
+    levelingConfig,
+  };
+}
+
+// ============================================================
 
 export default function AdminView({
   db,
@@ -128,6 +231,7 @@ export default function AdminView({
   const [adminSetCoinsAmount, setAdminSetCoinsAmount] = useState(0);
 
   const [adminRemoveModalData, setAdminRemoveModalData] = useState(null);
+  const [adminEditCardModal, setAdminEditCardModal] = useState(null); // { cardId, cardName, statIdx, stat, cardDef }
 
   const [editingCard, setEditingCard] = useState(null);
   const [cardForm, setCardForm] = useState({
@@ -191,6 +295,92 @@ export default function AdminView({
     audio.volume = cardForm.soundVolume !== undefined ? cardForm.soundVolume : 0.5;
     audio.play().catch((e) => console.error('Error playing sound:', e));
   };
+
+  // --- AUTO-BALANCE STATE & LOGIC ---
+  const [autoBalanceApplied, setAutoBalanceApplied] = useState(false);
+  const prevIsGameRef = useRef(false);
+
+  // Коли вмикається isGame — автоматично заповнюємо баланс
+  useEffect(() => {
+    if (cardForm.isGame && !prevIsGameRef.current) {
+      const balanced = computeAutoBalance(cardForm.rarity, cardForm.perk || null);
+      setCardForm(prev => ({ ...prev, ...balanced }));
+      setAutoBalanceApplied(true);
+    }
+    prevIsGameRef.current = cardForm.isGame;
+  }, [cardForm.isGame]); // eslint-disable-line
+
+  /** Ручне застосування авто-балансу (кнопка) */
+  const handleApplyAutoBalance = () => {
+    const balanced = computeAutoBalance(cardForm.rarity, cardForm.perk || null);
+    setCardForm(prev => ({ ...prev, ...balanced }));
+    setAutoBalanceApplied(true);
+  };
+
+  /** Зміна основного перку + авто-коригування perkValue і статків */
+  const handlePerkChange = (newPerk) => {
+    if (cardForm.isGame && newPerk) {
+      const balanced = computeAutoBalance(cardForm.rarity, newPerk);
+      setCardForm(prev => ({
+        ...prev,
+        perk: newPerk,
+        perkValue: balanced.perkValue,
+        minPower: balanced.minPower,
+        maxPower: balanced.maxPower,
+        minHp: balanced.minHp,
+        maxHp: balanced.maxHp,
+        levelingConfig: balanced.levelingConfig,
+      }));
+      setAutoBalanceApplied(true);
+    } else {
+      setCardForm(prev => ({ ...prev, perk: newPerk, perkValue: '' }));
+      setAutoBalanceApplied(false);
+    }
+  };
+
+  /** Зміна рідкості + перерахунок балансу якщо isGame увімкнено */
+  const handleRarityChange = (newRarity) => {
+    if (cardForm.isGame) {
+      const balanced = computeAutoBalance(newRarity, cardForm.perk || null);
+      setCardForm(prev => ({ ...prev, rarity: newRarity, ...balanced }));
+      setAutoBalanceApplied(true);
+    } else {
+      setCardForm(prev => ({ ...prev, rarity: newRarity }));
+    }
+  };
+  // --- END CARD AUTO-BALANCE ---
+
+  // --- PACK AUTO-BALANCE ---
+  const [packAutoBalanceApplied, setPackAutoBalanceApplied] = useState(false);
+  const prevPackIsGameRef = useRef(false);
+
+  /** Заповнити statsRanges паку базовими значеннями для кожної рідкості */
+  const applyPackAutoBalance = () => {
+    const ranges = {};
+    for (const [rarity, base] of Object.entries(AB_BASE)) {
+      ranges[rarity] = {
+        minPower: base.power,
+        maxPower: base.power,
+        minHp:    base.hp,
+        maxHp:    base.hp,
+      };
+    }
+    setPackForm(prev => ({ ...prev, statsRanges: ranges }));
+    setPackAutoBalanceApplied(true);
+  };
+
+  useEffect(() => {
+    if (packForm.isGame && !prevPackIsGameRef.current) {
+      applyPackAutoBalance();
+    }
+    prevPackIsGameRef.current = packForm.isGame;
+  }, [packForm.isGame]); // eslint-disable-line
+
+  const handlePackIsGameChange = (checked) => {
+    setPackForm(prev => ({ ...prev, isGame: checked }));
+    if (!checked) setPackAutoBalanceApplied(false);
+  };
+  // --- END PACK AUTO-BALANCE ---
 
   const [packImageFile, setPackImageFile] = useState(null);
 
@@ -405,6 +595,13 @@ export default function AdminView({
     } catch {
       showToast('Помилка доступу до інвентарю.');
     }
+    // Завантажуємо типи смарагдів якщо ще не завантажені
+    if (emeraldTypes.length === 0) {
+      try {
+        const types = await fetchAdminEmeraldTypes(getToken());
+        setEmeraldTypes(types || []);
+      } catch { /* silent */ }
+    }
     setLoadingUserInv(false);
   };
 
@@ -592,12 +789,13 @@ export default function AdminView({
     }
   };
 
-  const removeCardFromUser = async (cardId, currentAmount, isGameCard, gameStatsArray) => {
+  const removeCardFromUser = async (cardId, currentAmount, isGameCard, gameStatsArray, cardDef) => {
     if (gameStatsArray && (typeof gameStatsArray === 'string' ? JSON.parse(gameStatsArray).length > 0 : gameStatsArray.length > 0)) {
-      const cDef = cardsCatalog.find(c => c.id === cardId);
+      const cDef = cardDef || cardsCatalog.find(c => c.id === cardId);
       setAdminRemoveModalData({
         cardId,
         cardName: cDef?.name || 'Card',
+        cardDef: cDef || null,
         stats: typeof gameStatsArray === 'string' ? JSON.parse(gameStatsArray) : gameStatsArray
       });
       return;
@@ -637,6 +835,123 @@ export default function AdminView({
       loadUsers();
     } catch {
       showToast('Помилка вилучення дублікату.', 'error');
+    }
+  };
+
+  const adminAddDuplicate = async (cardId) => {
+    try {
+      await adminUserActionRequest(getToken(), 'giveCard', viewingUser.uid, {
+        cardId,
+        amount: 1,
+        level: 1,
+      });
+      showToast('Дублікат додано.', 'success');
+      const invRes = await fetchAdminUserInventory(getToken(), viewingUser.uid);
+      const updatedItem = invRes.find(i => i.id === cardId);
+      if (updatedItem) {
+        const stats = typeof updatedItem.gameStats === 'string'
+          ? JSON.parse(updatedItem.gameStats) : (updatedItem.gameStats || []);
+        setAdminRemoveModalData(prev => ({ ...prev, stats }));
+      }
+    } catch {
+      showToast('Помилка додавання дублікату.', 'error');
+    }
+  };
+
+  const adminRemoveDuplicate = async (cardId, mainIdx, stats) => {
+    // Find first non-main, non-inSafe entry
+    const dupIdx = stats.findIndex((s, i) => i !== mainIdx && !s.inSafe);
+    if (dupIdx === -1) return showToast('Немає вільних дублікатів для вилучення.', 'error');
+    try {
+      await adminUserActionRequest(getToken(), 'removeCard', viewingUser.uid, {
+        cardId,
+        amount: 1,
+        statsIndex: dupIdx,
+      });
+      showToast('Дублікат вилучено.', 'success');
+      const invRes = await fetchAdminUserInventory(getToken(), viewingUser.uid);
+      const updatedItem = invRes.find(i => i.id === cardId);
+      if (updatedItem) {
+        const newStats = typeof updatedItem.gameStats === 'string'
+          ? JSON.parse(updatedItem.gameStats) : (updatedItem.gameStats || []);
+        if (newStats.length === 0) {
+          setAdminRemoveModalData(null);
+        } else {
+          setAdminRemoveModalData(prev => ({ ...prev, stats: newStats }));
+        }
+      } else {
+        setAdminRemoveModalData(null);
+      }
+    } catch {
+      showToast('Помилка вилучення дублікату.', 'error');
+    }
+  };
+
+  const saveCardStatEdit = async () => {
+    if (!adminEditCardModal) return;
+    const {
+      cardId, statIdx,
+      editPower, editHp, editLevel, editEmerald, origEmerald,
+      editPerk, editPerkValue, editBonusPerk, editBonusPerkValue, editBonusPerkLevel,
+      origPerk, origPerkValue, origBonusPerk, origBonusPerkValue, origBonusPerkLevel,
+    } = adminEditCardModal;
+    try {
+      // 1. Статки примірника (level / power / hp)
+      await adminUserActionRequest(getToken(), 'updateCardStat', viewingUser.uid, {
+        cardId, statsIndex: statIdx,
+        power: Number(editPower), hp: Number(editHp), level: Number(editLevel),
+      });
+
+      // 2. Смарагд на примірнику (якщо змінився)
+      if (editEmerald !== origEmerald) {
+        await adminUserActionRequest(getToken(), 'adminSetEmerald', viewingUser.uid, {
+          cardId, statsIndex: statIdx,
+          emeraldTypeId: editEmerald || null,
+        });
+      }
+
+      // 3. Визначення картки (перки) — якщо змінилось
+      const defChanged =
+        String(editPerk || '') !== String(origPerk || '') ||
+        String(editPerkValue || '') !== String(origPerkValue || '') ||
+        String(editBonusPerk || '') !== String(origBonusPerk || '') ||
+        String(editBonusPerkValue || '') !== String(origBonusPerkValue || '') ||
+        String(editBonusPerkLevel || '') !== String(origBonusPerkLevel || '');
+      if (defChanged) {
+        await adminUserActionRequest(getToken(), 'updateCardDef', viewingUser.uid, {
+          cardId,
+          perk: editPerk || '',
+          perkValue: editPerkValue,
+          bonusPerk: editBonusPerk || '',
+          bonusPerkValue: editBonusPerkValue,
+          bonusPerkLevel: editBonusPerkLevel,
+        });
+        // Оновлюємо каталог локально
+        setCardsCatalog(prev => prev.map(c => c.id === cardId ? {
+          ...c,
+          perk: editPerk || null,
+          perkValue: editPerkValue !== '' ? Number(editPerkValue) : null,
+          bonusPerk: editBonusPerk || null,
+          bonusPerkValue: editBonusPerkValue !== '' ? Number(editBonusPerkValue) : null,
+          bonusPerkLevel: editBonusPerkLevel !== '' ? Number(editBonusPerkLevel) : null,
+        } : c));
+      }
+
+      showToast('Картку оновлено.', 'success');
+      setAdminEditCardModal(null);
+      handleInspectUser(viewingUser.uid);
+
+      // Оновлюємо статки у модалці видалення
+      const invRes = await fetchAdminUserInventory(getToken(), viewingUser.uid);
+      const updatedItem = invRes.find(i => i.id === cardId);
+      if (updatedItem && adminRemoveModalData) {
+        const stats = typeof updatedItem.gameStats === 'string'
+          ? JSON.parse(updatedItem.gameStats) : updatedItem.gameStats;
+        const updatedDef = cardsCatalog.find(c => c.id === cardId);
+        setAdminRemoveModalData(prev => ({ ...prev, stats, cardDef: updatedDef || prev.cardDef }));
+      }
+    } catch {
+      showToast('Помилка оновлення картки.', 'error');
     }
   };
 
@@ -1269,40 +1584,376 @@ export default function AdminView({
         </div>
       )}
 
-      {/* МОДАЛКА ВИЛУЧЕННЯ ІГРОВОЇ КАРТКИ */}
+      {/* МОДАЛКА УПРАВЛІННЯ ІГРОВОЮ КАРТКОЮ */}
       {adminRemoveModalData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-neutral-900 border border-red-900/50 p-6 rounded-3xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col animate-in zoom-in-95">
-            <h3 className="text-xl font-black text-red-500 mb-2">
-              Вилучення: {adminRemoveModalData.cardName}
+          <div className="bg-neutral-900 border border-neutral-700 p-6 rounded-3xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-white mb-1 flex items-center gap-2">
+              <Swords size={20} className="text-purple-400" />
+              {adminRemoveModalData.cardName}
             </h3>
-            <p className="text-sm text-neutral-400 mb-4">Оберіть конкретний екземпляр для видалення (Сила / HP).</p>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2 mb-4">
-              {adminRemoveModalData.stats && adminRemoveModalData.stats.length > 0 ? (
-                adminRemoveModalData.stats.map((stat, idx) => (
-                  <div key={idx} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex justify-between items-center">
-                    <div className="flex gap-4">
-                      <div className="text-green-400 font-bold text-sm">Сила: {stat.power}</div>
-                      <div className="text-red-400 font-bold text-sm">HP: {stat.hp}</div>
+            {/* Perk info from card definition */}
+            {(() => {
+              const cd = adminRemoveModalData.cardDef;
+              if (!cd) return null;
+              const perks = [cd.perk, cd.bonusPerk].filter(Boolean).filter(p => PERK_META[p]);
+              return perks.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-3 mt-1">
+                  {perks.map(p => {
+                    const m = PERK_META[p];
+                    return (
+                      <span key={p} className={`text-xs px-2 py-0.5 rounded-full ${m.bg} ${m.color} font-bold border border-white/10`} title={m.desc}>
+                        {m.label}{cd.perk === p && cd.perkValue ? ` ${cd.perkValue}%` : ''}{cd.bonusPerk === p && cd.bonusPerkValue ? ` ${cd.bonusPerkValue}%` : ''}
+                      </span>
+                    );
+                  })}
+                  {cd.bonusPerkLevel && <span className="text-[10px] text-neutral-500">Бонус-перк з {cd.bonusPerkLevel} рів.</span>}
+                </div>
+              ) : null;
+            })()}
+            {adminRemoveModalData.cardDef?.isGame ? (
+              // ===== ІГРОВА КАРТКА: головна + дублікати =====
+              (() => {
+                const stats = adminRemoveModalData.stats || [];
+                const mainIdx = stats.reduce((best, s, i) => (s.level || 1) > (stats[best]?.level || 1) ? i : best, 0);
+                const mainStat = stats[mainIdx];
+                const dupCount = stats.length - 1;
+                const cd = adminRemoveModalData.cardDef;
+                return (
+                  <div className="flex-1 overflow-y-auto pr-1 mb-4 space-y-3">
+                    {/* Головна картка */}
+                    <div>
+                      <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-2">Головна картка</p>
+                      {mainStat ? (
+                        <div className="bg-neutral-950 p-3 rounded-xl border border-purple-900/40 flex justify-between items-center gap-2">
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Star size={13} className="text-yellow-400" />
+                            <span className="text-yellow-300 font-black text-sm">Рів.{mainStat.level || 1}</span>
+                          </div>
+                          <div className="flex gap-3 flex-1 flex-wrap">
+                            <div className="flex items-center gap-1 text-green-400 font-bold text-sm">
+                              <Swords size={12} />{mainStat.power}
+                            </div>
+                            <div className="flex items-center gap-1 text-red-400 font-bold text-sm">
+                              <Heart size={12} />{mainStat.hp}
+                            </div>
+                            {mainStat.emerald && (() => {
+                              const et = emeraldTypes.find(e => e.id === mainStat.emerald);
+                              return et ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-700/50 bg-emerald-900/30 text-emerald-300 flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full inline-block" style={{ background: et.color }} />
+                                  {et.name}
+                                </span>
+                              ) : null;
+                            })()}
+                            {mainStat.inSafe && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded border border-blue-800">Сейф</span>}
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                setAdminEditCardModal({
+                                  cardId: adminRemoveModalData.cardId,
+                                  cardName: adminRemoveModalData.cardName,
+                                  statIdx: mainIdx,
+                                  editPower: mainStat.power,
+                                  editHp: mainStat.hp,
+                                  editLevel: mainStat.level || 1,
+                                  editEmerald: mainStat.emerald || null,
+                                  origEmerald: mainStat.emerald || null,
+                                  editPerk: cd?.perk || '',
+                                  editPerkValue: cd?.perkValue ?? '',
+                                  editBonusPerk: cd?.bonusPerk || '',
+                                  editBonusPerkValue: cd?.bonusPerkValue ?? '',
+                                  editBonusPerkLevel: cd?.bonusPerkLevel ?? '',
+                                  origPerk: cd?.perk || '',
+                                  origPerkValue: cd?.perkValue ?? '',
+                                  origBonusPerk: cd?.bonusPerk || '',
+                                  origBonusPerkValue: cd?.bonusPerkValue ?? '',
+                                  origBonusPerkLevel: cd?.bonusPerkLevel ?? '',
+                                  cardDef: cd,
+                                });
+                              }}
+                              className="bg-blue-900/30 hover:bg-blue-900/60 text-blue-400 p-2 rounded-lg transition-colors border border-blue-900/50"
+                              title="Редагувати"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => removeSpecificCardInstance(adminRemoveModalData.cardId, mainIdx)}
+                              className="bg-red-600/20 hover:bg-red-600/40 text-red-500 p-2 rounded-lg transition-colors border border-red-900/50"
+                              title="Вилучити картку"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-neutral-500 text-sm py-3 text-center">Немає статів.</div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => removeSpecificCardInstance(adminRemoveModalData.cardId, idx)}
-                      className="bg-red-600/20 hover:bg-red-600/40 text-red-500 p-2 rounded-lg transition-colors border border-red-900/50"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* Дублікати */}
+                    <div>
+                      <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-2">Дублікати для апгрейду</p>
+                      <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center justify-between gap-3">
+                        <span className="text-neutral-300 text-sm">Кількість дублікатів:</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => adminRemoveDuplicate(adminRemoveModalData.cardId, mainIdx, stats)}
+                            disabled={dupCount <= 0}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-900/30 hover:bg-red-900/60 text-red-400 border border-red-900/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-black text-lg"
+                          >−</button>
+                          <span className="text-white font-black text-lg w-8 text-center">{dupCount}</span>
+                          <button
+                            onClick={() => adminAddDuplicate(adminRemoveModalData.cardId)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-green-900/30 hover:bg-green-900/60 text-green-400 border border-green-900/50 transition-colors font-black text-lg"
+                          >+</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-neutral-500 text-sm py-4 text-center">Ця картка не має ігрових статів або вони ще не були призначені. (Видаляйте через бек)</div>
-              )}
-            </div>
+                );
+              })()
+            ) : (
+              // ===== ЗВИЧАЙНА КАРТКА: всі примірники =====
+              <>
+                <p className="text-xs text-neutral-500 mb-3">Екземпляри картки у гравця — редагуй або вилучай конкретний примірник.</p>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-4">
+                  {adminRemoveModalData.stats && adminRemoveModalData.stats.length > 0 ? (
+                    adminRemoveModalData.stats.map((stat, idx) => (
+                      <div key={idx} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Star size={13} className="text-yellow-400" />
+                          <span className="text-yellow-300 font-black text-sm">Рів.{stat.level || 1}</span>
+                        </div>
+                        <div className="flex gap-3 flex-1 flex-wrap">
+                          <div className="flex items-center gap-1 text-green-400 font-bold text-sm">
+                            <Swords size={12} />{stat.power}
+                          </div>
+                          <div className="flex items-center gap-1 text-red-400 font-bold text-sm">
+                            <Heart size={12} />{stat.hp}
+                          </div>
+                          {stat.emerald && (() => {
+                            const et = emeraldTypes.find(e => e.id === stat.emerald);
+                            return et ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-700/50 bg-emerald-900/30 text-emerald-300 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: et.color }} />
+                                {et.name}
+                              </span>
+                            ) : null;
+                          })()}
+                          {stat.inSafe && <span className="text-[10px] bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded border border-blue-800">Сейф</span>}
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            onClick={() => {
+                              const cd = adminRemoveModalData.cardDef;
+                              setAdminEditCardModal({
+                                cardId: adminRemoveModalData.cardId,
+                                cardName: adminRemoveModalData.cardName,
+                                statIdx: idx,
+                                editPower: stat.power,
+                                editHp: stat.hp,
+                                editLevel: stat.level || 1,
+                                editEmerald: stat.emerald || null,
+                                origEmerald: stat.emerald || null,
+                                editPerk: cd?.perk || '',
+                                editPerkValue: cd?.perkValue ?? '',
+                                editBonusPerk: cd?.bonusPerk || '',
+                                editBonusPerkValue: cd?.bonusPerkValue ?? '',
+                                editBonusPerkLevel: cd?.bonusPerkLevel ?? '',
+                                origPerk: cd?.perk || '',
+                                origPerkValue: cd?.perkValue ?? '',
+                                origBonusPerk: cd?.bonusPerk || '',
+                                origBonusPerkValue: cd?.bonusPerkValue ?? '',
+                                origBonusPerkLevel: cd?.bonusPerkLevel ?? '',
+                                cardDef: cd,
+                              });
+                            }}
+                            className="bg-blue-900/30 hover:bg-blue-900/60 text-blue-400 p-2 rounded-lg transition-colors border border-blue-900/50"
+                            title="Редагувати"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => removeSpecificCardInstance(adminRemoveModalData.cardId, idx)}
+                            className="bg-red-600/20 hover:bg-red-600/40 text-red-500 p-2 rounded-lg transition-colors border border-red-900/50"
+                            title="Вилучити"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-neutral-500 text-sm py-4 text-center">Ця картка не має ігрових статів.</div>
+                  )}
+                </div>
+              </>
+            )}
             <button
               onClick={() => setAdminRemoveModalData(null)}
               className="w-full bg-neutral-800 text-white font-bold py-3 rounded-xl hover:bg-neutral-700 transition-colors"
             >
               Закрити
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА ПОВНОГО РЕДАГУВАННЯ КАРТКИ ГРАВЦЯ */}
+      {adminEditCardModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-neutral-900 border border-blue-900/50 p-5 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+            <h3 className="text-lg font-black text-blue-300 mb-0.5 flex items-center gap-2">
+              <Edit2 size={18} /> {adminEditCardModal.cardName}
+            </h3>
+            <p className="text-xs text-neutral-500 mb-4">Примірник #{adminEditCardModal.statIdx + 1}</p>
+
+            {/* === БЛОК 1: СТАТКИ ПРИМІРНИКА === */}
+            <div className="mb-4 p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl">
+              <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">⚙️ Статки примірника</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-yellow-400 uppercase mb-1 block">Рівень</label>
+                  <input type="number" min="1" max="10"
+                    value={adminEditCardModal.editLevel}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editLevel: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-yellow-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-green-400 uppercase mb-1 block">Сила</label>
+                  <input type="number" min="0"
+                    value={adminEditCardModal.editPower}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editPower: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-green-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-red-400 uppercase mb-1 block">HP</label>
+                  <input type="number" min="0"
+                    value={adminEditCardModal.editHp}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editHp: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-red-500 outline-none text-sm"
+                  />
+                </div>
+              </div>
+              {/* Смарагд на примірнику */}
+              <div className="mt-3">
+                <label className="text-[10px] font-bold text-emerald-400 uppercase mb-1 block">Смарагд на картці</label>
+                <select
+                  value={adminEditCardModal.editEmerald || ''}
+                  onChange={e => setAdminEditCardModal(prev => ({ ...prev, editEmerald: e.target.value ? Number(e.target.value) : null }))}
+                  className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-emerald-500 outline-none text-sm"
+                >
+                  <option value="">Без смарагду</option>
+                  {emeraldTypes.map(et => (
+                    <option key={et.id} value={et.id}>{et.name} (+{et.perkBoostPercent}%)</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* === БЛОК 2: ВИЗНАЧЕННЯ КАРТКИ (перки) === */}
+            <div className="mb-4 p-3.5 bg-purple-950/20 border border-purple-900/30 rounded-2xl">
+              <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-1">⚡ Визначення картки (перки)</p>
+              <p className="text-[10px] text-neutral-500 mb-3">⚠️ Зміни застосуються до всіх гравців з цією карткою</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-purple-300 uppercase mb-1 block">Перк</label>
+                  <select
+                    value={adminEditCardModal.editPerk || ''}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editPerk: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-purple-500 outline-none text-sm"
+                  >
+                    <option value="">Без перку</option>
+                    <optgroup label="⚔️ Атакувальні">
+                      <option value="crit">Крит</option>
+                      <option value="cleave">Сплеск</option>
+                      <option value="poison">Отрута</option>
+                      <option value="lifesteal">Вампіризм</option>
+                      <option value="burn">Опік</option>
+                    </optgroup>
+                    <optgroup label="🛡️ Захисні">
+                      <option value="dodge">Ухилення</option>
+                      <option value="thorns">Шипи</option>
+                      <option value="armor">Броня</option>
+                      <option value="laststand">Виживання</option>
+                      <option value="shield">Щит</option>
+                    </optgroup>
+                    <optgroup label="🎯 Тактичні">
+                      <option value="taunt">Провокація</option>
+                      <option value="healer">Цілитель</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-purple-300 uppercase mb-1 block">Ефект (%)</label>
+                  <input type="number" min="1" max="100"
+                    placeholder="Авто"
+                    disabled={!adminEditCardModal.editPerk || adminEditCardModal.editPerk === 'taunt' || adminEditCardModal.editPerk === 'laststand'}
+                    value={adminEditCardModal.editPerkValue ?? ''}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editPerkValue: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-purple-500 outline-none text-sm disabled:opacity-30"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-blue-300 uppercase mb-1 block">Бонус-перк (рів.)</label>
+                  <select
+                    value={adminEditCardModal.editBonusPerkLevel ?? ''}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editBonusPerkLevel: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-blue-500 outline-none text-sm"
+                  >
+                    <option value="">Без бонус-перку</option>
+                    {[2,3,4,5,6,7,8,9,10].map(l => <option key={l} value={l}>Рів. {l}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-blue-300 uppercase mb-1 block">Бонус-перк</label>
+                  <select
+                    value={adminEditCardModal.editBonusPerk || ''}
+                    disabled={!adminEditCardModal.editBonusPerkLevel}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editBonusPerk: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-blue-500 outline-none text-sm disabled:opacity-30"
+                  >
+                    <option value="">Оберіть</option>
+                    <option value="crit">Крит</option>
+                    <option value="cleave">Сплеск</option>
+                    <option value="poison">Отрута</option>
+                    <option value="lifesteal">Вампіризм</option>
+                    <option value="burn">Опік</option>
+                    <option value="dodge">Ухилення</option>
+                    <option value="thorns">Шипи</option>
+                    <option value="armor">Броня</option>
+                    <option value="laststand">Виживання</option>
+                    <option value="shield">Щит</option>
+                    <option value="taunt">Провокація</option>
+                    <option value="healer">Цілитель</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-blue-300 uppercase mb-1 block">Ефект бонус-перку (%)</label>
+                  <input type="number" min="1" max="100"
+                    placeholder="Авто"
+                    disabled={!adminEditCardModal.editBonusPerk || adminEditCardModal.editBonusPerk === 'taunt' || adminEditCardModal.editBonusPerk === 'laststand'}
+                    value={adminEditCardModal.editBonusPerkValue ?? ''}
+                    onChange={e => setAdminEditCardModal(prev => ({ ...prev, editBonusPerkValue: e.target.value }))}
+                    className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-white focus:border-blue-500 outline-none text-sm disabled:opacity-30"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setAdminEditCardModal(null)}
+                className="flex-1 bg-neutral-800 text-white font-bold py-3 rounded-xl hover:bg-neutral-700 transition-colors text-sm">
+                Скасувати
+              </button>
+              <button onClick={saveCardStatEdit}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors text-sm">
+                Зберегти
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1769,8 +2420,13 @@ export default function AdminView({
                           <div className="text-[10px] font-bold text-white truncate w-full text-center mt-1">
                             {c.name}
                           </div>
-                          <div className="text-xs font-black text-yellow-500 mb-1 z-10">
-                            x{invItem.amount}
+                          <div className="flex items-center justify-center gap-1.5 mb-1 z-10">
+                            <span className="text-xs font-black text-yellow-500">x{invItem.amount}</span>
+                            {c.isGame && (() => {
+                              const gs = typeof invItem.gameStats === 'string' ? JSON.parse(invItem.gameStats || '[]') : (invItem.gameStats || []);
+                              const maxLvl = gs.length > 0 ? Math.max(...gs.map(s => s.level || 1)) : null;
+                              return maxLvl ? <span className="text-[9px] font-black text-purple-300 bg-purple-900/50 px-1 rounded">Рів.{maxLvl}</span> : null;
+                            })()}
                           </div>
 
                           {/* Admin Action Overlay */}
@@ -1778,7 +2434,7 @@ export default function AdminView({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats);
+                                removeCardFromUser(invItem.id, invItem.amount, c.isGame, invItem.gameStats, c);
                               }}
                               className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-xl font-bold font-mono text-xs shadow-[0_0_15px_rgba(220,38,38,0.8)] transform hover:scale-110 transition-transform pointer-events-auto"
                               title="Управління (Ігрова) / Вилучити"
@@ -1792,6 +2448,66 @@ export default function AdminView({
                   {userInventory.length === 0 && (
                     <p className="col-span-full text-neutral-500">Інвентар порожній.</p>
                   )}
+                </div>
+              )}
+
+              {/* ===== СМАРАГДИ ГРАВЦЯ ===== */}
+              {viewingUser && emeraldTypes.length > 0 && (
+                <div className="mt-6 p-4 border border-emerald-900/30 bg-emerald-950/10 rounded-2xl">
+                  <h4 className="text-emerald-400 font-bold text-sm mb-3 flex items-center gap-2">
+                    <Gem size={16} className="text-emerald-400" /> Смарагди гравця
+                    <span className="text-xs text-neutral-500 font-normal ml-1">— редагуй кількість кожного типу</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
+                    {emeraldTypes.map(et => {
+                      const emeraldInv = typeof viewingUser.emeraldInventory === 'object'
+                        ? viewingUser.emeraldInventory
+                        : (viewingUser.emeraldInventory ? JSON.parse(viewingUser.emeraldInventory) : {});
+                      const count = emeraldInv[String(et.id)] || 0;
+                      const setCount = async (newCount) => {
+                        const nc = Math.max(0, newCount);
+                        const newInv = {
+                          ...(typeof viewingUser.emeraldInventory === 'object'
+                            ? viewingUser.emeraldInventory
+                            : JSON.parse(viewingUser.emeraldInventory || '{}')),
+                          [String(et.id)]: nc,
+                        };
+                        if (nc === 0) delete newInv[String(et.id)];
+                        try {
+                          await adminUserActionRequest(getToken(), 'setEmeraldInventory', viewingUser.uid, {
+                            emeraldInventory: newInv,
+                          });
+                          setViewingUser(prev => ({ ...prev, emeraldInventory: newInv }));
+                          // also update allUsers
+                          loadUsers();
+                        } catch { showToast('Помилка оновлення смарагдів.', 'error'); }
+                      };
+                      return (
+                        <div key={et.id} className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 px-3 py-2 rounded-xl">
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: et.color }} />
+                          <span className="text-sm text-white font-bold">{et.name}</span>
+                          <span className="text-xs text-neutral-500">+{et.perkBoostPercent}%</span>
+                          <div className="flex items-center gap-1 ml-2">
+                            <button
+                              onClick={() => setCount(count - 1)}
+                              disabled={count <= 0}
+                              className="w-6 h-6 rounded-lg bg-neutral-800 hover:bg-red-900/50 text-neutral-300 font-black text-sm flex items-center justify-center disabled:opacity-30 transition-colors"
+                            >−</button>
+                            <input
+                              type="number" min="0"
+                              value={count}
+                              onChange={e => setCount(Number(e.target.value))}
+                              className="w-10 text-center bg-neutral-950 border border-neutral-700 rounded-lg text-yellow-400 font-black text-sm py-0.5 outline-none focus:border-emerald-500"
+                            />
+                            <button
+                              onClick={() => setCount(count + 1)}
+                              className="w-6 h-6 rounded-lg bg-neutral-800 hover:bg-emerald-900/50 text-emerald-400 font-black text-sm flex items-center justify-center transition-colors"
+                            >+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -2963,58 +3679,50 @@ export default function AdminView({
 
               {packForm.isGame && (
                 <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 mt-4 p-5 border border-indigo-900/30 rounded-2xl bg-indigo-950/10 shadow-inner">
-                  <h4 className="text-indigo-300 text-sm font-bold mb-4 flex items-center gap-2">
-                    <Zap size={16} className="text-yellow-500" />
-                    Діапазони Характеристик (Сила / HP)
-                    <span className="text-indigo-500/70 font-normal text-xs ml-2">(залиште пустими для стандартних)</span>
-                  </h4>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h4 className="text-indigo-300 text-sm font-bold flex items-center gap-2">
+                      <Zap size={16} className="text-yellow-500" />
+                      Діапазони Характеристик (Сила / HP)
+                      <span className="text-indigo-500/70 font-normal text-xs">(залиште пустими для стандартних)</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={applyPackAutoBalance}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-700/30 hover:bg-indigo-700/60 text-indigo-300 text-xs font-bold border border-indigo-600/40 transition-colors"
+                    >
+                      ⚖️ Авто-баланс
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                     {rarities.map((r) => (
                       <div key={`stats-${r.name}`} className="flex flex-col gap-3 p-3.5 bg-neutral-900/80 border border-neutral-700/50 rounded-xl relative overflow-hidden group hover:border-indigo-500/50 transition-colors">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <label className="text-sm font-bold text-center text-indigo-300 mb-1">{r.name}</label>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-2">
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Min Сила</span>
+                            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider pl-1">⚔️ Сила</span>
                             <input
                               type="number"
-                              placeholder="Auto"
-                              value={packForm.statsRanges?.[r.name]?.minPower || ''}
-                              onChange={(e) => updatePackStatsRange(r.name, 'minPower', e.target.value)}
-                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-yellow-500 outline-none w-full"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Max Сила</span>
-                            <input
-                              type="number"
-                              placeholder="Auto"
+                              placeholder="Авто"
                               value={packForm.statsRanges?.[r.name]?.maxPower || ''}
-                              onChange={(e) => updatePackStatsRange(r.name, 'maxPower', e.target.value)}
-                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-yellow-500 outline-none w-full"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Min HP</span>
-                            <input
-                              type="number"
-                              placeholder="Auto"
-                              value={packForm.statsRanges?.[r.name]?.minHp || ''}
-                              onChange={(e) => updatePackStatsRange(r.name, 'minHp', e.target.value)}
-                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-red-500 outline-none w-full"
+                              onChange={(e) => {
+                                updatePackStatsRange(r.name, 'maxPower', e.target.value);
+                                updatePackStatsRange(r.name, 'minPower', e.target.value);
+                              }}
+                              className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-blue-500 outline-none w-full"
                             />
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider pl-1">Max HP</span>
+                            <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider pl-1">❤️ HP</span>
                             <input
                               type="number"
-                              placeholder="Auto"
+                              placeholder="Авто"
                               value={packForm.statsRanges?.[r.name]?.maxHp || ''}
-                              onChange={(e) => updatePackStatsRange(r.name, 'maxHp', e.target.value)}
+                              onChange={(e) => {
+                                updatePackStatsRange(r.name, 'maxHp', e.target.value);
+                                updatePackStatsRange(r.name, 'minHp', e.target.value);
+                              }}
                               className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white text-sm focus:border-red-500 outline-none w-full"
                             />
                           </div>
@@ -3048,10 +3756,11 @@ export default function AdminView({
                   <input
                     type="checkbox"
                     checked={packForm.isGame || false}
-                    onChange={(e) => setPackForm({ ...packForm, isGame: e.target.checked })}
+                    onChange={(e) => handlePackIsGameChange(e.target.checked)}
                     className="w-4 h-4 accent-green-500 rounded"
                   />
                   Ігровий Пак (Сили)
+                  {packAutoBalanceApplied && <span className="text-[10px] text-green-400 font-bold ml-auto">⚖️ авто</span>}
                 </label>
               </div>
             </div>
@@ -3231,7 +3940,7 @@ export default function AdminView({
                   <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Рідкість</label>
                   <select
                     value={cardForm.rarity}
-                    onChange={(e) => setCardForm({ ...cardForm, rarity: e.target.value })}
+                    onChange={(e) => handleRarityChange(e.target.value)}
                     className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-colors font-bold"
                   >
                     {rarities.map((r) => (
@@ -3400,6 +4109,19 @@ export default function AdminView({
                     />
                     Активувати ігрову логіку
                   </label>
+                  {cardForm.isGame && (
+                    <button
+                      type="button"
+                      onClick={handleApplyAutoBalance}
+                      className="inline-flex items-center gap-1.5 text-xs text-amber-400 font-bold cursor-pointer bg-amber-900/10 px-3 py-1.5 rounded-lg border border-amber-700/40 hover:bg-amber-900/30 transition-colors"
+                      title="Перерахувати баланс на основі рідкості та перку"
+                    >
+                      ⚖️ Авто-баланс
+                    </button>
+                  )}
+                  {autoBalanceApplied && cardForm.isGame && (
+                    <span className="text-[10px] text-amber-500/70 font-bold italic">⚖️ застосовано</span>
+                  )}
                   <label className="inline-flex items-center gap-2 text-xs text-red-400 font-bold cursor-pointer bg-red-900/10 px-3 py-1.5 rounded-lg border border-red-900/30 hover:bg-red-900/20 transition-colors">
                     <input
                       type="checkbox"
@@ -3415,38 +4137,20 @@ export default function AdminView({
               <div className={`transition-all duration-300 ${cardForm.isGame ? 'opacity-100' : 'opacity-40 grayscale pointer-events-none'}`}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Мін. Сила</label>
+                    <label className="text-[10px] font-bold text-blue-400 uppercase ml-1">⚔️ Сила (базова, Рів.1)</label>
                     <input
                       type="number" placeholder="Авто"
-                      value={cardForm.minPower ?? ''}
-                      onChange={(e) => setCardForm({ ...cardForm, minPower: e.target.value })}
-                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-blue-400 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. Сила</label>
-                    <input
-                      type="number" placeholder="Фікс. якщо пусте"
                       value={cardForm.maxPower ?? ''}
-                      onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value })}
+                      onChange={(e) => setCardForm({ ...cardForm, maxPower: e.target.value, minPower: e.target.value })}
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-blue-400 focus:border-blue-500 outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Мін. HP</label>
+                    <label className="text-[10px] font-bold text-red-400 uppercase ml-1">❤️ HP (базове, Рів.1)</label>
                     <input
                       type="number" placeholder="Авто"
-                      value={cardForm.minHp ?? ''}
-                      onChange={(e) => setCardForm({ ...cardForm, minHp: e.target.value })}
-                      className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-red-400 focus:border-red-500 outline-none"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Макс. HP</label>
-                    <input
-                      type="number" placeholder="Фікс. якщо пусте"
                       value={cardForm.maxHp ?? ''}
-                      onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value })}
+                      onChange={(e) => setCardForm({ ...cardForm, maxHp: e.target.value, minHp: e.target.value })}
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-red-400 focus:border-red-500 outline-none"
                     />
                   </div>
@@ -3457,7 +4161,7 @@ export default function AdminView({
                     <label className="text-[10px] font-bold text-purple-400 uppercase ml-1">Здібність (Перк)</label>
                     <select
                       value={cardForm.perk || ''}
-                      onChange={(e) => setCardForm({ ...cardForm, perk: e.target.value })}
+                      onChange={(e) => handlePerkChange(e.target.value)}
                       className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none"
                     >
                       <option value="">Без здібності</option>
@@ -3694,12 +4398,8 @@ export default function AdminView({
                 {cardForm.isGame && (
                   <div className="mt-3 text-xs bg-green-900/20 text-green-400 px-3 py-2 rounded-lg border border-green-900/30 flex flex-col gap-1 w-full text-center">
                     <span className="font-bold uppercase tracking-widest text-[10px] text-green-500">Ігрова Картка</span>
-                    <div>
-                      ⚔️ Сила: {cardForm.minPower || '?'} - {cardForm.maxPower || cardForm.minPower || '?'}
-                    </div>
-                    <div>
-                      ❤️ HP: {cardForm.minHp || '?'} - {cardForm.maxHp || cardForm.minHp || '?'}
-                    </div>
+                    <div>⚔️ Сила (Рів.1): {cardForm.maxPower || '?'}</div>
+                    <div>❤️ HP (Рів.1): {cardForm.maxHp || '?'}</div>
                   </div>
                 )}
                 {cardForm.perk && (

@@ -180,6 +180,7 @@ model MarketListing {
   soldAt    DateTime?
   power     Int?
   hp        Int?
+  level     Int?    @default(1)
   isDuplicate     Boolean @default(false)
   duplicateAmount Int     @default(1)
 
