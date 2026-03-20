@@ -111,19 +111,19 @@ export default function PremiumShopView({
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="text-center mb-10">
-        <h2 className="text-4xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-600 uppercase tracking-widest flex items-center justify-center gap-3">
-          <Gem className="text-fuchsia-500 w-10 h-10" /> Преміум Магазин
+      <div className="text-center mb-6 sm:mb-10">
+        <h2 className="text-2xl sm:text-4xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-600 uppercase tracking-widest flex items-center justify-center gap-3">
+          <Gem className="text-fuchsia-500 w-7 h-7 sm:w-10 sm:h-10" /> Преміум Магазин
         </h2>
         <p className="text-neutral-400">Ексклюзивні пропозиції для елітних лордів.</p>
       </div>
 
       {premiumShopItems && premiumShopItems.length > 0 && (
         <div className="mb-12">
-          <h3 className="text-2xl font-black text-white text-center mb-8 uppercase tracking-widest flex items-center justify-center gap-2">
+          <h3 className="text-xl sm:text-2xl font-black text-white text-center mb-4 sm:mb-8 uppercase tracking-widest flex items-center justify-center gap-2">
             <Star className="text-fuchsia-500" /> Ексклюзивні Товари
           </h3>
-          <div className="flex flex-wrap justify-center gap-2 mb-8">
+          <div className="flex flex-wrap justify-center gap-2 mb-4 sm:mb-8">
             <button
               onClick={() => setActiveFilter('all')}
               className={`px-4 py-2 rounded-full font-bold text-sm transition-colors ${activeFilter === 'all' ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
@@ -149,7 +149,7 @@ export default function PremiumShopView({
               Прикраси аватару
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 max-w-5xl mx-auto">
             {premiumShopItems
               .filter((item) => activeFilter === 'all' || item.type === activeFilter)
               .map((item, idx) => {
@@ -181,7 +181,7 @@ export default function PremiumShopView({
               return (
                 <div
                   key={idx}
-                  className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 flex flex-col items-center justify-between relative group hover:border-fuchsia-900 transition-colors shadow-lg"
+                  className="bg-neutral-900 border border-neutral-800 rounded-3xl p-3 sm:p-6 flex flex-col items-center justify-between relative group hover:border-fuchsia-900 transition-colors shadow-lg"
                   onMouseEnter={(e) => { const v = e.currentTarget.querySelector('video'); if(v) v.play().catch(()=>{}); }}
                   onMouseLeave={(e) => { const v = e.currentTarget.querySelector('video'); if(v) { v.pause(); v.currentTime = 0; } }}
                 >
@@ -270,7 +270,7 @@ export default function PremiumShopView({
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-neutral-900 to-neutral-900 border-2 border-neutral-800 rounded-3xl p-6 sm:p-10 max-w-4xl mx-auto shadow-2xl mb-12 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-neutral-900 to-neutral-900 border-2 border-neutral-800 rounded-3xl p-4 sm:p-10 max-w-4xl mx-auto shadow-2xl mb-12 relative overflow-hidden">
         {/* Decorative gradient top edge */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-blue-600"></div>
         {/* Optional glowing backgrounds */}
@@ -281,10 +281,10 @@ export default function PremiumShopView({
           {/* Top Section */}
           <div className="flex flex-col items-center mb-10">
             <Gem
-              size={60}
-              className="mx-auto text-fuchsia-400 mb-6 drop-shadow-[0_0_20px_rgba(217,70,239,0.5)] animate-pulse"
+              size={40}
+              className="mx-auto text-fuchsia-400 mb-4 sm:mb-6 sm:!w-[60px] sm:!h-[60px] drop-shadow-[0_0_20px_rgba(217,70,239,0.5)] animate-pulse"
             />
-            <h3 className="text-3xl font-black text-white mb-6 text-center">
+            <h3 className="text-2xl sm:text-3xl font-black text-white mb-6 text-center">
               Преміум Акаунт ({premiumDurationDays} Днів)
             </h3>
 
@@ -311,7 +311,7 @@ export default function PremiumShopView({
           <div className="h-px w-full bg-gradient-to-r from-transparent via-neutral-700 to-transparent mb-8"></div>
 
           {/* Bottom Section */}
-          <div className="flex flex-col md:flex-row items-stretch justify-between gap-8 md:gap-6">
+          <div className="flex flex-col md:flex-row items-stretch justify-between gap-3 sm:gap-8 md:gap-6">
 
             {/* Buy Premium */}
             <div className="w-full md:w-[48%] flex flex-col justify-end">
@@ -323,7 +323,7 @@ export default function PremiumShopView({
               <button
                 onClick={handleBuyPremium}
                 disabled={isProcessing}
-                className="w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black text-lg py-4 px-6 rounded-2xl shadow-xl transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className="w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black text-base sm:text-lg py-3 sm:py-4 px-4 sm:px-6 rounded-2xl shadow-xl transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 {isPremiumActive ? `Продовжити ще на ${premiumDurationDays} днів` : 'Придбати Преміум'}
                 <span className="bg-black/30 px-3 py-1 rounded-lg text-sm flex items-center gap-1">
@@ -362,7 +362,7 @@ export default function PremiumShopView({
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 rounded-2xl transition-transform hover:scale-105 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 sm:px-6 rounded-2xl transition-transform hover:scale-105 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   Купити
                   <span className="bg-black/30 px-2 py-1 rounded-lg text-xs flex items-center gap-1">
@@ -384,7 +384,7 @@ export default function PremiumShopView({
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => setPreviewBadge(null)}
           />
-          <div className="relative bg-neutral-900 border border-fuchsia-500/50 rounded-3xl p-6 sm:p-8 w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="relative bg-neutral-900 border border-fuchsia-500/50 rounded-3xl p-3 sm:p-8 w-full max-w-4xl shadow-2xl animate-in zoom-in-95 duration-200">
             <button
               onClick={() => setPreviewBadge(null)}
               className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"

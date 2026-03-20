@@ -300,13 +300,13 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
 
   return (
     <div className="w-full flex justify-center pb-10 animate-in fade-in zoom-in-95 duration-500 p-2">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-xl mt-4">
-        <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 p-4">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl p-3 sm:p-8 w-full max-w-2xl shadow-xl mt-2 sm:mt-4">
+        <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 sm:gap-6 p-2 sm:p-4">
           {/* Заголовок та Історія */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-3">
-              <Rocket size={32} className="text-red-500" />
-              <h1 className="text-3xl font-black text-white tracking-widest uppercase">Crash</h1>
+              <Rocket size={24} className="sm:w-8 sm:h-8 text-red-500" />
+              <h1 className="text-xl sm:text-3xl font-black text-white tracking-widest uppercase">Crash</h1>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
@@ -333,7 +333,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         </div>
 
         {/* Екран гри */}
-        <div className="relative bg-neutral-950 rounded-2xl h-64 sm:h-80 w-full mb-6 border-2 flex-shrink-0 border-neutral-800 overflow-hidden shadow-inner">
+        <div className="relative bg-neutral-950 rounded-xl sm:rounded-2xl h-52 sm:h-80 w-full mb-4 sm:mb-6 border-2 flex-shrink-0 border-neutral-800 overflow-hidden shadow-inner">
           {/* Сітка на фоні */}
           <div
             className="absolute inset-0 opacity-[0.15]"
@@ -357,7 +357,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
             className={`absolute inset-0 flex flex-col items-center justify-center z-10 transition-transform ${status === 'crashed' ? 'scale-110' : ''}`}
           >
             <div
-              className={`text-6xl sm:text-7xl font-black font-mono tracking-tighter ${status === 'crashed' ? 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]' : getMultiplierColor(multiplier)}`}
+              className={`text-5xl sm:text-7xl font-black font-mono tracking-tighter ${status === 'crashed' ? 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]' : getMultiplierColor(multiplier)}`}
             >
               {multiplier.toFixed(2)}x
             </div>
@@ -416,7 +416,7 @@ export default function GameCrash({ profile, setProfile, goBack, showToast }) {
         )}
 
         {/* Панель управління */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="w-full sm:w-1/3">
             <label className="text-neutral-500 font-bold text-xs uppercase tracking-wider mb-2 block">
               Ставка (Монети)

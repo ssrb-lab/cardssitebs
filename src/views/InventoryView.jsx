@@ -282,22 +282,22 @@ export default function InventoryView({
 
   return (
     <div className="pb-10">
-      <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-md mx-auto mb-6 relative z-40">
+      <div className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1 max-w-md mx-auto mb-4 sm:mb-6 relative z-40">
         <button
           onClick={() => setTab('cards')}
-          className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${tab === 'cards' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
+          className={`flex-1 py-2 rounded-lg font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 sm:gap-2 ${tab === 'cards' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
         >
-          <LayoutGrid size={16} /> Всі Картки
+          <LayoutGrid size={16} /> <span className="hidden xs:inline">Всі</span> Картки
         </button>
         <button
           onClick={() => setTab('showcases')}
-          className={`flex-1 py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${tab === 'showcases' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
+          className={`flex-1 py-2 rounded-lg font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 sm:gap-2 ${tab === 'showcases' ? 'bg-blue-600 text-white' : 'text-neutral-400 hover:text-white'}`}
         >
-          <Star size={16} /> Мої Вітрини
+          <Star size={16} /> Вітрини
         </button>
         <button
           onClick={() => setIsSafeOpen(!isSafeOpen)}
-          className={`px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 border-l border-neutral-700 ml-1 ${isSafeOpen ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' : 'text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800'}`}
+          className={`px-2 sm:px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-1 sm:gap-2 border-l border-neutral-700 ml-1 ${isSafeOpen ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' : 'text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800'}`}
           title="Сейф (захист від продажу)"
         >
           {isSafeOpen ? <Unlock size={18} /> : <Lock size={18} />}
@@ -306,9 +306,9 @@ export default function InventoryView({
 
       {tab === 'cards' ? (
         <div className="animate-in fade-in">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-neutral-900/80 p-5 rounded-2xl border border-neutral-800 shadow-lg">
-            <h2 className="text-2xl font-black flex items-center gap-3 text-white uppercase tracking-wider shrink-0">
-              <LayoutGrid className="text-yellow-500 w-8 h-8" /> Інвентар{' '}
+          <div className="flex flex-col md:flex-row justify-between items-center mb-4 sm:mb-8 gap-3 sm:gap-4 bg-neutral-900/80 p-3 sm:p-5 rounded-2xl border border-neutral-800 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-black flex items-center gap-2 sm:gap-3 text-white uppercase tracking-wider shrink-0">
+              <LayoutGrid className="text-yellow-500 w-6 h-6 sm:w-8 sm:h-8" /> Інвентар{' '}
               <span className="text-neutral-500 text-lg">
                 ({visibleInventoryCount}/{visibleCatalogTotal})
               </span>
@@ -479,7 +479,7 @@ export default function InventoryView({
 
                             </div>
 
-                            <div className="p-5 flex-1">
+                            <div className="p-3 sm:p-5 flex-1">
                               <div className="text-white font-black text-lg leading-tight line-clamp-2 min-h-[2.5rem] mb-3">
                                 {p.name}
                               </div>
@@ -528,7 +528,7 @@ export default function InventoryView({
               <p className="text-xl font-medium mb-2 text-neutral-400">Картки не знайдено.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
               {filteredInventory.map((item, index) => {
                 const style = getCardStyle(item.card.rarity, rarities);
                 const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';
@@ -782,7 +782,7 @@ export default function InventoryView({
         <div className="animate-in fade-in">
           {!activeShowcase ? (
             <div>
-              <div className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800 mb-6 text-center">
+              <div className="bg-neutral-900 p-3 sm:p-6 rounded-2xl border border-neutral-800 mb-6 text-center">
                 <h3 className="text-xl font-bold text-white mb-4">
                   <Star className="inline text-yellow-500 mb-1" /> Створити нову вітрину
                 </h3>
@@ -817,7 +817,7 @@ export default function InventoryView({
                     <div
                       key={s.id}
                       onClick={() => setSelectedShowcaseId(s.id)}
-                      className={`bg-neutral-900 border-2 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 ${profile?.mainShowcaseId === s.id ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-neutral-800 hover:border-neutral-600'}`}
+                      className={`bg-neutral-900 border-2 rounded-2xl p-3 sm:p-5 cursor-pointer transition-all hover:-translate-y-1 ${profile?.mainShowcaseId === s.id ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-neutral-800 hover:border-neutral-600'}`}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-black text-lg text-white truncate pr-2">{s.name}</h4>
@@ -862,7 +862,7 @@ export default function InventoryView({
             </div>
           ) : (
             <div className="animate-in slide-in-from-right-4">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-neutral-900 p-5 rounded-2xl border border-neutral-800">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3 sm:gap-4 bg-neutral-900 p-3 sm:p-5 rounded-2xl border border-neutral-800">
                 <div>
                   <button
                     onClick={() => setSelectedShowcaseId(null)}
@@ -870,7 +870,7 @@ export default function InventoryView({
                   >
                     <ArrowLeft size={16} /> До всіх вітрин
                   </button>
-                  <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
                     {activeShowcase.name}{' '}
                     <span className="text-neutral-500 text-sm font-normal">
                       ({builderCards.length}/10)
@@ -908,7 +908,7 @@ export default function InventoryView({
 
               {/* ЗОНА ВІТРИНИ (DROP ZONE) */}
               <div
-                className={`bg-neutral-900/50 border-2 border-dashed ${builderCards.length < 10 ? 'border-purple-500/50' : 'border-neutral-700'} rounded-3xl p-6 min-h-[200px] mb-8 flex flex-wrap justify-center gap-4 transition-colors`}
+                className={`bg-neutral-900/50 border-2 border-dashed ${builderCards.length < 10 ? 'border-purple-500/50' : 'border-neutral-700'} rounded-3xl p-3 sm:p-6 min-h-[160px] sm:min-h-[200px] mb-4 sm:mb-8 flex flex-wrap justify-center gap-2 sm:gap-4 transition-colors`}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
               >
@@ -925,7 +925,7 @@ export default function InventoryView({
                       className="relative group cursor-pointer animate-in zoom-in-95"
                     >
                       <div
-                        className={`w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} isolate z-0`}
+                        className={`w-16 xs:w-20 sm:w-32 aspect-[2/3] rounded-xl border-2 overflow-hidden bg-neutral-950 ${style.border} ${effectClass} isolate z-0`}
                       >
                         <CardFrame frame={cData.frame} effect={cData.effect}>
                           <img
@@ -950,7 +950,7 @@ export default function InventoryView({
                 {Array.from({ length: Math.max(0, 10 - builderCards.length) }).map((_, i) => (
                   <div
                     key={`empty-${i}`}
-                    className="w-24 sm:w-32 aspect-[2/3] rounded-xl border-2 border-dashed border-neutral-800 bg-neutral-950/30 flex items-center justify-center opacity-50"
+                    className="w-16 xs:w-20 sm:w-32 aspect-[2/3] rounded-xl border-2 border-dashed border-neutral-800 bg-neutral-950/30 flex items-center justify-center opacity-50"
                   >
                     <GripHorizontal className="text-neutral-700" size={32} />
                   </div>
@@ -959,7 +959,7 @@ export default function InventoryView({
 
               {/* ІНВЕНТАР ДЛЯ ВИБОРУ */}
               <h3 className="text-lg font-bold text-white mb-4">Ваш Інвентар:</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 opacity-90 hover:opacity-100 transition-opacity">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3 opacity-90 hover:opacity-100 transition-opacity">
                 {filteredInventory.map((item) => {
                   const style = getCardStyle(item.card.rarity, rarities);
                   // Розрахунок доступних
@@ -1003,7 +1003,7 @@ export default function InventoryView({
       {/* МОДАЛКА ПЕРЕКАЗУ В СЕЙФ/З СЕЙФУ */}
       {safeTransferModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-sm p-4 sm:p-6 shadow-2xl relative">
             <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
               {safeTransferModal.isEnteringSafe ? <Lock className="text-yellow-500" /> : <Unlock className="text-yellow-500" />}
               {safeTransferModal.isEnteringSafe ? 'Сховати в Сейф' : 'Дістати з Сейфу'}
@@ -1046,9 +1046,9 @@ export default function InventoryView({
       {isSafeOpen && (
         <div className="fixed top-0 bottom-0 left-0 z-50 pointer-events-none">
           {/* bg-black/60 pointer-events-auto removed to allow clicking cards */}
-          <div className="relative w-80 max-w-[85vw] h-full bg-neutral-900 border-r border-neutral-700 shadow-[20px_0_50px_rgba(0,0,0,0.8)] flex flex-col pt-[72px] animate-in slide-in-from-left duration-300 pointer-events-auto">
-            <div className="px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50 backdrop-blur sticky top-0 z-20">
-              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 to-yellow-600 flex items-center gap-2">
+          <div className="relative w-72 sm:w-80 max-w-[85vw] h-full bg-neutral-900 border-r border-neutral-700 shadow-[20px_0_50px_rgba(0,0,0,0.8)] flex flex-col pt-[72px] animate-in slide-in-from-left duration-300 pointer-events-auto">
+            <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50 backdrop-blur sticky top-0 z-20">
+              <h2 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 to-yellow-600 flex items-center gap-2">
                 <Lock className="text-yellow-500" strokeWidth={2.5} /> Сейф
               </h2>
               <button onClick={() => setIsSafeOpen(false)} className="text-neutral-500 hover:text-white p-2">✕</button>
@@ -1118,7 +1118,7 @@ export default function InventoryView({
           onClick={() => !isSellGameDupes && setSellGameDupeModal(null)}
         >
           <div
-            className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl"
+            className="bg-neutral-900 border border-neutral-700 rounded-2xl p-4 sm:p-6 w-full max-w-sm mx-3 sm:mx-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-white font-black text-lg mb-1 flex items-center gap-2">

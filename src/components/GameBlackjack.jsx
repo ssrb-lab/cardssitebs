@@ -177,7 +177,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 max-w-2xl mx-auto relative select-none">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
         <button
           onClick={goBack}
           disabled={isProcessing}
@@ -191,7 +191,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         </div>
       </div>
 
-      <div className="bg-[#0b291d] border-4 border-[#12422e] rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden min-h-[350px] sm:min-h-[400px] flex flex-col justify-between">
+      <div className="bg-[#0b291d] border-2 sm:border-4 border-[#12422e] rounded-2xl sm:rounded-3xl p-3 sm:p-6 shadow-2xl relative overflow-hidden min-h-[300px] sm:min-h-[400px] flex flex-col justify-between">
         {/* Dealer Area */}
         {gameState !== 'betting' && (
           <div className="mb-2 sm:mb-4">
@@ -322,14 +322,14 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
         {/* Betting Screen */}
         {gameState === 'betting' && (
           <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="w-24 h-24 bg-[#12422e] rounded-full flex items-center justify-center shadow-inner mb-6 border-4 border-[#0d3021]">
-              <Coins size={40} className="text-yellow-500" />
+            <div className="w-16 h-16 sm:w-24 sm:h-24 bg-[#12422e] rounded-full flex items-center justify-center shadow-inner mb-4 sm:mb-6 border-4 border-[#0d3021]">
+              <Coins size={28} className="sm:w-10 sm:h-10 text-yellow-500" />
             </div>
-            <h2 className="text-3xl font-black text-white mb-8 tracking-wider uppercase">
+            <h2 className="text-2xl sm:text-3xl font-black text-white mb-6 sm:mb-8 tracking-wider uppercase">
               Зробіть ставку
             </h2>
 
-            <div className="flex items-center gap-4 bg-black/40 p-3 rounded-2xl mb-8 border border-white/5">
+            <div className="flex items-center gap-2 sm:gap-4 bg-black/40 p-3 rounded-2xl mb-6 sm:mb-8 border border-white/5">
               <button
                 onClick={() => adjustBet(-100)}
                 className="w-12 h-12 bg-red-500/20 text-red-400 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
@@ -349,7 +349,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
                   if (betAmount < 10 && profile.coins >= 10) setBetAmount(10);
                   else if (profile.coins < 10) setBetAmount(profile.coins);
                 }}
-                className="w-32 text-center text-3xl font-black text-yellow-500 bg-transparent border-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-24 sm:w-32 text-center text-2xl sm:text-3xl font-black text-yellow-500 bg-transparent border-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <button
                 onClick={() => adjustBet(100)}
@@ -359,7 +359,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
               </button>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-3 mb-8 w-full max-w-[300px]">
+            <div className="flex flex-wrap justify-center gap-3 mb-6 sm:mb-8 w-full max-w-[300px]">
               <button
                 onClick={() => setBetAmount(10)}
                 className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-colors border border-white/10"
@@ -398,11 +398,11 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
 
       {/* Action Buttons */}
       {gameState === 'playing' && (
-        <div className="mt-4 flex justify-center gap-4">
+        <div className="mt-3 sm:mt-4 flex justify-center gap-3 sm:gap-4">
           <button
             onClick={hit}
             disabled={isProcessing}
-            className="flex-1 max-w-[200px] bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-transform hover:scale-105"
+            className="flex-1 max-w-[200px] bg-blue-600 hover:bg-blue-500 text-white font-black py-3 sm:py-4 rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-transform hover:scale-105"
           >
             <Plus size={20} /> Взяти
           </button>
@@ -410,7 +410,7 @@ export default function GameBlackjack({ profile, setProfile, goBack, showToast }
           <button
             onClick={stand}
             disabled={isProcessing}
-            className="flex-1 max-w-[200px] bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-transform hover:scale-105"
+            className="flex-1 max-w-[200px] bg-red-600 hover:bg-red-500 text-white font-black py-3 sm:py-4 rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-transform hover:scale-105"
           >
             <Hand size={20} /> Зупинитись
           </button>

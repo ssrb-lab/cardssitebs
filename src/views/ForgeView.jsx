@@ -191,8 +191,15 @@ export default function ForgeView({
       const nonDefending = instances.filter(
         (inst) => !defendingIndices.some((d) => d.cardId === inst.card.id && d.statsIndex === inst.statsIndex)
       );
-      const pickBest = (arr) => arr.reduce((best, c) => (c.level > best.level ? c : best), arr[0]);
-      const representative = nonDefending.length > 0 ? pickBest(nonDefending) : pickBest(instances);
+      const pickBest = (arr) => arr.reduce((best, c) => {
+        if (c.level > best.level) return c;
+        if (c.level < best.level) return best;
+        const bestDef = defendingIndices.some((d) => d.cardId === best.card.id && d.statsIndex === best.statsIndex);
+        const cDef = defendingIndices.some((d) => d.cardId === c.card.id && d.statsIndex === c.statsIndex);
+        if (bestDef && !cDef) return c;
+        return best;
+      }, arr[0]);
+      const representative = pickBest(instances);
       const allDefending = nonDefending.length === 0;
       const availDupes = instances.length; // загальна кількість (включно з захисними)
 
@@ -307,10 +314,10 @@ export default function ForgeView({
   return (
     <div className="pb-10 pt-4 max-w-6xl mx-auto w-full px-4 animate-in fade-in zoom-in-95">
       {/* Main Forge Panel */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 lg:p-10 mb-8 shadow-2xl relative overflow-hidden">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-3 sm:p-6 lg:p-10 mb-4 sm:mb-8 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-to-b from-blue-600/5 to-transparent pointer-events-none" />
 
-        <div className="flex flex-col lg:flex-row gap-12 items-center relative z-10">
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-12 items-center relative z-10">
           {/* Selected card slot */}
           <div className="flex flex-col items-center gap-3">
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Обрана Картка</span>
@@ -371,7 +378,7 @@ export default function ForgeView({
           {/* Info & actions */}
           <div className="w-full lg:w-1/2 space-y-6">
             <div>
-              <h1 className="text-4xl font-black text-white uppercase tracking-tight flex items-center gap-4 mb-2">
+              <h1 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tight flex items-center gap-2 sm:gap-4 mb-2">
                 <ArrowUpCircle className="text-blue-500" size={36} />
                 Зала Прокачки
               </h1>
@@ -397,7 +404,7 @@ export default function ForgeView({
                   </div>
                 )}
                 {isMaxLevel ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-2xl text-center">
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 sm:p-6 rounded-2xl text-center">
                     <Star className="text-yellow-500 mx-auto mb-2" size={32} />
                     <h3 className="text-yellow-400 font-black text-xl uppercase">Максимальний рівень!</h3>
                     <p className="text-yellow-500/70 text-sm mt-1">Ця картка досягла межі своєї могутності.</p>
@@ -651,8 +658,8 @@ export default function ForgeView({
                       <p className="text-neutral-500 text-xs mb-3 leading-relaxed">
                         Дублікати продаються без параметрів. Покупець отримує картку з базовими характеристиками.
                       </p>
-                      <div className="flex gap-2 items-end">
-                        <div className="flex-1">
+                      <div className="flex flex-wrap sm:flex-nowrap gap-2 items-end">
+                        <div className="flex-1 min-w-[80px]">
                           <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Кількість</label>
                           <input
                             type="number"
@@ -663,7 +670,7 @@ export default function ForgeView({
                             className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:border-blue-500"
                           />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-[80px]">
                           <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Ціна (разом)</label>
                           <input
                             type="number"
@@ -677,7 +684,7 @@ export default function ForgeView({
                         <button
                           onClick={handleListDupes}
                           disabled={isListingDupes || !sellDupePrice}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-colors"
+                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-colors w-full sm:w-auto justify-center"
                         >
                           {isListingDupes ? <RefreshCw size={13} className="animate-spin" /> : <Tag size={13} />}
                           Виставити
@@ -725,7 +732,7 @@ export default function ForgeView({
         if (damagedCards.length === 0) return null;
 
         return (
-          <div className="bg-neutral-900 border border-red-900/30 rounded-3xl p-6 mb-8 shadow-xl relative overflow-hidden">
+          <div className="bg-neutral-900 border border-red-900/30 rounded-3xl p-3 sm:p-6 mb-4 sm:mb-8 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-red-900/5 to-transparent pointer-events-none" />
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-5">
@@ -813,10 +820,10 @@ export default function ForgeView({
       })()}
 
       {/* Emerald Box Panel */}
-      <div className="bg-neutral-900 border border-emerald-900/30 rounded-3xl p-6 mb-8 shadow-xl relative overflow-hidden">
+      <div className="bg-neutral-900 border border-emerald-900/30 rounded-3xl p-3 sm:p-6 mb-4 sm:mb-8 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-emerald-600/5 to-transparent pointer-events-none" />
         <div className="relative z-10">
-          <div className="flex flex-col lg:flex-row gap-8 items-center">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-8 items-center">
             {/* Left: box button */}
             <div className="flex flex-col items-center gap-4 shrink-0">
               <h2 className="text-xl font-black text-white flex items-center gap-2">
@@ -851,7 +858,7 @@ export default function ForgeView({
                   }
                 >
                   <span
-                    className="text-5xl transition-all duration-300 select-none"
+                    className="text-3xl sm:text-5xl transition-all duration-300 select-none"
                     style={
                       boxPhase === 'opening' ? { transform: 'scale(1.3) rotate(-10deg)', filter: 'drop-shadow(0 0 16px gold)' } :
                       boxPhase === 'shaking' ? { display: 'inline-block' } : {}
@@ -992,8 +999,8 @@ export default function ForgeView({
       `}</style>
 
       {/* Card list */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className="text-2xl font-black text-white flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 gap-4">
+        <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
           Ваш Арсенал <span className="text-neutral-600">({groupedCards.length})</span>
         </h2>
         <div className="flex gap-2">
@@ -1015,7 +1022,7 @@ export default function ForgeView({
           <p className="text-neutral-500 font-bold uppercase tracking-widest">У вас немає ігрових карток</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
           {groupedCards.map((item) => {
             const isSelected = selectedMain?.card.id === item.card.id;
             const isDefending = item.allDefending;
@@ -1038,10 +1045,10 @@ export default function ForgeView({
             return (
               <div
                 key={item.card.id}
-                onClick={() => !isUpgrading && !isDefending && setSelectedMain(item)}
+                onClick={() => !isUpgrading && setSelectedMain(item)}
                 className={`flex flex-col group cursor-pointer transition-all duration-300 ${
                   isSelected ? '-translate-y-2' : 'hover:-translate-y-2'
-                } ${isDefending ? 'grayscale opacity-40 cursor-not-allowed' : ''}`}
+                }`}
               >
                 <div
                   className={`relative w-full aspect-[2/3] rounded-xl overflow-hidden border-2 bg-neutral-900 mb-3 transition-all duration-300 group-hover:shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform-gpu will-change-transform isolate z-0 ${
@@ -1066,8 +1073,8 @@ export default function ForgeView({
                   )}
 
                   {isDefending && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-30">
-                      <span className="text-[10px] font-black text-white uppercase bg-red-600 px-2 py-1 rounded-full border border-red-400">
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-30 pointer-events-none">
+                      <span className="text-[10px] font-black text-white uppercase bg-red-600/90 px-2 py-1 rounded-full border border-red-400">
                         Арена
                       </span>
                     </div>
@@ -1178,7 +1185,7 @@ export default function ForgeView({
             onClick={() => setSellDupeModal(null)}
           >
             <div
-              className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 w-full max-w-sm animate-in zoom-in-95 fade-in duration-200"
+              className="bg-neutral-900 border border-neutral-700 rounded-3xl p-4 sm:p-6 w-full max-w-sm animate-in zoom-in-95 fade-in duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-4">

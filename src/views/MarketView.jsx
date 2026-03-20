@@ -32,9 +32,9 @@ export default function MarketView({
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
         <div className="text-center sm:text-left">
-          <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center justify-center sm:justify-start gap-3">
+          <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-widest flex items-center justify-center sm:justify-start gap-3">
             <Store className="text-blue-500 w-8 h-8" /> Ринок Карток
           </h2>
           <p className="text-neutral-400 text-sm">Купуйте рідкісні лоти в інших гравців!</p>
@@ -84,7 +84,7 @@ export default function MarketView({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
           {activeListings.map((listing) => {
             const card = cardsCatalog.find((c) => c.id === listing.cardId);
             if (!card) return null;
@@ -138,8 +138,8 @@ export default function MarketView({
                   )}
                 </div>
 
-                <div className="w-full px-1 text-center flex flex-col items-center">
-                  <div className="font-bold text-xs text-white truncate w-full mb-0.5">
+                <div className="w-full px-0.5 sm:px-1 text-center flex flex-col items-center">
+                  <div className="font-bold text-[11px] sm:text-xs text-white truncate w-full mb-0.5">
                     {card.name}
                   </div>
                   {isDupe ? (
@@ -147,14 +147,14 @@ export default function MarketView({
                       Базові характеристики · ×{dupeAmt} шт.
                     </div>
                   ) : null}
-                  <div className="text-[10px] text-neutral-500 mb-3 truncate w-full flex items-center justify-center gap-1">
+                  <div className="text-[10px] text-neutral-500 mb-2 sm:mb-3 truncate w-full flex items-center justify-center gap-1">
                     <User size={10} /> {listing.sellerNickname}
                   </div>
 
                   {isMine ? (
                     <button
                       onClick={() => cancelMarketListing(listing)}
-                      className="w-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold py-2 rounded-lg transition-colors border border-red-800"
+                      className="w-full bg-red-900/50 hover:bg-red-600 text-red-200 hover:text-white text-xs font-bold py-2 min-h-[40px] rounded-lg transition-colors border border-red-800"
                     >
                       Зняти з продажу
                     </button>
@@ -162,7 +162,7 @@ export default function MarketView({
                     <div className="w-full flex gap-1">
                       <button
                         onClick={() => buyFromMarket(listing)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-lg shadow-blue-900/20 flex justify-center items-center gap-1"
+                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 min-h-[40px] rounded-lg transition-colors shadow-lg shadow-blue-900/20 flex justify-center items-center gap-1"
                       >
                         {isDupe
                           ? <>{dupeAmt} шт. ({listing.price} <Coins size={10} />)</>
@@ -172,7 +172,7 @@ export default function MarketView({
                       {isAdmin && (
                         <button
                           onClick={() => cancelMarketListing(listing)}
-                          className="bg-red-900 text-red-400 hover:bg-red-600 hover:text-white p-2 rounded-lg"
+                          className="bg-red-900 text-red-400 hover:bg-red-600 hover:text-white p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg"
                           title="Примусово видалити лот (Адмін)"
                         >
                           <Trash2 size={14} />

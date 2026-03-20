@@ -253,7 +253,7 @@ const getDefendingInstances = async (uid) => {
   return instances;
 };
 
-const syncArenaIndices = async (tx, userUid, cardId, oldToNewIndexMap) => {
+const syncArenaIndices = async (tx, userUid, cardId, oldToNewIndexMap, statsUpdateObj = null) => {
   const points = await tx.arenaPoint.findMany({
     where: { ownerId: userUid },
   });
@@ -263,7 +263,15 @@ const syncArenaIndices = async (tx, userUid, cardId, oldToNewIndexMap) => {
     let pointChanged = false;
     const updatedCards = point.defendingCards.map((c) => {
       if (c.id === cardId && c.statsIndex !== undefined && c.statsIndex !== null) {
-        if (oldToNewIndexMap.has(c.statsIndex)) {
+        if (statsUpdateObj && c.statsIndex === statsUpdateObj.oldStatsIndex) {
+          c.level = statsUpdateObj.level;
+          c.power = statsUpdateObj.power;
+          c.maxHp = statsUpdateObj.hp;
+          c.hp = statsUpdateObj.hp; // Heal on level up
+          pointChanged = true;
+        }
+
+        if (oldToNewIndexMap && oldToNewIndexMap.has(c.statsIndex)) {
           const newIdx = oldToNewIndexMap.get(c.statsIndex);
           if (newIdx !== c.statsIndex) {
             c.statsIndex = newIdx;
@@ -3449,8 +3457,9 @@ app.post('/api/game/arena/points/:id/swap-cards', authenticate, async (req, res)
         power: s.power !== undefined && s.power !== null ? Number(s.power) : minPower,
         hp: s.hp !== undefined && s.hp !== null ? Number(s.hp) : minHp,
         maxHp: s.maxHp !== undefined && s.maxHp !== null ? Number(s.maxHp) : (s.hp !== undefined && s.hp !== null ? Number(s.hp) : minHp),
+        level: Number(s.level) || 1,
       }));
-      while (effectiveStats.length < invItem.amount) effectiveStats.push({ power: minPower, hp: minHp });
+      while (effectiveStats.length < invItem.amount) effectiveStats.push({ power: minPower, hp: minHp, level: 1 });
       effectiveStats.length = invItem.amount;
 
       const idx = c.statsIndex;
@@ -3471,6 +3480,7 @@ app.post('/api/game/arena/points/:id/swap-cards', authenticate, async (req, res)
         hp: effectiveStats[idx].hp,
         maxHp: effectiveStats[idx].maxHp || effectiveStats[idx].hp,
         currentHp: effectiveStats[idx].hp,
+        level: effectiveStats[idx].level || 1,
         statsIndex: idx,
       });
     }
@@ -3601,11 +3611,12 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
             : s.hp !== undefined && s.hp !== null
               ? Number(s.hp)
               : minHp,
+        level: Number(s.level) || 1,
         perks: Array.isArray(s.perks) ? s.perks : [],
       }));
 
       while (effectiveStats.length < invItem.amount) {
-        effectiveStats.push({ power: minPower, hp: minHp, perks: [] });
+        effectiveStats.push({ power: minPower, hp: minHp, level: 1, perks: [] });
       }
 
       // Truncate to actual amount (gameStats may have stale entries from sold/traded copies)
@@ -3637,6 +3648,7 @@ app.post('/api/game/arena/points/:id/capture', authenticate, async (req, res) =>
         hp: finalHp,
         maxHp: finalHp,
         currentHp: finalHp,
+        level: effectiveStats[idx].level || 1,
         statsIndex: idx,
       });
     }
@@ -6941,7 +6953,12 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
     // В боях бекенд буде брати level8Perk безпосередньо з card
     
     await prisma.$transaction(async (tx) => {
-      await syncArenaIndices(tx, user.uid, cardId, map);
+      await syncArenaIndices(tx, user.uid, cardId, map, {
+        oldStatsIndex: statsIndex,
+        level: updatedStatObj.level,
+        power: updatedStatObj.power,
+        hp: updatedStatObj.hp, // Цей HP - це maxHp
+      });
 
       const decrementData = currency === 'crystals' ? { crystals: { decrement: requiredCost } } : { coins: { decrement: requiredCost } };
       if (requiredCost > 0) {
@@ -6965,9 +6982,12 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
       include: { inventory: { include: { card: true } } },
     });
 
+    const updatedDefending = await getDefendingInstances(req.user.uid);
+    const profileWithDefending = { ...updatedUser, defendingInstances: updatedDefending };
+
     res.json({
       success: true,
-      profile: updatedUser,
+      profile: profileWithDefending,
       newPower: updatedStatObj.power,
       newHp: updatedStatObj.hp,
       newLevel: updatedStatObj.level,

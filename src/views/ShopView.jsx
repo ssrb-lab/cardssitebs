@@ -93,11 +93,11 @@ export default function ShopView({
   if (isRouletteSpinning && rouletteItems.length > 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[65vh] animate-in fade-in duration-500 w-full pb-10 overflow-hidden">
-        <h2 className="text-3xl font-black mb-10 text-white uppercase tracking-widest text-center animate-pulse drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+        <h2 className="text-xl sm:text-3xl font-black mb-6 sm:mb-10 text-white uppercase tracking-widest text-center animate-pulse drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
           Відкриваємо пак...
         </h2>
 
-        <div className="relative w-full max-w-4xl mx-auto bg-neutral-900 border-[4px] border-neutral-700 rounded-3xl h-72 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
+        <div className="relative w-full max-w-4xl mx-auto bg-neutral-900 border-[4px] border-neutral-700 rounded-3xl h-48 sm:h-72 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
           <div className="absolute inset-y-0 left-0 w-16 sm:w-32 bg-gradient-to-r from-neutral-950 to-transparent z-20 pointer-events-none"></div>
           <div className="absolute inset-y-0 right-0 w-16 sm:w-32 bg-gradient-to-l from-neutral-950 to-transparent z-20 pointer-events-none"></div>
 
@@ -123,7 +123,7 @@ export default function ShopView({
               return (
                 <div
                   key={i}
-                  className={`w-40 h-56 rounded-2xl border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass} transform-gpu will-change-transform isolate z-0`}
+                  className={`w-28 h-40 sm:w-40 sm:h-56 rounded-2xl border-2 sm:border-4 shrink-0 bg-neutral-950 relative overflow-hidden shadow-xl ${style.border} ${effectClass} transform-gpu will-change-transform isolate z-0`}
                 >
                   <CardFrame frame={item.frame} effect={item.effect}>
                     <img
@@ -178,7 +178,7 @@ export default function ShopView({
 
     return (
       <div className="flex flex-col items-center min-h-[65vh] animate-in zoom-in-95 duration-700 w-full pb-10">
-        <h2 className="text-3xl sm:text-4xl font-black mb-8 text-white uppercase tracking-widest text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+        <h2 className="text-xl sm:text-4xl font-black mb-4 sm:mb-8 text-white uppercase tracking-widest text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
           Ви отримали {pulledCards.length > 1 ? `(${pulledCards.length} шт)` : '!'}
         </h2>
 
@@ -320,7 +320,7 @@ export default function ShopView({
           <ArrowLeft size={20} /> Назад
         </button>
 
-        <div className="flex flex-col items-center mb-8 sm:mb-12 bg-neutral-900/50 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-neutral-800 max-w-3xl mx-4 sm:mx-auto">
+        <div className="flex flex-col items-center mb-4 sm:mb-12 bg-neutral-900/50 p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-neutral-800 max-w-3xl mx-4 sm:mx-auto">
           {selectedPack.isPremiumOnly && (
             <div className="bg-fuchsia-900/50 text-fuchsia-300 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-3 border border-fuchsia-500/30">
               <Gem size={14} /> Преміум Пак
@@ -331,7 +331,7 @@ export default function ShopView({
               Ігровий Пак (Дає сили)
             </div>
           )}
-          <h2 className="text-xl sm:text-3xl font-black mb-4 sm:mb-6 text-white text-center">{selectedPack.name}</h2>
+          <h2 className="text-lg sm:text-3xl font-black mb-4 sm:mb-6 text-white text-center">{selectedPack.name}</h2>
 
           <div className="relative w-32 h-32 sm:w-48 sm:h-48 mb-6 sm:mb-8 flex justify-center items-center perspective-1000">
             {openingPackId === selectedPack.id ? (
@@ -598,7 +598,7 @@ export default function ShopView({
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
       <div className="text-center mb-6">
-        <h2 className="text-3xl font-black mb-2 text-white uppercase tracking-widest">
+        <h2 className="text-xl sm:text-3xl font-black mb-2 text-white uppercase tracking-widest">
           Магазин Паків
         </h2>
         <p className="text-neutral-400 text-sm">Оберіть пак, Мій лорд, і випробуйте удачу!</p>

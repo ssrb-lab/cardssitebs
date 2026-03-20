@@ -1281,60 +1281,51 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
       <header className="bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 shadow-md">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div className="max-w-5xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
           <div
-            className="flex items-center gap-2 sm:gap-3 text-white font-black text-lg tracking-wider cursor-pointer shrink-0"
+            className="flex items-center gap-2 text-white font-black text-lg tracking-wider cursor-pointer shrink-0"
             onClick={() => navigate('/shop')}
           >
             <img
               src={logo1}
               alt="Card Game Logo"
-              className="w-10 h-10 object-contain rounded-xl"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-xl"
               loading="lazy"
             />
             <span className="hidden md:block whitespace-nowrap">Card Game</span>
           </div>
 
-          <button 
+          <button
             onClick={() => setShowDonateModal(true)}
-            className="flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-colors bg-pink-500/10 px-3 sm:px-4 py-2 rounded-xl border border-pink-500/20 shrink-0 mx-4"
+            className="hidden sm:flex items-center gap-2 text-pink-400 hover:text-pink-300 transition-colors bg-pink-500/10 px-3 sm:px-4 py-2 rounded-xl border border-pink-500/20 shrink-0"
           >
             <Heart size={18} className="shrink-0 fill-pink-500/20" />
             <span className="hidden sm:block font-bold whitespace-nowrap">Підтримати</span>
           </button>
 
-          <div className="flex items-center gap-3 lg:gap-6 min-w-0 ml-auto lg:overflow-visible overflow-x-auto no-scrollbar py-1">
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 ml-auto overflow-x-auto no-scrollbar py-1">
               <button
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-3 hover:bg-neutral-800 p-1.5 pr-3 rounded-full text-left shrink-0"
+                className="flex items-center hover:bg-neutral-800 p-1 sm:p-1.5 rounded-full shrink-0"
               >
-                <PlayerAvatar profile={profile} className="w-10 h-10 rounded-full" iconSize={20} />
-                <div className="hidden xl:block text-left">
-                  <div className="font-bold text-sm text-white flex items-center gap-1">
-                    {profile?.nickname}
-                    <span className="bg-red-900/50 text-red-400 text-[10px] px-1.5 py-0.5 rounded-md border border-red-800 flex items-center gap-0.5 ml-1">
-                      <Swords size={10} /> {profile?.farmLevel || 1}
-                    </span>
-                  </div>
-                </div>
+                <PlayerAvatar profile={profile} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full" iconSize={18} />
               </button>
 
               {canClaimDaily && (
                 <button
                   onClick={() => navigate('/profile')}
-                  className="bg-orange-500/20 text-orange-400 p-2 sm:p-2.5 rounded-xl border border-orange-500/30 shrink-0"
+                  className="bg-orange-500/20 text-orange-400 p-1.5 sm:p-2.5 rounded-xl border border-orange-500/30 shrink-0"
                 >
-                  <Gift size={20} className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Gift size={16} className="sm:w-5 sm:h-5" />
                 </button>
               )}
 
               <button
                 onClick={() => setShowNotifications(true)}
-                className="relative bg-neutral-950 p-2 sm:p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
+                className="relative bg-neutral-950 p-1.5 sm:p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
                 title="Сповіщення"
               >
-                <Mail size={20} className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Mail size={16} className="sm:w-5 sm:h-5" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full border border-neutral-900 shadow-[0_0_10px_rgba(239,68,68,0.5)]">
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -1344,7 +1335,7 @@ export default function App() {
 
               <button
                 onClick={toggleAutoSound}
-                className="bg-neutral-950 p-2 sm:p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
+                className="hidden sm:block bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
                 title={
                   profile?.autoSoundEnabled !== false
                     ? 'Вимкнути автозвук карток'
@@ -1352,27 +1343,26 @@ export default function App() {
                 }
               >
                 {profile?.autoSoundEnabled !== false ? (
-                  <Volume2 size={20} className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Volume2 size={20} />
                 ) : (
-                  <VolumeX size={20} className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <VolumeX size={20} />
                 )}
               </button>
 
-              <div className="bg-yellow-950/30 backdrop-blur-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-yellow-700/50 flex gap-1.5 sm:gap-2 items-center shrink-0 shadow-inner">
-                <Coins size={16} className="text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)] sm:w-[18px] sm:h-[18px]" />
-                <span className="text-yellow-400 font-black text-xs sm:text-base drop-shadow-md">{(profile?.coins || 0).toLocaleString()}</span>
+              <div className="bg-yellow-950/30 backdrop-blur-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border border-yellow-700/50 flex gap-1 sm:gap-2 items-center shrink-0 shadow-inner">
+                <Coins size={14} className="text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)] sm:w-[18px] sm:h-[18px]" />
+                <span className="text-yellow-400 font-black text-[10px] sm:text-base drop-shadow-md">{(profile?.coins || 0).toLocaleString()}</span>
               </div>
-              <div className="bg-fuchsia-950/30 backdrop-blur-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-fuchsia-700/50 flex gap-1.5 sm:gap-2 items-center shrink-0 shadow-inner">
-                <Gem size={16} className="text-fuchsia-400 drop-shadow-[0_0_5px_rgba(217,70,239,0.8)] sm:w-[18px] sm:h-[18px]" />
-                <span className="text-fuchsia-400 font-black text-xs sm:text-base drop-shadow-md">{(profile?.crystals || 0).toLocaleString()}</span>
+              <div className="bg-fuchsia-950/30 backdrop-blur-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border border-fuchsia-700/50 flex gap-1 sm:gap-2 items-center shrink-0 shadow-inner">
+                <Gem size={14} className="text-fuchsia-400 drop-shadow-[0_0_5px_rgba(217,70,239,0.8)] sm:w-[18px] sm:h-[18px]" />
+                <span className="text-fuchsia-400 font-black text-[10px] sm:text-base drop-shadow-md">{(profile?.crystals || 0).toLocaleString()}</span>
               </div>
               <button
                 onClick={() => navigate('/premium')}
-                className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border bg-gradient-to-r from-fuchsia-600/20 to-purple-600/20 hover:from-fuchsia-500/30 hover:to-purple-500/30 border-fuchsia-500/30 text-fuchsia-300 shrink-0 transition-all active:scale-[0.97] shadow-[0_0_10px_rgba(217,70,239,0.1)]"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1 sm:py-2 rounded-full border bg-gradient-to-r from-fuchsia-600/20 to-purple-600/20 hover:from-fuchsia-500/30 hover:to-purple-500/30 border-fuchsia-500/30 text-fuchsia-300 shrink-0 transition-all active:scale-[0.97] shadow-[0_0_10px_rgba(217,70,239,0.1)]"
               >
-                <Gem size={16} className="sm:w-[18px] sm:h-[18px] drop-shadow-[0_0_5px_rgba(217,70,239,0.8)]" /> <span className="hidden sm:block font-bold text-sm drop-shadow-md">Преміум</span>
+                <Gem size={14} className="sm:w-[18px] sm:h-[18px] drop-shadow-[0_0_5px_rgba(217,70,239,0.8)]" /> <span className="hidden sm:block font-bold text-sm drop-shadow-md">Преміум</span>
               </button>
-            </div>
           </div>
         </div>
       </header>
@@ -1386,7 +1376,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="max-w-5xl w-full mx-auto p-4 mt-4 flex-grow">
+      <main className="max-w-5xl w-full mx-auto px-2 sm:px-4 pt-2 sm:pt-4 flex-grow">
         <Routes>
           <Route path="/farm" element={
             <FarmView
@@ -1613,7 +1603,7 @@ export default function App() {
         </Routes>
       </main>
 
-      <footer className="w-full text-center text-neutral-600 text-xs py-8 mt-auto px-4 relative z-10">
+      <footer className="w-full text-center text-neutral-600 text-xs py-4 sm:py-8 mt-auto px-4 relative z-10">
         <p>&copy; {new Date().getFullYear()} Card Game. Всі права захищені.</p>
         <div className="flex justify-center gap-4 mt-2">
           <button
@@ -1727,8 +1717,8 @@ export default function App() {
 
       <DonateModal isOpen={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
-      <nav className="fixed bottom-0 w-full bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-2 py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar">
-        <div className="min-w-max mx-auto flex justify-center sm:gap-2">
+      <nav className="fixed bottom-0 w-full bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-0 sm:px-2 py-1 sm:py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar safe-area-bottom">
+        <div className="min-w-max mx-auto flex justify-center gap-0 sm:gap-2">
           <NavButton
             icon={<Swords size={22} />}
             label="Фарм"
@@ -1788,11 +1778,11 @@ export default function App() {
           {(profile?.isAdmin || profile?.isSuperAdmin) && (
             <button
               onClick={() => navigate('/admin')}
-              className={`flex flex-col items-center p-2 rounded-lg w-16 sm:w-20 transition-colors ${currentView === 'admin' ? 'text-purple-500' : 'text-neutral-500'}`}
+              className={`flex flex-col items-center p-1.5 sm:p-2 rounded-lg w-12 sm:w-20 transition-colors ${currentView === 'admin' ? 'text-purple-500' : 'text-neutral-500'}`}
             >
-              <Shield size={22} />
-              <span className="text-[9px] sm:text-[10px] mt-1 font-bold uppercase tracking-wider">
-                Адмінка
+              <Shield size={18} className="sm:w-[22px] sm:h-[22px]" />
+              <span className="text-[8px] sm:text-[10px] mt-0.5 sm:mt-1 font-bold uppercase tracking-wider leading-tight">
+                Адмін
               </span>
             </button>
           )}

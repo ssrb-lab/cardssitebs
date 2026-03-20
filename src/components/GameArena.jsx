@@ -616,6 +616,8 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
   const ownedGameCards = React.useMemo(() => {
     const cards = [];
     if (profile?.inventory && cardsCatalog) {
+      const defendingIndices = profile?.defendingInstances || [];
+
       profile.inventory.forEach((invItem) => {
         const cardDetails = cardsCatalog.find((c) => c.id === invItem.cardId);
 
@@ -642,23 +644,49 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           const limitedStats = effectiveStats.slice(0, invItem.amount);
 
+          let bestStat = null;
+          let bestIdx = -1;
+
           limitedStats.forEach((statObj, idx) => {
             if (statObj.power > 0 && !statObj.inSafe) {
-              cards.push({
-                ...cardDetails,
-                uniqueInstanceId: `${cardDetails.id}-${statObj.power}-${statObj.hp}-${idx}`,
-                power: statObj.power,
-                hp: statObj.hp,
-                level: statObj.level || 1,
-                statsIndex: idx,
-              });
+              if (!bestStat) {
+                bestStat = statObj;
+                bestIdx = idx;
+              } else {
+                const currLevel = statObj.level || 1;
+                const bestLevel = bestStat.level || 1;
+                
+                if (currLevel > bestLevel) {
+                  bestStat = statObj;
+                  bestIdx = idx;
+                } else if (currLevel === bestLevel) {
+                  const bestDef = defendingIndices.some(d => d.cardId === cardDetails.id && d.statsIndex === bestIdx);
+                  const currDef = defendingIndices.some(d => d.cardId === cardDetails.id && d.statsIndex === idx);
+                  // If the current best is defending, and this one is NOT, prefer this one
+                  if (bestDef && !currDef) {
+                    bestStat = statObj;
+                    bestIdx = idx;
+                  }
+                }
+              }
             }
           });
+
+          if (bestStat) {
+            cards.push({
+              ...cardDetails,
+              uniqueInstanceId: `${cardDetails.id}-${bestStat.power}-${bestStat.hp}-${bestIdx}`,
+              power: bestStat.power,
+              hp: bestStat.hp,
+              level: bestStat.level || 1,
+              statsIndex: bestIdx,
+            });
+          }
         }
       });
     }
     return cards;
-  }, [profile?.inventory, cardsCatalog]);
+  }, [profile?.inventory, cardsCatalog, profile?.defendingInstances]);
 
   const filteredAndSortedCards = React.useMemo(() => {
     const selectedIds = new Set(deck.map(c => c.id));
@@ -948,38 +976,38 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       `}</style>
 
       {/* Header section with back button and profile block */}
-      <div className="w-full flex items-center justify-between mb-4 border-b border-indigo-900/50 pb-4">
+      <div className="w-full flex items-center justify-between mb-2 sm:mb-4 border-b border-indigo-900/50 pb-2 sm:pb-4 gap-2">
         <button
           onClick={goBack}
-          className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-bold transition-colors bg-indigo-950/30 px-4 py-2 rounded-xl"
+          className="flex items-center gap-1 sm:gap-2 text-indigo-400 hover:text-indigo-300 font-bold transition-colors bg-indigo-950/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-base shrink-0"
         >
-          <ArrowLeft size={20} /> Покинути Арену
+          <ArrowLeft size={16} className="sm:w-5 sm:h-5" /> <span className="hidden sm:inline">Покинути Арену</span><span className="sm:hidden">Назад</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <Trophy className="text-indigo-400" size={28} />
-          <h2 className="text-3xl font-black text-white uppercase tracking-widest drop-shadow-md">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <Trophy className="text-indigo-400 hidden sm:block" size={28} />
+          <h2 className="text-lg sm:text-3xl font-black text-white uppercase tracking-wider sm:tracking-widest drop-shadow-md">
             Арена
           </h2>
           <button
             onClick={() => setShowPerkInfo(true)}
-            className="ml-2 bg-indigo-950/50 border border-indigo-700/50 hover:border-indigo-500 text-indigo-400 hover:text-indigo-300 p-1.5 rounded-lg transition-colors"
+            className="sm:ml-2 bg-indigo-950/50 border border-indigo-700/50 hover:border-indigo-500 text-indigo-400 hover:text-indigo-300 p-1 sm:p-1.5 rounded-lg transition-colors"
             title="Інфо про перки"
           >
-            <Info size={18} />
+            <Info size={16} className="sm:w-[18px] sm:h-[18px]" />
           </button>
           <button
             onClick={() => setShowRules(true)}
-            className="bg-red-950/50 border border-red-700/50 hover:border-red-500 text-red-500 hover:text-red-400 p-1.5 rounded-lg transition-colors flex items-center justify-center"
+            className="bg-red-950/50 border border-red-700/50 hover:border-red-500 text-red-500 hover:text-red-400 p-1 sm:p-1.5 rounded-lg transition-colors flex items-center justify-center"
             title="Правила Арени"
           >
-            <ShieldAlert size={18} />
+            <ShieldAlert size={16} className="sm:w-[18px] sm:h-[18px]" />
           </button>
         </div>
 
-        <div className="flex flex-col items-end sm:flex-row sm:items-center gap-3 sm:gap-6 bg-indigo-950/20 px-4 py-2 rounded-2xl border border-indigo-900/30">
-          <div className="flex items-center gap-3">
-            <PlayerAvatar profile={profile} className="w-10 h-10 rounded-full" iconSize={20} />
+        <div className="flex items-center gap-1.5 sm:gap-6 bg-indigo-950/20 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border border-indigo-900/30">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <PlayerAvatar profile={profile} className="w-7 h-7 sm:w-10 sm:h-10 rounded-full" iconSize={16} />
             <div className="hidden md:block text-left">
               <div className="font-bold text-sm text-white flex items-center gap-1">
                 {profile?.nickname}
@@ -988,20 +1016,20 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="bg-neutral-950/50 px-3 py-1.5 rounded-xl border border-indigo-900/50 flex gap-1.5 items-center">
-              <Coins size={16} className="text-yellow-500" />
-              <span className="text-yellow-500 font-black text-sm">{profile?.coins}</span>
+          <div className="flex items-center gap-1.5 sm:gap-4">
+            <div className="bg-neutral-950/50 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-indigo-900/50 flex gap-1 sm:gap-1.5 items-center">
+              <Coins size={14} className="sm:w-4 sm:h-4 text-yellow-500" />
+              <span className="text-yellow-500 font-black text-[11px] sm:text-sm">{profile?.coins}</span>
             </div>
-            <div className="bg-neutral-950/50 px-3 py-1.5 rounded-xl border border-indigo-900/50 flex gap-1.5 items-center">
-              <Gem size={16} className="text-fuchsia-500" />
-              <span className="text-fuchsia-500 font-black text-sm">{profile?.crystals || 0}</span>
+            <div className="bg-neutral-950/50 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-indigo-900/50 flex gap-1 sm:gap-1.5 items-center">
+              <Gem size={14} className="sm:w-4 sm:h-4 text-fuchsia-500" />
+              <span className="text-fuchsia-500 font-black text-[11px] sm:text-sm">{profile?.crystals || 0}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 w-full h-[calc(100vh-100px)] min-h-0 pb-4 relative overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-3 sm:gap-6 w-full h-[calc(100vh-80px)] sm:h-[calc(100vh-100px)] min-h-0 pb-4 relative overflow-hidden">
         {/* Left Panel - Deck Selection */}
         <div
           className={`flex flex-col gap-4 transition-all duration-500 ease-in-out shrink-0 h-full transform-gpu will-change-transform
@@ -1213,7 +1241,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
           )}
 
           {/* Map Instructions */}
-          <div className="absolute bottom-4 left-4 z-40 bg-neutral-900/80 backdrop-blur-sm p-3 rounded-xl border border-neutral-800 shadow-xl pointer-events-none">
+          <div className="absolute bottom-4 left-4 z-40 bg-neutral-900/80 backdrop-blur-sm p-2 sm:p-3 rounded-xl border border-neutral-800 shadow-xl pointer-events-none hidden sm:block">
             <div className="text-xs text-neutral-400 flex flex-col gap-1">
               <span className="flex items-center gap-2 font-bold mb-1">
                 <MapPin size={14} className="text-indigo-400" /> Управління Картою:
@@ -2019,14 +2047,14 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
 
           {/* BATTLE FIELD OVERLAY */}
           {battleState && (
-            <div className="absolute inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-between p-6 animate-in fade-in zoom-in-95 duration-500 border border-red-500/20 shadow-[inset_0_0_100px_rgba(220,38,38,0.1)]">
+            <div className="absolute inset-0 z-50 bg-[#0a0a0a] flex flex-col items-center justify-between p-2 sm:p-6 animate-in fade-in zoom-in-95 duration-500 border border-red-500/20 shadow-[inset_0_0_100px_rgba(220,38,38,0.1)]">
               {/* Opponent (Defender) Area */}
-              <div className="w-full flex-1 flex flex-col items-center justify-start gap-4">
+              <div className="w-full flex-1 flex flex-col items-center justify-start gap-2 sm:gap-4">
                 <div className="text-center">
-                  <span className="text-red-500 font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                    <ShieldAlert size={16} /> Захисник
+                  <span className="text-red-500 font-bold uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-2">
+                    <ShieldAlert size={14} className="sm:w-4 sm:h-4" /> Захисник
                   </span>
-                  <h3 className="text-2xl font-black text-white">
+                  <h3 className="text-lg sm:text-2xl font-black text-white">
                     {battleState.point.ownerNickname}
                   </h3>
                 </div>
@@ -2091,7 +2119,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                             {/* Floating combat text */}
                             {isHit && !isDodge && !isHeal && (
                               <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-500">
-                                <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
+                                <span className={`font-black text-2xl sm:text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
                                   {isCrit ? '💥' : isBurnTick ? '🔥' : ''}-{animationStepData.damage}
                                 </span>
                                 {isShieldBlock && animationStepData.shieldBlocked > 0 && (
@@ -2137,25 +2165,25 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               </div>
 
               {/* Center Status / Controls */}
-              <div className="h-24 w-full flex items-center justify-center relative shrink-0">
+              <div className="h-16 sm:h-24 w-full flex items-center justify-center relative shrink-0">
                 <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
-                <div className="relative bg-neutral-950 border-2 border-red-500/50 rounded-full w-20 h-20 flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.3)] z-10">
-                  <div className="text-red-500 font-black italic text-2xl tracking-tighter">VS</div>
+                <div className="relative bg-neutral-950 border-2 border-red-500/50 rounded-full w-14 h-14 sm:w-20 sm:h-20 flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.3)] z-10">
+                  <div className="text-red-500 font-black italic text-xl sm:text-2xl tracking-tighter">VS</div>
                 </div>
 
                 {!isBattleAnimating && !battleResult && (
                   <>
                     <button
                       onClick={startBattle}
-                      className="absolute left-4 sm:left-[22%] top-1/2 -translate-y-1/2 bg-red-600 hover:bg-red-500 text-white font-black px-6 py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] hover:scale-105 uppercase text-sm border border-red-400 z-20"
+                      className="absolute left-1 sm:left-[22%] top-1/2 -translate-y-1/2 bg-red-600 hover:bg-red-500 text-white font-black px-3 sm:px-6 py-2 sm:py-3 rounded-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] hover:scale-105 uppercase text-[10px] sm:text-sm border border-red-400 z-20"
                     >
-                      Почати Бій ({battleState.point.entryFee} 🪙)
+                      Бій ({battleState.point.entryFee} 🪙)
                     </button>
                     <button
                       onClick={() => setBattleState(null)}
-                      className="absolute right-4 sm:right-[22%] top-1/2 -translate-y-1/2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold px-4 py-3 rounded-xl transition-colors border border-neutral-700 uppercase text-xs z-20"
+                      className="absolute right-1 sm:right-[22%] top-1/2 -translate-y-1/2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold px-2 sm:px-4 py-2 sm:py-3 rounded-xl transition-colors border border-neutral-700 uppercase text-[10px] sm:text-xs z-20"
                     >
-                      Відступити (Скасувати)
+                      <span className="hidden sm:inline">Відступити (Скасувати)</span><span className="sm:hidden">Назад</span>
                     </button>
                   </>
                 )}
@@ -2202,7 +2230,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
               )}
 
               {/* Player (Attacker) Area */}
-              <div className="w-full flex-1 flex flex-col items-center justify-end gap-4">
+              <div className="w-full flex-1 flex flex-col items-center justify-end gap-2 sm:gap-4">
                 <div className="flex gap-1.5 sm:gap-4 justify-center items-center">
                   {battleState.attackerDeck.map((card, idx) => {
                     const hp =
@@ -2266,7 +2294,7 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                         {/* Floating combat text */}
                         {isHit && !isDodge && !isHeal && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none animate-in slide-in-from-top-5 fade-in duration-500">
-                            <span className={`font-black text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
+                            <span className={`font-black text-2xl sm:text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,1)] ${isCrit ? 'text-yellow-400 scale-125' : isBurnTick ? 'text-orange-400' : 'text-red-500'}`}>
                               {isCrit ? '💥' : isBurnTick ? '🔥' : ''}-{animationStepData.damage}
                             </span>
                             {ev.includes('laststand') && <span className="text-yellow-300 font-black text-sm mt-1 animate-bounce">1 HP!</span>}
@@ -2316,32 +2344,32 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
                   })}
                 </div>
                 <div className="text-center">
-                  <h3 className="text-2xl font-black text-indigo-400">{profile?.nickname}</h3>
-                  <span className="text-indigo-500/70 font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                    <Swords size={16} /> Атакуючий
+                  <h3 className="text-lg sm:text-2xl font-black text-indigo-400">{profile?.nickname}</h3>
+                  <span className="text-indigo-500/70 font-bold uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-2">
+                    <Swords size={14} className="sm:w-4 sm:h-4" /> Атакуючий
                   </span>
                 </div>
               </div>
 
               {/* BATTLE RESULT MODAL */}
               {battleResult && (
-                <div className="absolute inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in-50 duration-500 p-4">
-                  <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 sm:p-8 max-w-xl w-full flex flex-col shadow-2xl max-h-[90vh] overflow-hidden">
-                    <div className="flex flex-col items-center mb-6 shrink-0">
+                <div className="absolute inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in-50 duration-500 p-2 sm:p-4">
+                  <div className="bg-neutral-900 border border-neutral-700 rounded-2xl sm:rounded-3xl p-4 sm:p-8 max-w-xl w-full flex flex-col shadow-2xl max-h-[90vh] overflow-hidden">
+                    <div className="flex flex-col items-center mb-4 sm:mb-6 shrink-0">
                       {battleResult.won ? (
                         <>
                           <div className="relative">
-                            <Trophy size={64} className="text-yellow-400 animate-bounce mb-2" />
+                            <Trophy size={48} className="sm:w-16 sm:h-16 text-yellow-400 animate-bounce mb-2" />
                             <div className="absolute -inset-4 bg-yellow-400/20 blur-2xl rounded-full -z-10 animate-pulse"></div>
                           </div>
-                          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Перемога!</h2>
-                          <p className="text-indigo-400 font-bold text-sm">Точку захоплено під ваш прапор</p>
+                          <h2 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tighter">Перемога!</h2>
+                          <p className="text-indigo-400 font-bold text-xs sm:text-sm">Точку захоплено під ваш прапор</p>
                         </>
                       ) : (
                         <>
-                          <X size={64} className="text-red-500 mb-2" />
-                          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Поразка</h2>
-                          <p className="text-red-400/70 font-bold text-sm">Атаку відбито захисниками</p>
+                          <X size={48} className="sm:w-16 sm:h-16 text-red-500 mb-2" />
+                          <h2 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tighter">Поразка</h2>
+                          <p className="text-red-400/70 font-bold text-xs sm:text-sm">Атаку відбито захисниками</p>
                         </>
                       )}
                     </div>
@@ -2527,10 +2555,10 @@ export default function GameArena({ profile, setProfile, cardsCatalog, goBack, s
       {/* RULES INFO MODAL */}
       {showRules && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowRules(false)}>
-          <div className="bg-neutral-900 border border-red-500/30 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-[0_0_40px_rgba(239,68,68,0.2)] custom-scrollbar animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6 border-b border-red-900/50 pb-4">
-              <h3 className="text-2xl font-black text-white uppercase tracking-wider flex items-center gap-3">
-                <ShieldAlert size={28} className="text-red-500" /> Правила Арени
+          <div className="bg-neutral-900 border border-red-500/30 rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-[0_0_40px_rgba(239,68,68,0.2)] custom-scrollbar animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4 sm:mb-6 border-b border-red-900/50 pb-3 sm:pb-4">
+              <h3 className="text-lg sm:text-2xl font-black text-white uppercase tracking-wider flex items-center gap-2 sm:gap-3">
+                <ShieldAlert size={22} className="sm:w-7 sm:h-7 text-red-500" /> Правила Арени
               </h3>
               <button onClick={() => setShowRules(false)} className="p-2 rounded-xl bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
                 <X size={20} />

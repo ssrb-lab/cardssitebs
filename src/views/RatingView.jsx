@@ -60,12 +60,12 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
 
   return (
     <div className="max-w-3xl mx-auto pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center mb-8">
+      <div className="text-center mb-4 sm:mb-8">
         <Trophy
           size={48}
           className="mx-auto text-yellow-500 mb-4 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]"
         />
-        <h2 className="text-3xl font-black text-white uppercase tracking-widest">Зал Слави</h2>
+        <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-widest">Зал Слави</h2>
         <p className="text-neutral-400 text-sm mt-2 mb-6">
           Знайдіть гравців або змагайтеся за першість
         </p>
@@ -209,7 +209,7 @@ export default function RatingView({ currentUid, setViewingPlayerProfile }) {
           );
         })}
         {filteredLeaders.length === 0 && (
-          <div className="p-8 text-center text-neutral-500">Гравців не знайдено.</div>
+          <div className="p-4 sm:p-8 text-center text-neutral-500">Гравців не знайдено.</div>
         )}
       </div>
     </div>

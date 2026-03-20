@@ -377,10 +377,10 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8 items-center md:items-start justify-center">
+      <div className="flex flex-col md:flex-row gap-4 sm:gap-8 items-center md:items-start justify-center">
         {/* Game Area */}
         <div className="flex-1 w-full max-w-md">
-          <div className="flex justify-between items-center mb-6 bg-neutral-900 border border-neutral-800 p-4 rounded-2xl">
+          <div className="flex justify-between items-center mb-4 sm:mb-6 bg-neutral-900 border border-neutral-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
             <div>
               <div className="text-xs text-neutral-500 uppercase font-bold mb-1">Рівень</div>
               <div className="text-2xl font-black text-white">{score + 1}</div>
@@ -397,7 +397,7 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
             </div>
           </div>
 
-          <div className="bg-[#0f172a] p-3 sm:p-4 rounded-3xl border border-slate-800/50 shadow-2xl relative overflow-hidden">
+          <div className="bg-[#0f172a] p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-800/50 shadow-2xl relative overflow-hidden">
             {/* Background decorative circuits pattern (very simple css version) */}
             <div
               className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -432,21 +432,17 @@ export default function GameFuse({ profile, setProfile, goBack, showToast }) {
         </div>
 
         {/* Info Panel side */}
-        <div className="flex-1 w-full max-w-sm flex flex-col justify-center text-center md:text-left mt-4 md:mt-20 px-4">
-          <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight uppercase tracking-wide mb-4 flex items-center justify-center md:justify-start gap-3">
-            <Zap className="text-yellow-500" size={32} />
-            Відмітьте всі
-            <br />
-            пошкоджені
-            <br />
-            запобіжники
+        <div className="flex-1 w-full max-w-sm flex flex-col justify-center text-center md:text-left mt-2 md:mt-20 px-2 sm:px-4">
+          <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white leading-tight uppercase tracking-wide mb-3 sm:mb-4 flex items-center justify-center md:justify-start gap-2 sm:gap-3">
+            <Zap className="text-yellow-500 shrink-0" size={24} />
+            <span>Відмітьте всі пошкоджені запобіжники</span>
           </h2>
           <p className="text-neutral-400 text-sm font-medium mb-6">
             Спочатку запам'ятайте їх розташування. Коли вони сховаються - натискайте по пам'яті. За
             кожну помилку ви втрачаєте 1 життя.
           </p>
 
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl sm:rounded-2xl p-3 sm:p-4">
             <div className="text-xs text-neutral-500 uppercase font-bold mb-2">
               Рівень навички: {progressInfo.level}
             </div>

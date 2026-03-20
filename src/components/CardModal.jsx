@@ -193,7 +193,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
       onClick={() => setViewingCard(null)}
     >
       <div
-        className="flex min-h-full items-center justify-center px-10 py-8"
+        className="flex min-h-full items-center justify-center px-4 sm:px-10 py-4 sm:py-8"
       >
       <div
         className="relative flex flex-col items-center w-full max-w-xs animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 pb-4"
@@ -225,7 +225,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
           <div className={`text-sm font-black uppercase tracking-widest mb-2 ${style.text} flex items-center gap-1.5`}>
             <Sparkles size={16} /> {card.rarity}
           </div>
-          <h3 className="font-black text-4xl text-white mb-2 drop-shadow-xl">{card.name}</h3>
+          <h3 className="font-black text-2xl sm:text-4xl text-white mb-2 drop-shadow-xl">{card.name}</h3>
         </div>
 
         {/* Battle perk from catalog */}

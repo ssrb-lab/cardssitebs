@@ -8,7 +8,7 @@ function BattleReportModal({ report, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-neutral-900 border border-neutral-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
         <div className="flex justify-between items-center mb-6 shrink-0">
           <div>
             <h2 className="text-xl font-black text-white uppercase tracking-tight">Звіт про оборону</h2>
@@ -186,7 +186,7 @@ export default function NotificationsModal({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-neutral-900 border border-neutral-700 rounded-3xl p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="bg-neutral-900 border border-neutral-700 rounded-2xl sm:rounded-3xl p-4 sm:p-6 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-black text-white">Сповіщення</h2>
             <button

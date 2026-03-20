@@ -374,7 +374,7 @@ export default function AdminView({
       applyPackAutoBalance();
     }
     prevPackIsGameRef.current = packForm.isGame;
-  }, [packForm.isGame]); // eslint-disable-line
+  }, [packForm.isGame]);  
 
   const handlePackIsGameChange = (checked) => {
     setPackForm(prev => ({ ...prev, isGame: checked }));
@@ -1511,8 +1511,8 @@ export default function AdminView({
       {/* МОДАЛКА БАНУ */}
       {banModalUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-neutral-900 border border-red-900/50 p-6 rounded-3xl shadow-2xl max-w-sm w-full animate-in zoom-in-95">
-            <h3 className="text-xl font-black text-red-500 mb-4 flex items-center gap-2">
+          <div className="bg-neutral-900 border border-red-900/50 p-4 sm:p-6 rounded-3xl shadow-2xl max-w-sm w-full animate-in zoom-in-95">
+            <h3 className="text-lg sm:text-xl font-black text-red-500 mb-4 flex items-center gap-2">
               <Ban /> Заблокувати {banModalUser.nickname}
             </h3>
             <form onSubmit={submitBan} className="space-y-4">
@@ -1587,7 +1587,7 @@ export default function AdminView({
       {/* МОДАЛКА УПРАВЛІННЯ ІГРОВОЮ КАРТКОЮ */}
       {adminRemoveModalData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-neutral-900 border border-neutral-700 p-6 rounded-3xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col animate-in zoom-in-95">
+          <div className="bg-neutral-900 border border-neutral-700 p-4 sm:p-6 rounded-3xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col animate-in zoom-in-95">
             <h3 className="text-xl font-black text-white mb-1 flex items-center gap-2">
               <Swords size={20} className="text-purple-400" />
               {adminRemoveModalData.cardName}
@@ -1803,7 +1803,7 @@ export default function AdminView({
       {/* МОДАЛКА ПОВНОГО РЕДАГУВАННЯ КАРТКИ ГРАВЦЯ */}
       {adminEditCardModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-neutral-900 border border-blue-900/50 p-5 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+          <div className="bg-neutral-900 border border-blue-900/50 p-4 sm:p-5 rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <h3 className="text-lg font-black text-blue-300 mb-0.5 flex items-center gap-2">
               <Edit2 size={18} /> {adminEditCardModal.cardName}
             </h3>
@@ -1812,7 +1812,7 @@ export default function AdminView({
             {/* === БЛОК 1: СТАТКИ ПРИМІРНИКА === */}
             <div className="mb-4 p-3.5 bg-neutral-950 border border-neutral-800 rounded-2xl">
               <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">⚙️ Статки примірника</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-yellow-400 uppercase mb-1 block">Рівень</label>
                   <input type="number" min="1" max="10"
@@ -1961,7 +1961,7 @@ export default function AdminView({
       {/* МОДАЛКА ПРЕМІУМУ */}
       {premiumModalUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-3xl shadow-2xl max-w-sm w-full animate-in zoom-in-95">
+          <div className="bg-neutral-900 border border-fuchsia-900/50 p-4 sm:p-6 rounded-3xl shadow-2xl max-w-sm w-full animate-in zoom-in-95">
             <h3 className="text-xl font-black text-fuchsia-400 mb-4 flex items-center gap-2">
               <Gem /> Преміум: {premiumModalUser.nickname}
             </h3>
@@ -2014,22 +2014,22 @@ export default function AdminView({
       )}
 
       {/* НАВІГАЦІЯ АДМІНКИ */}
-      <div className="flex flex-wrap gap-2 mb-6 bg-neutral-900 p-2 rounded-xl">
+      <div className="flex gap-2 mb-4 sm:mb-6 bg-neutral-900 p-2 rounded-xl overflow-x-auto scrollbar-thin scrollbar-thumb-neutral-700">
         <button
           onClick={() => setActiveTab('users')}
-          className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+          className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
         >
           <Users size={18} /> Гравці
         </button>
         <button
           onClick={() => setActiveTab('packs')}
-          className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'packs' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+          className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'packs' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
         >
           <Layers size={18} /> Паки
         </button>
         <button
           onClick={() => setActiveTab('cards')}
-          className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'cards' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+          className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'cards' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
         >
           <LayoutGrid size={18} /> Картки
         </button>
@@ -2037,49 +2037,49 @@ export default function AdminView({
           <>
             <button
               onClick={() => setActiveTab('achievements')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'achievements' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'achievements' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
             >
               <Trophy size={18} /> Ачівки
             </button>
             <button
               onClick={() => setActiveTab('bosses')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'bosses' ? 'bg-red-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'bosses' ? 'bg-red-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
             >
               <Swords size={18} /> Боси
             </button>
             <button
               onClick={() => setActiveTab('promos')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'promos' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'promos' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
             >
               <Ticket size={18} /> Коди
             </button>
             <button
               onClick={() => setActiveTab('notifications')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'notifications' ? 'bg-blue-600 text-white' : 'text-blue-400/70 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'notifications' ? 'bg-blue-600 text-white' : 'text-blue-400/70 hover:bg-neutral-800'}`}
             >
               <Mail size={18} className="shrink-0" /> Сповіщення
             </button>
             <button
               onClick={() => setActiveTab('premiumShop')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'premiumShop' ? 'bg-fuchsia-600 text-white' : 'text-fuchsia-400/70 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'premiumShop' ? 'bg-fuchsia-600 text-white' : 'text-fuchsia-400/70 hover:bg-neutral-800'}`}
             >
               <Gem size={18} /> Прем Товари
             </button>
             <button
               onClick={() => setActiveTab('emeralds')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'emeralds' ? 'bg-emerald-700 text-white' : 'text-emerald-400/70 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'emeralds' ? 'bg-emerald-700 text-white' : 'text-emerald-400/70 hover:bg-neutral-800'}`}
             >
               💎 Смарагди
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'settings' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'settings' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
             >
               <Settings size={18} /> Налаштування
             </button>
             <button
               onClick={() => setActiveTab('logs')}
-              className={`flex-1 min-w-[120px] whitespace-nowrap py-3 px-3 rounded-lg font-bold flex justify-center items-center gap-2 ${activeTab === 'logs' ? 'bg-red-900 text-white' : 'text-red-400 hover:bg-neutral-800'}`}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'logs' ? 'bg-red-900 text-white' : 'text-red-400 hover:bg-neutral-800'}`}
             >
               <ScrollText size={18} /> Логи
             </button>
@@ -2287,8 +2287,8 @@ export default function AdminView({
               </div>
 
               {/* Рядок зі Статистикою гравця (на всю ширину) */}
-              <div className="bg-neutral-950 p-6 rounded-xl border border-purple-900/40 shadow-inner mb-6 w-full">
-                <h4 className="font-bold text-purple-300 text-lg mb-6 flex items-center gap-2">
+              <div className="bg-neutral-950 p-3 sm:p-6 rounded-xl border border-purple-900/40 shadow-inner mb-4 sm:mb-6 w-full">
+                <h4 className="font-bold text-purple-300 text-base sm:text-lg mb-4 sm:mb-6 flex items-center gap-2">
                   <span>📊</span> Статистика Гравця
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
@@ -2365,7 +2365,7 @@ export default function AdminView({
                   <Loader2 className="animate-spin mx-auto w-8 h-8" />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 mt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 mt-2">
                   {userInventory
                     .filter((invItem) => {
                       const c = cardsCatalog.find((cat) => cat.id === invItem.id);
@@ -2682,12 +2682,12 @@ export default function AdminView({
 
       {/* --- Вкладка: НАЛАШТУВАННЯ (Щоденні нагороди) --- */}
       {activeTab === 'settings' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           <form
             onSubmit={saveSettings}
-            className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
+            className="bg-neutral-900 border border-purple-900/50 p-3 sm:p-6 rounded-2xl"
           >
-            <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 text-white flex items-center gap-2">
               <Settings className="text-blue-500" /> Глобальні Налаштування
             </h3>
 
@@ -2809,15 +2809,15 @@ export default function AdminView({
       )}
       {/* --- Вкладка: БОСИ --- */}
       {activeTab === 'bosses' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-2 mb-6">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+          <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4 sm:mb-6">
             <Swords className="text-red-500" /> Налаштування Босів
           </h2>
 
           {/* Форма створення Боса */}
           <form
             onSubmit={handleAddBoss}
-            className="bg-neutral-900 border border-red-900/50 p-6 rounded-2xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+            className="bg-neutral-900 border border-red-900/50 p-3 sm:p-6 rounded-2xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
           >
             <div>
               <label className="block text-xs text-neutral-500 uppercase font-bold mb-1">
@@ -3002,12 +3002,12 @@ export default function AdminView({
       )}
       {/* --- Вкладка: ТОВАРИ ПРЕМІУМ МАГАЗИНУ --- */}
       {activeTab === 'premiumShop' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           <form
             onSubmit={addPremiumShopItem}
-            className="bg-neutral-900 border border-fuchsia-900/50 p-6 rounded-2xl"
+            className="bg-neutral-900 border border-fuchsia-900/50 p-3 sm:p-6 rounded-2xl"
           >
-            <h3 className="text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 text-fuchsia-400 flex items-center gap-2">
               <Gem /> {editingShopItem ? 'Редагувати товар' : 'Додати товар у Прем. Магазин'}
             </h3>
             
@@ -3200,12 +3200,12 @@ export default function AdminView({
 
       {/* --- Вкладка: ПРОМОКОДИ --- */}
       {activeTab === 'promos' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           <form
             onSubmit={savePromo}
-            className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
+            className="bg-neutral-900 border border-purple-900/50 p-3 sm:p-6 rounded-2xl"
           >
-            <h3 className="text-xl font-bold mb-4 text-purple-400 flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 text-purple-400 flex items-center gap-2">
               <Ticket /> Створити Промокод
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -3286,7 +3286,7 @@ export default function AdminView({
                     Нагорода: {p.reward} <Coins size={14} className="inline" />
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3 sm:gap-6">
                   <div className="text-right text-xs text-neutral-400">
                     <div>
                       Сервер:{' '}
@@ -3378,12 +3378,12 @@ export default function AdminView({
 
       {/* --- Вкладка: АЧІВКИ (ДОСЯГНЕННЯ) --- */}
       {activeTab === 'achievements' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           <form
             onSubmit={saveAchievement}
-            className="bg-neutral-900 border border-yellow-900/50 p-6 rounded-2xl"
+            className="bg-neutral-900 border border-yellow-900/50 p-3 sm:p-6 rounded-2xl"
           >
-            <h3 className="text-xl font-bold mb-4 text-yellow-500 flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 text-yellow-500 flex items-center gap-2">
               <Trophy /> {editingAchievement ? 'Редагувати Ачівку' : 'Створити Ачівку'}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -3564,12 +3564,12 @@ export default function AdminView({
 
       {/* --- Вкладка: ПАКИ --- */}
       {activeTab === 'packs' && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           <form
             onSubmit={savePack}
-            className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
+            className="bg-neutral-900 border border-purple-900/50 p-3 sm:p-6 rounded-2xl"
           >
-            <h3 className="text-xl font-bold mb-4 text-purple-400">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 text-purple-400">
               {editingPack ? `Редагування Паку` : 'Створити Пак'}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
@@ -3899,18 +3899,18 @@ export default function AdminView({
 
       {/* --- Вкладка: КАРТКИ --- */}
       {activeTab === 'cards' && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="flex flex-col xl:flex-row gap-6">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+          <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
             <form
               onSubmit={saveCard}
-              className="flex-1 bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl"
+              className="flex-1 bg-neutral-900 border border-purple-900/50 p-3 sm:p-6 rounded-2xl"
             >
-            <h3 className="text-xl font-bold mb-6 text-purple-400 border-b border-purple-900/30 pb-2">
+            <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-purple-400 border-b border-purple-900/30 pb-2">
               {editingCard ? `Редагування Картки` : 'Додати Картку'}
             </h3>
 
             {/* --- СЕКЦІЯ 1: ОСНОВНЕ --- */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="w-8 h-px bg-neutral-800"></span> Основна інформація
               </h4>
@@ -3956,7 +3956,7 @@ export default function AdminView({
             </div>
 
             {/* --- СЕКЦІЯ 2: ЕКОНОМІКА --- */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="w-8 h-px bg-neutral-800"></span> Економіка та шанси
               </h4>
@@ -4000,12 +4000,12 @@ export default function AdminView({
             </div>
 
             {/* --- СЕКЦІЯ 3: ВІЗУАЛ ТА МЕДІА --- */}
-            <div className="mb-8 p-4 bg-neutral-950/30 border border-neutral-800 rounded-2xl">
+            <div className="mb-6 sm:mb-8 p-3 sm:p-4 bg-neutral-950/30 border border-neutral-800 rounded-2xl">
               <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="w-8 h-px bg-neutral-800"></span> Зовнішній вигляд та медіа
               </h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Зображення картки</label>
                   <div className="bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 flex flex-col gap-2">
@@ -4098,12 +4098,12 @@ export default function AdminView({
             </div>
 
             {/* --- СЕКЦІЯ 4: ІГРОВІ ПАРАМЕТРИ --- */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
                   <span className="w-8 h-px bg-neutral-800"></span> Ігрові параметри
                 </h4>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="inline-flex items-center gap-2 text-xs text-green-400 font-bold cursor-pointer bg-green-900/10 px-3 py-1.5 rounded-lg border border-green-900/30 hover:bg-green-900/20 transition-colors">
                     <input
                       type="checkbox"
@@ -4205,7 +4205,7 @@ export default function AdminView({
             </div>
 
             {/* --- СЕКЦІЯ 5: ПРОКАЧКА (РІВНІ) --- */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-xs font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
                   <span className="w-8 h-px bg-neutral-800"></span> Прокачка (Рівні 1-10)
@@ -4356,7 +4356,7 @@ export default function AdminView({
 
           {/* ПРЕВ'Ю (справа) */}
           <div className="w-full xl:w-80 shrink-0">
-            <div className="bg-neutral-900 border border-purple-900/50 p-6 rounded-2xl sticky top-6">
+            <div className="bg-neutral-900 border border-purple-900/50 p-4 sm:p-6 rounded-2xl sticky top-6">
               <h3 className="text-xl font-bold mb-4 text-purple-400 text-center">Прев'ю</h3>
               
               <div className="flex justify-center">
@@ -4593,8 +4593,8 @@ export default function AdminView({
 
       {/* --- Вкладка: СПОВІЩЕННЯ --- */}
       {activeTab === 'notifications' && (
-        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 animate-in fade-in slide-in-from-bottom-4">
-          <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
+        <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-3 sm:p-6 animate-in fade-in slide-in-from-bottom-4">
+          <h2 className="text-xl sm:text-2xl font-black text-white mb-4 sm:mb-6 flex items-center gap-2">
             <Mail className="text-blue-500" /> Надіслати Сповіщення
           </h2>
 
@@ -4755,10 +4755,10 @@ export default function AdminView({
 
       {/* --- Вкладка: СМАРАГДИ --- */}
       {activeTab === 'emeralds' && currentProfile.isAdmin && (
-        <div className="space-y-6 animate-in fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
           {/* Box Settings */}
-          <div className="bg-neutral-900 border border-emerald-900/40 rounded-2xl p-6">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-5">
+          <div className="bg-neutral-900 border border-emerald-900/40 rounded-2xl p-3 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 mb-4 sm:mb-5">
               💎 Налаштування Скрині
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
@@ -4810,17 +4810,17 @@ export default function AdminView({
           </div>
 
           {/* Emerald Types */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-5">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 mb-4 sm:mb-5">
               Типи Смарагдів
             </h3>
 
             {/* Type form */}
-            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-5 mb-6">
+            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 sm:p-5 mb-4 sm:mb-6">
               <h4 className="text-sm font-bold text-neutral-300 mb-4">
                 {editingEmeraldType ? `Редагувати: ${editingEmeraldType.name}` : 'Новий тип смарагду'}
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
                 <div>
                   <label className="text-xs font-bold text-neutral-400 mb-1 block">Назва</label>
                   <input

@@ -148,12 +148,12 @@ export default function PublicProfileView({
     <div className="pb-10 animate-in fade-in slide-in-from-right-8 duration-500">
       <button
         onClick={goBack}
-        className="mb-6 flex items-center gap-2 text-neutral-400 hover:text-white font-bold transition-colors"
+        className="mb-4 sm:mb-6 flex items-center gap-2 text-neutral-400 hover:text-white font-bold transition-colors"
       >
-        <ArrowLeft size={20} /> Повернутися до Рейтингу
+        <ArrowLeft size={20} className="shrink-0" /> <span className="truncate">Повернутися до Рейтингу</span>
       </button>
 
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-4 sm:p-8 text-center relative overflow-hidden mb-4 sm:mb-8 shadow-xl">
         {playerInfo.profileBannerUrl ? (
           <div 
             className="absolute inset-0 w-full h-full bg-cover bg-center opacity-40 pointer-events-none"
@@ -168,7 +168,7 @@ export default function PublicProfileView({
         <div className="relative w-24 h-24 mx-auto mb-4 z-10">
           <PlayerAvatar
             profile={playerInfo}
-            className={`w-full h-full rounded-full text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`}
+            className={`w-full h-full rounded-full text-2xl sm:text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`}
             iconSize={48}
           />
           {isPremiumActive && (
@@ -178,7 +178,7 @@ export default function PublicProfileView({
           )}
         </div>
 
-        <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
+        <h2 className="text-xl sm:text-3xl font-black text-white mb-1 relative z-10 flex flex-wrap justify-center items-center gap-1.5 sm:gap-2">
           {playerInfo.nickname}
           <span
             className="bg-red-600/20 backdrop-blur-md text-red-400 text-sm px-3 py-1 rounded-xl border border-red-500/40 flex items-center gap-1.5 shadow-sm"
@@ -198,7 +198,7 @@ export default function PublicProfileView({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-8 relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10">
           <div className="bg-neutral-950/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg transition-all">
             <Coins className="text-yellow-500 mb-2" size={24} />
             <span className="text-xl sm:text-2xl font-black text-white">
@@ -248,11 +248,11 @@ export default function PublicProfileView({
       </div>
 
       {mainShowcase && (
-        <div className="mb-10">
-          <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2">
-            <Star className="text-yellow-500" /> Головна Вітрина: {mainShowcase.name}
+        <div className="mb-6 sm:mb-10">
+          <h3 className="text-xl sm:text-2xl font-black text-white mb-4 flex items-center gap-2">
+            <Star className="text-yellow-500 shrink-0" /> Головна Вітрина: {mainShowcase.name}
           </h3>
-          <div className="bg-neutral-900 border border-yellow-600/30 rounded-3xl p-6 flex flex-wrap justify-center gap-4 shadow-[0_0_30px_rgba(234,179,8,0.1)]">
+          <div className="bg-neutral-900 border border-yellow-600/30 rounded-3xl p-4 sm:p-6 flex flex-wrap justify-center gap-3 sm:gap-4 shadow-[0_0_30px_rgba(234,179,8,0.1)]">
             {mainShowcase.validCards.length === 0 ? (
               <p className="text-neutral-500 py-4">Вітрина порожня.</p>
             ) : (
@@ -287,9 +287,9 @@ export default function PublicProfileView({
 
       {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
       {achievementsCatalog && achievementsCatalog.length > 0 && (
-        <div className="mb-10 bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-xl">
-          <h3 className="text-2xl font-black text-white mb-4 flex items-center gap-2">
-            <Trophy className="text-yellow-500" /> Досягнення (
+        <div className="mb-6 sm:mb-10 bg-neutral-900 border border-neutral-800 rounded-3xl p-4 sm:p-6 shadow-xl">
+          <h3 className="text-xl sm:text-2xl font-black text-white mb-4 flex items-center gap-2">
+            <Trophy className="text-yellow-500 shrink-0" /> Досягнення (
             {
               achievementsCatalog.filter((ach) => {
                 if (playerInfo?.achievements?.find((ua) => ua.achievementId === ach.id))
@@ -382,8 +382,8 @@ export default function PublicProfileView({
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h3 className="text-2xl font-black text-white flex items-center gap-2 shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
+        <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 shrink-0">
           <LayoutGrid className="text-blue-500" /> Колекція Гравця
         </h3>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -426,7 +426,7 @@ export default function PublicProfileView({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
         {filteredInventory.map((item, index) => {
           const style = getCardStyle(item.card.rarity, rarities);
           const effectClass = item.card.effect ? `effect-${item.card.effect}` : '';

@@ -220,16 +220,16 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
         <ArrowLeft size={20} /> Повернутися до вибору гри
       </button>
 
-      <div className="flex justify-between items-center mb-6 px-2">
-        <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3 drop-shadow-lg">
-          <Keyboard className="text-blue-500" size={32} /> Слівце
+      <div className="flex justify-between items-center mb-4 sm:mb-6 px-2">
+        <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-widest flex items-center gap-2 sm:gap-3 drop-shadow-lg">
+          <Keyboard className="text-blue-500" size={24} /> Слівце
         </h2>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 shadow-inner">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 shadow-inner">
           <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">
             Спроб сьогодні
           </div>
           <div
-            className={`font-black text-lg ${dailyAttempts >= 5 ? 'text-red-500' : 'text-blue-500'}`}
+            className={`font-black text-base sm:text-lg ${dailyAttempts >= 5 ? 'text-red-500' : 'text-blue-500'}`}
           >
             {dailyAttempts} / 5
           </div>
@@ -237,12 +237,12 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
       </div>
 
       {!gameState || gameState.status !== 'playing' ? (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 sm:p-10 text-center shadow-lg relative overflow-hidden">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl sm:rounded-3xl p-5 sm:p-10 text-center shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Keyboard size={150} />
           </div>
 
-          <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-wider relative z-10">
+          <h3 className="text-xl sm:text-2xl font-black text-white mb-3 sm:mb-4 uppercase tracking-wider relative z-10">
             Що таке Слівце?
           </h3>
           <p className="text-neutral-400 text-sm mb-6 leading-relaxed relative z-10">
@@ -314,7 +314,7 @@ export default function GameWordle({ profile, setProfile, goBack, showToast, wor
                     const letter = rowLetters[colIdx] || '';
                     const color = rowColors[colIdx];
                     let cellClass =
-                      'border-2 rounded-xl flex items-center justify-center text-2xl font-black uppercase transition-all duration-300 transform-gpu will-change-transform';
+                      'border-2 rounded-lg sm:rounded-xl flex items-center justify-center text-lg sm:text-2xl font-black uppercase transition-all duration-300 transform-gpu will-change-transform';
 
                     if (color === 'green')
                       cellClass +=

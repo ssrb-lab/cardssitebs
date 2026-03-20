@@ -292,8 +292,8 @@ export default function FarmView({
 
     return (
       <div className="pb-10 animate-in fade-in zoom-in-95 duration-500 max-w-5xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 px-2 gap-4">
-          <h2 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-8 px-2 gap-3 sm:gap-4">
+          <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-widest flex items-center gap-2 sm:gap-3">
             <Zap className="text-yellow-500" /> Ігрові режими
           </h2>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 flex items-center gap-2 shadow-inner">
@@ -309,7 +309,7 @@ export default function FarmView({
         </div>
 
         {profile?.isAdmin && (
-          <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-4 mb-8 mx-2 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+          <div className="bg-red-900/20 border border-red-500/30 rounded-2xl p-4 mb-4 sm:mb-8 mx-2 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
             <div className="flex items-center gap-2 text-red-400 font-bold uppercase tracking-widest text-sm">
               <ShieldAlert size={20} /> Панель блокування ігор
             </div>
@@ -367,9 +367,9 @@ export default function FarmView({
         )}
 
         {/* Арена (Виділена окремо) */}
-        <div className="mb-8 px-2 w-full">
+        <div className="mb-4 sm:mb-8 px-2 w-full">
           <div
-            className={`bg-gradient-to-r ${isBlocked('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
+            className={`bg-gradient-to-r ${isBlocked('arena') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-indigo-900/40 to-purple-900/40 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] group hover:border-indigo-500'} border rounded-3xl p-3 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 transition-all`}
           >
             <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
               <Trophy
@@ -391,7 +391,7 @@ export default function FarmView({
                   />
                 </div>
                 <h3
-                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('arena') ? 'text-neutral-500' : 'text-white'}`}
+                  className={`text-xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('arena') ? 'text-neutral-500' : 'text-white'}`}
                 >
                   Арена
                 </h3>
@@ -426,7 +426,7 @@ export default function FarmView({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 px-2">
           <div
             onClick={() => (isBlocked('2048') ? null : setActiveGame('2048'))}
-            className={`bg-neutral-900 border ${isBlocked('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('2048') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-purple-900/50 hover:border-purple-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Gamepad2
@@ -442,7 +442,7 @@ export default function FarmView({
               />{' '}
               Гра 2048
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Складайте кубики, встановлюйте рекорди та конвертуйте свій рахунок у монети!
             </p>
             {isBlocked('2048') ? (
@@ -458,7 +458,7 @@ export default function FarmView({
 
           <div
             onClick={() => (isBlocked('tetris') ? null : setActiveGame('tetris'))}
-            className={`bg-neutral-900 border ${isBlocked('tetris') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-cyan-900/50 hover:border-cyan-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('tetris') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-cyan-900/50 hover:border-cyan-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Blocks
@@ -474,7 +474,7 @@ export default function FarmView({
               />{' '}
               Тетріс
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Класична неонова гра! Збирайте лінії, набирайте рахунок та отримуйте монети.
             </p>
             {isBlocked('tetris') ? (
@@ -490,7 +490,7 @@ export default function FarmView({
 
           <div
             onClick={() => (isBlocked('fuse') ? null : setActiveGame('fuse'))}
-            className={`bg-neutral-900 border ${isBlocked('fuse') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-orange-900/50 hover:border-orange-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('fuse') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-orange-900/50 hover:border-orange-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Zap
@@ -506,7 +506,7 @@ export default function FarmView({
               />{' '}
               Запобіжники
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Шукайте пошкоджені запобіжники на платах та заробляйте монети за кожен рівень!
             </p>
             {isBlocked('fuse') ? (
@@ -522,7 +522,7 @@ export default function FarmView({
 
           <div
             onClick={() => (isBlocked('blackjack') ? null : setActiveGame('blackjack'))}
-            className={`bg-neutral-900 border ${isBlocked('blackjack') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-emerald-900/50 hover:border-emerald-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('blackjack') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-emerald-900/50 hover:border-emerald-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Dices
@@ -542,7 +542,7 @@ export default function FarmView({
               />{' '}
               Блекджек
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Роби ставку, збирай 21 та перемагай дилера у класичній грі Блекджек!
             </p>
             {isBlocked('blackjack') ? (
@@ -558,7 +558,7 @@ export default function FarmView({
 
           <div
             onClick={() => (isBlocked('wordle') ? null : setActiveGame('wordle'))}
-            className={`bg-neutral-900 border ${isBlocked('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('wordle') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-blue-900/50 hover:border-blue-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Keyboard
@@ -574,7 +574,7 @@ export default function FarmView({
               />{' '}
               Слівце
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Вгадайте українське слово з 5 літер! Тренуйте розум і заробляйте великі призи.
             </p>
             {isBlocked('wordle') ? (
@@ -590,7 +590,7 @@ export default function FarmView({
 
           <div
             onClick={() => (isBlocked('crash') ? null : setActiveGame('crash'))}
-            className={`bg-neutral-900 border ${isBlocked('crash') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-rose-900/50 hover:border-rose-500 cursor-pointer'} rounded-3xl p-6 group transition-all relative overflow-hidden shadow-lg`}
+            className={`bg-neutral-900 border ${isBlocked('crash') ? 'border-neutral-800 opacity-50 cursor-not-allowed' : 'border-rose-900/50 hover:border-rose-500 cursor-pointer'} rounded-3xl p-4 sm:p-6 group transition-all relative overflow-hidden shadow-lg`}
           >
             <div className="absolute -right-6 -top-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Rocket
@@ -606,7 +606,7 @@ export default function FarmView({
               />{' '}
               Краш
             </h3>
-            <p className="text-neutral-400 text-sm mb-6 relative z-10">
+            <p className="text-neutral-400 text-sm mb-3 sm:mb-6 relative z-10">
               Слідкуй за графіком та встигни забрати виграш до того, як ракета впаде!
             </p>
             {isBlocked('crash') ? (
@@ -623,12 +623,12 @@ export default function FarmView({
         </div>
 
         {/* Горизонтальний сепаратор */}
-        <div className="w-full h-px bg-neutral-800 my-8 px-2"></div>
+        <div className="w-full h-px bg-neutral-800 my-4 sm:my-8 px-2"></div>
 
         {/* Битва з Босом (Виділена окремо внизу) */}
-        <div className="mb-8 px-2 w-full">
+        <div className="mb-4 sm:mb-8 px-2 w-full">
           <div
-            className={`bg-gradient-to-r ${isBlocked('boss') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-red-900/40 to-orange-900/40 border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.15)] group hover:border-red-500'} border rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 transition-all`}
+            className={`bg-gradient-to-r ${isBlocked('boss') ? 'from-neutral-900/80 to-neutral-950/80 border-neutral-800 opacity-75' : 'from-red-900/40 to-orange-900/40 border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.15)] group hover:border-red-500'} border rounded-3xl p-3 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 transition-all`}
           >
             <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity scale-150 -translate-y-1/4 translate-x-1/4 pointer-events-none">
               <Swords
@@ -650,7 +650,7 @@ export default function FarmView({
                   />
                 </div>
                 <h3
-                  className={`text-3xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('boss') ? 'text-neutral-500' : 'text-white'}`}
+                  className={`text-xl sm:text-4xl font-black uppercase tracking-widest drop-shadow-md ${isBlocked('boss') ? 'text-neutral-500' : 'text-white'}`}
                 >
                   Битва з Босом
                 </h3>
@@ -788,16 +788,16 @@ export default function FarmView({
         >
           <ArrowLeft size={20} /> Повернутися до вибору гри
         </button>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 sm:p-10 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-4 sm:p-10 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-purple-600"></div>
           <Timer className="mx-auto text-blue-500 mb-6 w-16 h-16 opacity-50 animate-pulse" />
           <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-widest">
             Арена зачинена
           </h2>
-          <p className="text-neutral-400 mb-8 text-sm">
+          <p className="text-neutral-400 mb-4 sm:mb-8 text-sm">
             Наступний супротивник ще в дорозі. Дайте своїм воїнам перепочити.
           </p>
-          <div className="text-4xl sm:text-5xl font-black text-yellow-500 mb-2 font-mono drop-shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+          <div className="text-2xl sm:text-5xl font-black text-yellow-500 mb-2 font-mono drop-shadow-[0_0_15px_rgba(234,179,8,0.4)]">
             {timeLeft}
           </div>
           <p className="text-[10px] text-neutral-500 uppercase font-bold tracking-widest mt-4">
@@ -849,14 +849,14 @@ export default function FarmView({
       </div>
 
       <div
-        className={`bg-neutral-900 border rounded-2xl p-4 mb-8 flex justify-between items-center shadow-lg transition-colors ${hp <= 0 ? 'border-green-500/50' : 'border-neutral-800'}`}
+        className={`bg-neutral-900 border rounded-2xl p-3 sm:p-4 mb-4 sm:mb-8 flex justify-between items-center shadow-lg transition-colors ${hp <= 0 ? 'border-green-500/50' : 'border-neutral-800'}`}
       >
         <div>
           <div className="text-xs text-neutral-500 font-bold uppercase tracking-wider mb-1">
             Скарбниця боса
           </div>
           <div
-            className={`text-3xl font-black flex items-center gap-2 ${hp <= 0 ? 'text-green-500' : 'text-yellow-500'}`}
+            className={`text-xl sm:text-3xl font-black flex items-center gap-2 ${hp <= 0 ? 'text-green-500' : 'text-yellow-500'}`}
           >
             {visualCoins} <Coins size={28} />
           </div>
@@ -881,7 +881,7 @@ export default function FarmView({
       </div>
 
       <div className="flex flex-col items-center relative">
-        <div className="w-full bg-neutral-950 h-8 rounded-full overflow-hidden border-2 border-neutral-800 mb-8 relative shadow-inner">
+        <div className="w-full bg-neutral-950 h-8 rounded-full overflow-hidden border-2 border-neutral-800 mb-4 sm:mb-8 relative shadow-inner">
           <div
             className="h-full bg-gradient-to-r from-red-800 to-red-500 transition-all duration-75 ease-out"
             style={{ width: `${hpPercentage}%` }}
@@ -919,7 +919,7 @@ export default function FarmView({
               />
               {hp <= 0 && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm animate-in zoom-in">
-                  <div className="text-green-500 font-black text-3xl sm:text-4xl uppercase tracking-widest border-4 border-green-500 p-4 rounded-xl transform -rotate-12 shadow-[0_0_30px_rgba(34,197,94,0.5)]">
+                  <div className="text-green-500 font-black text-xl sm:text-4xl uppercase tracking-widest border-4 border-green-500 p-3 sm:p-4 rounded-xl transform -rotate-12 shadow-[0_0_30px_rgba(34,197,94,0.5)]">
                     ЗНИЩЕНО
                   </div>
                 </div>

@@ -298,7 +298,7 @@ export default function ProfileView({
             <Trash2 size={16} /> Очистити історію
           </button>
         </div>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6 shadow-lg">
           <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
             <Store className="text-yellow-500" /> Ваша Історія Ринку
           </h3>
@@ -405,7 +405,7 @@ export default function ProfileView({
                   showGrid={false}
                 />
               </div>
-              <div className="p-6 bg-neutral-900 border-t border-neutral-800 z-10 space-y-4">
+              <div className="p-3 sm:p-6 bg-neutral-900 border-t border-neutral-800 z-10 space-y-4">
                 <div>
                   <label className="text-xs font-bold text-neutral-400 mb-2 block uppercase">
                     Масштаб
@@ -432,12 +432,12 @@ export default function ProfileView({
           </div>
         )}
 
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-lg">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6 shadow-lg">
           <h3 className="text-xl font-black text-white mb-6 flex items-center gap-2">
             <Settings className="text-blue-500" /> Налаштування
           </h3>
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex flex-col gap-3 sm:gap-6">
+            <div className="flex flex-col md:flex-row gap-3 sm:gap-6">
               <div className="flex-1 bg-neutral-950/50 p-4 rounded-xl border border-neutral-800/50">
                 <label className="block text-sm font-bold text-neutral-400 mb-3">
                   Оновлення Аватарки
@@ -586,7 +586,7 @@ export default function ProfileView({
                     <div className="flex flex-wrap gap-4">
                        <div 
                          onClick={() => handleEquipPlate('')} 
-                         className={`w-full max-w-[240px] aspect-[5/1] rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold bg-neutral-900 ${!profile.activePlateUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                         className={`w-full max-w-[180px] sm:max-w-[240px] aspect-[5/1] rounded-lg cursor-pointer border-2 flex items-center justify-center text-xs text-neutral-500 font-bold bg-neutral-900 ${!profile.activePlateUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
                        >Без бейджа</div>
                        {userPlates.map((pUrl, i) => {
                          const isVideo = pUrl && pUrl.match(/\.(mp4|webm|mov)$/i);
@@ -594,7 +594,7 @@ export default function ProfileView({
                            <div 
                              key={i} 
                              onClick={() => handleEquipPlate(pUrl)} 
-                             className={`w-full max-w-[240px] aspect-[5/1] rounded-lg overflow-hidden cursor-pointer border-2 transition-colors relative bg-black/20 group ${profile.activePlateUrl === pUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
+                             className={`w-full max-w-[180px] sm:max-w-[240px] aspect-[5/1] rounded-lg overflow-hidden cursor-pointer border-2 transition-colors relative bg-black/20 group ${profile.activePlateUrl === pUrl ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'border-neutral-700 hover:border-neutral-500'}`}
                              onMouseEnter={(e) => { const v = e.currentTarget.querySelector('video'); if (v) v.play().catch(() => {}); }}
                              onMouseLeave={(e) => { const v = e.currentTarget.querySelector('video'); if (v) { v.pause(); v.currentTime = 0; } }}
                            >
@@ -638,7 +638,7 @@ export default function ProfileView({
 
   return (
     <div className="pb-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 text-center relative overflow-hidden mb-8 shadow-xl">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-4 sm:p-8 text-center relative overflow-hidden mb-4 sm:mb-8 shadow-xl">
         {profile?.profileBannerUrl ? (
           <div 
             className="absolute inset-0 w-full h-full bg-cover bg-center opacity-40 pointer-events-none"
@@ -653,7 +653,7 @@ export default function ProfileView({
         <div className="relative w-24 h-24 mx-auto mb-4 z-10">
           <PlayerAvatar
             profile={profile}
-            className={`w-full h-full rounded-full text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`}
+            className={`w-full h-full rounded-full text-2xl sm:text-4xl ${isPremiumActive ? 'border-4 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)]' : ''}`}
             iconSize={48}
           />
           {isPremiumActive && (
@@ -663,7 +663,7 @@ export default function ProfileView({
           )}
         </div>
 
-        <h2 className="text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
+        <h2 className="text-xl sm:text-3xl font-black text-white mb-1 relative z-10 flex justify-center items-center gap-2">
           {profile?.nickname}
           <span
             className="bg-red-600/20 backdrop-blur-md text-red-400 text-sm px-3 py-1 rounded-xl border border-red-500/40 flex items-center gap-1.5 shadow-sm"
@@ -723,8 +723,8 @@ export default function ProfileView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 max-w-4xl mx-auto mb-4 sm:mb-8">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
           <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10">
             <Gift className="text-orange-500" /> Щоденна Нагорода
           </h3>
@@ -740,7 +740,7 @@ export default function ProfileView({
           </button>
         </div>
 
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 relative overflow-hidden group">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6 relative overflow-hidden group">
           <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 relative z-10">
             <Ticket className="text-purple-500" /> Промокоди
           </h3>
@@ -765,7 +765,7 @@ export default function ProfileView({
 
       {/* ДОСЯГНЕННЯ ГРАВЦЯ */}
       {achievementsCatalog && achievementsCatalog.length > 0 && (
-        <div className="max-w-4xl mx-auto mb-8 bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
+        <div className="max-w-4xl mx-auto mb-8 bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-6">
           <h3 className="text-xl font-black text-white mb-4 flex items-center gap-2">
             <Trophy className="text-yellow-500" /> Усі Досягнення (
             {
@@ -863,14 +863,14 @@ export default function ProfileView({
       <div className="flex flex-col sm:flex-row gap-4 max-w-4xl mx-auto mb-6">
         <button
           onClick={() => setActiveTab('history')}
-          className="flex-1 bg-neutral-900 border border-neutral-800 hover:border-yellow-600/50 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all group shadow-md"
+          className="flex-1 bg-neutral-900 border border-neutral-800 hover:border-yellow-600/50 rounded-2xl p-3 sm:p-6 flex flex-col items-center justify-center gap-3 transition-all group shadow-md"
         >
           <Store size={36} className="text-yellow-500 group-hover:scale-110 transition-transform" />
           <span className="text-lg font-black text-white">Історія Ринку</span>
         </button>
         <button
           onClick={() => setActiveTab('settings')}
-          className="flex-1 bg-neutral-900 border border-neutral-800 hover:border-blue-600/50 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 transition-all group shadow-md"
+          className="flex-1 bg-neutral-900 border border-neutral-800 hover:border-blue-600/50 rounded-2xl p-3 sm:p-6 flex flex-col items-center justify-center gap-3 transition-all group shadow-md"
         >
           <Settings
             size={36}
