@@ -2460,16 +2460,20 @@ export default function AdminView({
                   </h4>
                   <div className="flex flex-wrap gap-3">
                     {emeraldTypes.map(et => {
-                      const emeraldInv = typeof viewingUser.emeraldInventory === 'object'
-                        ? viewingUser.emeraldInventory
-                        : (viewingUser.emeraldInventory ? JSON.parse(viewingUser.emeraldInventory) : {});
+                      const emeraldInv = viewingUser.emeraldInventory
+                        ? (typeof viewingUser.emeraldInventory === 'string'
+                          ? JSON.parse(viewingUser.emeraldInventory)
+                          : viewingUser.emeraldInventory)
+                        : {};
                       const count = emeraldInv[String(et.id)] || 0;
                       const setCount = async (newCount) => {
                         const nc = Math.max(0, newCount);
                         const newInv = {
-                          ...(typeof viewingUser.emeraldInventory === 'object'
-                            ? viewingUser.emeraldInventory
-                            : JSON.parse(viewingUser.emeraldInventory || '{}')),
+                          ...(viewingUser.emeraldInventory
+                            ? (typeof viewingUser.emeraldInventory === 'string'
+                              ? JSON.parse(viewingUser.emeraldInventory)
+                              : viewingUser.emeraldInventory)
+                            : {}),
                           [String(et.id)]: nc,
                         };
                         if (nc === 0) delete newInv[String(et.id)];
