@@ -1588,10 +1588,13 @@ export default function App() {
                 setViewingPlayerProfile={(nickname) => {
                   setViewingPlayerProfile(nickname);
                 }}
-                setCurrentView={(v) => {
-                  if (v === 'publicProfile' && viewingPlayerProfile) {
-                    navigate(`/dashboard/${viewingPlayerProfile}`);
-                  } else {
+                setCurrentView={(v, identifier) => {
+                  if (v === 'publicProfile') {
+                    const id = identifier || viewingPlayerProfile;
+                    if (id) {
+                      navigate(`/dashboard/${id}`);
+                    }
+                  } else if (v) {
                     navigate(`/${v}`);
                   }
                 }}
