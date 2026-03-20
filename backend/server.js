@@ -2531,11 +2531,22 @@ app.post('/api/game/2048/start', authenticate, async (req, res) => {
 
     // Записуємо час початку гри для античіту
     const now = new Date();
+    
+    // Перевіряємо, чи вже є активна гра 2048, щоб не скидати startTime при перезавантаженні сторінки
+    let startTime = now.toISOString();
+    const currentMinigame = typeof user.activeMinigame === 'string' 
+      ? JSON.parse(user.activeMinigame) 
+      : user.activeMinigame;
+      
+    if (currentMinigame && currentMinigame.game === '2048' && currentMinigame.startTime) {
+      startTime = currentMinigame.startTime;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
         last2048PlayDate: now,
-        activeMinigame: { game: '2048', startTime: now.toISOString() },
+        activeMinigame: { game: '2048', startTime: startTime },
       },
     });
 
@@ -2625,11 +2636,22 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
     const now = new Date();
+    
+    // Перевіряємо, чи вже є активна гра tetris
+    let startTime = now.toISOString();
+    const currentMinigame = typeof user.activeMinigame === 'string' 
+      ? JSON.parse(user.activeMinigame) 
+      : user.activeMinigame;
+      
+    if (currentMinigame && currentMinigame.game === 'tetris' && currentMinigame.startTime) {
+      startTime = currentMinigame.startTime;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
         lastTetrisPlayDate: now,
-        activeMinigame: { game: 'tetris', startTime: now.toISOString() },
+        activeMinigame: { game: 'tetris', startTime: startTime },
       },
     });
 
@@ -2728,11 +2750,22 @@ app.post('/api/game/fuse/start', authenticate, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { uid: req.user.uid } });
 
     const now = new Date();
+    
+    // Перевіряємо, чи вже є активна гра fuse
+    let startTime = now.toISOString();
+    const currentMinigame = typeof user.activeMinigame === 'string' 
+      ? JSON.parse(user.activeMinigame) 
+      : user.activeMinigame;
+      
+    if (currentMinigame && currentMinigame.game === 'fuse' && currentMinigame.startTime) {
+      startTime = currentMinigame.startTime;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { uid: user.uid },
       data: {
         lastFusePlayDate: now,
-        activeMinigame: { game: 'fuse', startTime: now.toISOString() },
+        activeMinigame: { game: 'fuse', startTime: startTime },
       },
     });
 

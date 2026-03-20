@@ -119,9 +119,11 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
         setGameOver(sGameOver);
         setTimeElapsed(sTimeElapsed || 0);
         setIsInitialized(true);
-        if (sGameOver) localStorage.removeItem('tetris_state');
-        if (!sGameOver) {
-          // Do not re-call startTetrisGameRequest to avoid resetting the startTime in the backend.
+        if (sGameOver) {
+          localStorage.removeItem('tetris_state');
+        } else {
+          // Always notify backend we are playing tetris to sync activeMinigame
+          startTetrisGameRequest(getToken()).catch(() => {});
         }
         return;
       } catch (e) {
@@ -464,9 +466,14 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
     } catch (e) {
       showToast(e.message || 'Помилка отримання нагороди.');
       setIsProcessing(false);
-      // If it's a 400 error, it's likely the game state is invalid in the backend,
-      // so we should clear local state anyway to avoid getting stuck.
-      if (e.message?.includes('400') || e.message?.includes('легітимно')) {
+      // If the backend says the game is invalid, clear local state so the user isn't stuck
+      const errorMsg = e.message || '';
+      if (
+        errorMsg.includes('легітимно') || 
+        errorMsg.includes('активна гра') || 
+        errorMsg.includes('400') ||
+        errorMsg.includes('Код: 400')
+      ) {
         localStorage.removeItem('tetris_state');
       }
     }
