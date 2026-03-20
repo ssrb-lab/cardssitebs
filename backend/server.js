@@ -6952,7 +6952,7 @@ app.post('/api/game/forge/levelup', authenticate, async (req, res) => {
         where: { userId_cardId: { userId: user.uid, cardId: cardId } },
         data: { 
           gameStats: finalStats,
-          amount: { decrement: requiredDupes }
+          amount: { decrement: dupesToRemove.length }
         },
       });
     });
