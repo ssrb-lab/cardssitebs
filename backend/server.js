@@ -340,11 +340,10 @@ function getEmeraldBoostPct(emeraldTypeId, emeraldCatalog) {
 function applyEmeraldBoost(catalogCard, emeraldTypeId, emeraldCatalog) {
   const boost = getEmeraldBoostPct(emeraldTypeId, emeraldCatalog);
   if (!boost) return catalogCard;
-  const mul = 1 + boost / 100;
   return {
     ...catalogCard,
-    perkValue: catalogCard.perkValue != null ? Math.round(catalogCard.perkValue * mul) : catalogCard.perkValue,
-    bonusPerkValue: catalogCard.bonusPerkValue != null ? Math.round(catalogCard.bonusPerkValue * mul) : catalogCard.bonusPerkValue,
+    perkValue: catalogCard.perkValue != null ? Math.round(catalogCard.perkValue + boost) : catalogCard.perkValue,
+    bonusPerkValue: catalogCard.bonusPerkValue != null ? Math.round(catalogCard.bonusPerkValue + boost) : catalogCard.bonusPerkValue,
   };
 }
 
@@ -5487,6 +5486,10 @@ app.get('/api/admin/users', authenticate, checkAdmin, async (req, res) => {
         crystals: true,
         uniqueCardsCount: true,
         emeraldInventory: true,
+        packsOpened: true,
+        coinsSpentOnPacks: true,
+        coinsEarnedFromPacks: true,
+        dailyFarmAmount: true,
       },
     });
     res.json(users);

@@ -1557,7 +1557,7 @@ export default function App() {
 
           <Route path="/dashboard/:identifier" element={
             <PublicProfileView
-              goBack={() => navigate('/rating')}
+              goBack={() => navigate(-1)}
               cardsCatalog={cardsCatalog}
               rarities={rarities}
               setViewingCard={setViewingCard}

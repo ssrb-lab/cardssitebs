@@ -184,7 +184,7 @@ export default function CardModal({ viewingCard, setViewingCard, rarities }) {
     : null;
   const emeraldBoostPct = installedEmerald ? installedEmerald.perkBoostPercent : 0;
   const boostedPerkValue = card.perkValue != null && emeraldBoostPct
-    ? Math.round(card.perkValue * (1 + emeraldBoostPct / 100))
+    ? Math.round(card.perkValue + emeraldBoostPct)
     : card.perkValue;
 
   return (

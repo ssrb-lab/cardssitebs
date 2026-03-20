@@ -1503,7 +1503,7 @@ export default function AdminView({
   };
 
   const filteredAdminUsers = allUsers.filter((u) =>
-    u.nickname?.toLowerCase().includes(adminUserSearchTerm.toLowerCase())
+    (u.nickname ?? '').toLowerCase().includes(adminUserSearchTerm.toLowerCase())
   );
 
   return (

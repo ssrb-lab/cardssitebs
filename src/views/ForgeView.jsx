@@ -554,7 +554,7 @@ export default function ForgeView({
                           <span className="text-neutral-400 line-through">{selectedMain.card.perkValue}%</span>
                           <span className="text-neutral-500">→</span>
                           <span className="font-black text-emerald-400">
-                            {Math.round(selectedMain.card.perkValue * (1 + selectedEmeraldType.perkBoostPercent / 100))}%
+                            {Math.round(selectedMain.card.perkValue + selectedEmeraldType.perkBoostPercent)}%
                           </span>
                         </div>
                       )}
@@ -566,7 +566,7 @@ export default function ForgeView({
                         {emeraldTypes.map((t) => {
                           const count = emeraldInventory[String(t.id)] || 0;
                           const boosted = selectedMain.card?.perkValue != null
-                            ? Math.round(selectedMain.card.perkValue * (1 + t.perkBoostPercent / 100))
+                            ? Math.round(selectedMain.card.perkValue + t.perkBoostPercent)
                             : null;
                           return (
                             <button
