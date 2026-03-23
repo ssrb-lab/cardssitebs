@@ -78,6 +78,7 @@ export default function App() {
   const [user, setUser] = useState(undefined);
   const [profile, setProfile] = useState(null);
   const [showDonateModal, setShowDonateModal] = useState(false);
+  const [activeGame, setActiveGame] = useState(null);
   const [dbInventory, setDbInventory] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
   const [showcases, setShowcases] = useState([]);
@@ -1391,6 +1392,7 @@ export default function App() {
               bosses={bosses}
               rarities={rarities}
               wordleEntryCost={wordleEntryCost}
+              onGameChange={setActiveGame}
             />
           } />
           
@@ -1792,6 +1794,7 @@ export default function App() {
           )}
         </div>
       </nav>
+
     </div>
   );
 }

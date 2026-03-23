@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ad sidebars — show only when viewport is wide enough beside max-w-5xl (1024px) content */
+.ad-sidebar {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  display: none;
+  /* Adaptive width: fills available space outside 1024px content, capped at 300px */
+  width: min(300px, calc((100vw - 1064px) / 2));
+  max-height: calc(100vh - 140px);
+  overflow: hidden;
+}
+
+.ad-sidebar-right {
+  left: calc(50% + 528px); /* 512px = half of 1024px content + 16px gap */
+}
+
+.ad-sidebar-left {
+  right: calc(50% + 528px);
+}
+
+/* Show when there is at least 200px of space per side: 1024px + 2×200px + gaps ≈ 1464px */
+@media (min-width: 1464px) {
+  .ad-sidebar {
+    display: block;
+  }
+}
+
 @layer components {
   .btn-game {
     @apply flex items-center justify-center gap-2 font-bold rounded-xl transition-all duration-300 active:scale-[0.97] shadow-lg border relative overflow-hidden;

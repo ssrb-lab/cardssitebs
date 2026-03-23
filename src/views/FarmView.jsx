@@ -41,6 +41,7 @@ export default function FarmView({
   showToast,
   bosses,
   wordleEntryCost,
+  onGameChange,
 }) {
   const playerLevel = profile?.farmLevel || 1;
 
@@ -61,6 +62,10 @@ export default function FarmView({
   const [timeLeft, setTimeLeft] = useState('');
   const [activeGame, setActiveGame] = useState(null);
   const [blockedGames, setBlockedGames] = useState([]);
+
+  useEffect(() => {
+    if (onGameChange) onGameChange(activeGame);
+  }, [activeGame]);
 
   // Хелпер: адміністратори можуть заходити в заблоковані ігри
   const isBlocked = (game) => profile?.isAdmin ? false : blockedGames.includes(game);
