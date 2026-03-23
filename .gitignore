@@ -30,3 +30,6 @@ start-server.bat
 .agents
 start-project.bat
 stop-project.bat
+
+# User-uploaded avatars — do NOT push to git, so live hosting avatars are preserved
+backend/uploads/avatars/

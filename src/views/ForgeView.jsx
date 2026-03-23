@@ -1134,12 +1134,16 @@ export default function ForgeView({
                       onClick={(e) => {
                         e.stopPropagation();
                         setSellDupeModal(item);
-                        setModalDupeAmount(1);
+                        setModalDupeAmount(isMax ? cardSellableCount : 1);
                         setModalDupePrice('');
                       }}
-                      className="mt-1.5 w-full flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wide text-blue-400 border border-blue-900/50 bg-blue-950/30 hover:bg-blue-900/40 rounded-lg py-1 transition-colors"
+                      className={`mt-1.5 w-full flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wide border rounded-lg py-1 transition-colors ${
+                        isMax
+                          ? 'text-yellow-400 border-yellow-700/50 bg-yellow-900/20 hover:bg-yellow-800/30'
+                          : 'text-blue-400 border-blue-900/50 bg-blue-950/30 hover:bg-blue-900/40'
+                      }`}
                     >
-                      <Store size={9} /> На ринок ({cardSellableCount})
+                      <Store size={9} /> {isMax ? `Продати всі (${cardSellableCount})` : `На ринок (${cardSellableCount})`}
                     </button>
                   )}
                 </div>
@@ -1195,6 +1199,9 @@ export default function ForgeView({
                 <div>
                   <div className="font-black text-white text-lg leading-tight">{modalCard.card.name}</div>
                   <div className="text-xs text-blue-400 font-bold mt-0.5">Доступно дублікатів: {maxSell}</div>
+                  {modalDupeAmount === maxSell && maxSell > 1 && (
+                    <div className="text-[10px] text-yellow-400 font-bold mt-0.5">★ Всі дублікати вибрано</div>
+                  )}
                   <div className="text-[10px] text-neutral-500 mt-0.5">Базові характеристики · без параметрів</div>
                 </div>
                 <button onClick={() => setSellDupeModal(null)} className="ml-auto text-neutral-500 hover:text-white">

@@ -57,6 +57,14 @@ export default function ShopView({
   const [rouletteOffset, setRouletteOffset] = useState(0);
   const [activeCategory, setActiveCategory] = useState('all');
 
+  // Responsive card slot width for roulette: mobile w-28 (112px) + gap-4 (16px) = 128, desktop sm:w-40 (160px) + gap-4 (16px) = 176
+  const [cardSlotWidth, setCardSlotWidth] = useState(() => window.innerWidth >= 640 ? 176 : 128);
+  useEffect(() => {
+    const onResize = () => setCardSlotWidth(window.innerWidth >= 640 ? 176 : 128);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     if (isRouletteSpinning) {
       // Avoid calling setState synchronously during render by using setTimeout
@@ -113,8 +121,8 @@ export default function ShopView({
                 roulettePos === 1 ? 'transform 4.5s cubic-bezier(0.1, 0.85, 0.1, 1)' : 'none',
               transform:
                 roulettePos === 1
-                  ? `translateX(-${35 * 176 + 80 + rouletteOffset}px)`
-                  : `translateX(-80px)`,
+                  ? `translateX(-${35 * cardSlotWidth + (cardSlotWidth / 2 - 8) + rouletteOffset}px)`
+                  : `translateX(-${cardSlotWidth / 2 - 8}px)`,
             }}
           >
             {rouletteItems.map((item, i) => {

@@ -901,7 +901,7 @@ export default function App() {
       }
 
       const isGameCard = cardData?.isGame && !cardData?.blockGame;
-      const keepAmount = isGameCard ? 3 : 1;
+      const keepAmount = 1;
 
       if (!existing || existing.amount <= keepAmount) {
         showToast(
@@ -955,10 +955,10 @@ export default function App() {
           .filter(Boolean);
 
       const duplicates = baseList.filter((item) => {
-        const keepAmount = (item.card?.isGame && !item.card?.blockGame) ? 3 : 1;
+        const keepAmount = 1;
         // Ігноруємо лімітовані картки (вони продаються лише на ринку)
         if (item.card?.maxSupply > 0) return false;
-        return item.amount > keepAmount;
+        return (item.totalAmount ?? item.amount) > keepAmount;
       });
       if (duplicates.length === 0) {
         showToast('Немає дублікатів для продажу!', 'error');
@@ -968,12 +968,16 @@ export default function App() {
       }
 
       const itemsToSell = duplicates.map((item) => {
-        const keepAmount = (item.card?.isGame && !item.card?.blockGame) ? 3 : 1;
+        const keepAmount = 1;
+        const safeCount = item.safeCount ?? 0;
+        const defendingCount = profile?.defendingInstances?.filter(inst => inst.cardId === (item.card?.id || item.id)).length || 0;
+        const totalAmt = item.totalAmount ?? item.amount;
+        const sellable = Math.max(0, totalAmt - keepAmount - safeCount - defendingCount);
         return {
           cardId: item.card?.id || item.id,
-          amount: item.amount - keepAmount,
+          amount: sellable,
         };
-      });
+      }).filter(i => i.amount > 0);
 
       const totalRequested = itemsToSell.reduce((s, i) => s + i.amount, 0);
 
@@ -1335,7 +1339,7 @@ export default function App() {
 
               <button
                 onClick={toggleAutoSound}
-                className="hidden sm:block bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
+                className="bg-neutral-950 p-1.5 sm:p-2.5 rounded-xl border border-neutral-800 text-neutral-400 hover:text-white transition-colors shrink-0"
                 title={
                   profile?.autoSoundEnabled !== false
                     ? 'Вимкнути автозвук карток'
@@ -1343,9 +1347,9 @@ export default function App() {
                 }
               >
                 {profile?.autoSoundEnabled !== false ? (
-                  <Volume2 size={20} />
+                  <Volume2 size={16} className="sm:w-5 sm:h-5" />
                 ) : (
-                  <VolumeX size={20} />
+                  <VolumeX size={16} className="sm:w-5 sm:h-5" />
                 )}
               </button>
 

@@ -178,7 +178,13 @@ export default function InventoryView({
   const duplicatesEarnedCoins = filteredInventory.reduce((sum, item) => {
     const meta = inventoryWithMeta.find((m) => m.card.id === item.card.id);
     const isGame = meta?.isGameCard || getEffectivePowers(item, packsCatalog).length > 0;
-    if (isGame) return sum;
+
+    // Ігрові картки з рівнем 10 можна продавати як звичайні
+    if (isGame) {
+      const powers = getEffectivePowers(item, packsCatalog);
+      const bestLevel = powers.reduce((max, p) => Math.max(max, p.level || 1), 1);
+      if (bestLevel < 10) return sum;
+    }
 
     const totalAmount = meta?.totalAmount ?? item.amount;
     const safeCount = meta?.safeCount ?? 0;
@@ -198,8 +204,12 @@ export default function InventoryView({
     const totalAmount = meta?.totalAmount ?? item.amount;
     if (totalAmount <= 1) return false;
 
-    // Якщо є дублікати ігрового типу — їх не можна продавати
-    if (isGame) return true;
+    // Ігрові картки з рівнем < 10 — блокуємо продаж
+    if (isGame) {
+      const powers = getEffectivePowers(item, packsCatalog);
+      const bestLevel = powers.reduce((max, p) => Math.max(max, p.level || 1), 1);
+      if (bestLevel < 10) return true;
+    }
 
     const safeCount = meta?.safeCount ?? 0;
     const defendingCount =
@@ -553,6 +563,7 @@ export default function InventoryView({
                     ? powers.filter((p) => !p.inSafe && !defendingStatsSet.has(p.statsIndex)).length
                     : 0;
                   const canSellGameToMarket = isGameItem && sellableGameCount > 0;
+                  const hasMaxLevel = isGameItem && powers.reduce((max, p) => Math.max(max, p.level || 1), 1) >= 10;
 
                   return (
                     <div
@@ -694,45 +705,65 @@ export default function InventoryView({
                               </>
                             ) : (
                               <div className="flex flex-col gap-1.5 w-full">
-                                {(() => {
-                                  const gameDupesAvailable = item.amount - defendingCountForCard;
-                                  const maxGameSellable = Math.max(0, gameDupesAvailable - 1);
-                                  // Якщо дублікатів для "залишити 1" немає — але 1 екземпляр продати можна,
-                                  // даємо кнопку звичайного виставлення (зберігає power/hp).
-                                  if (maxGameSellable === 0) {
-                                    if (!canSellGameToMarket) return null;
-                                    return (
-                                      <button
-                                        disabled={!canSellGameToMarket}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setListingCard(item.card);
-                                        }}
-                                        className={`w-full ${
-                                          !canSellGameToMarket
-                                            ? 'bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed'
-                                            : 'bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50'
-                                        } text-[10px] py-1.5 rounded-lg font-bold transition-all border`}
-                                      >
-                                        На Ринок
-                                      </button>
-                                    );
-                                  }
-
-                                  return (
+                                {hasMaxLevel ? (
+                                  <>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        sellDuplicate(item.card.id);
+                                      }}
+                                      className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] text-xs py-2 rounded-lg font-bold transition-all"
+                                    >
+                                      Продати (+{currentSellPrice}{' '}
+                                      <Coins size={10} className="inline text-yellow-500" />)
+                                    </button>
+                                    <div className="flex gap-1.5 w-full">
+                                      {item.amount > 1 && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            sellEveryDuplicate([item]);
+                                          }}
+                                          className="flex-1 bg-neutral-800/80 hover:bg-red-900/50 text-neutral-400 hover:border-red-900/50 border-neutral-700 text-[10px] py-1.5 rounded-lg font-bold transition-all border"
+                                          title="Залишити лише 1"
+                                        >
+                                          Всі (-1)
+                                        </button>
+                                      )}
+                                      {canSellGameToMarket && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSellGameDupeModal({ item, maxSellable: Math.max(0, item.amount - defendingCountForCard - 1) });
+                                            setSellGameDupeAmount(1);
+                                            setSellGameDupePrice('');
+                                          }}
+                                          className="flex-1 bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-800/50 text-[10px] py-1.5 rounded-lg font-bold transition-all border"
+                                        >
+                                          На Ринок
+                                        </button>
+                                      )}
+                                    </div>
+                                  </>
+                                ) : canSellGameToMarket ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const gameDupesAvailable = item.amount - defendingCountForCard;
+                                      const maxGameSellable = Math.max(0, gameDupesAvailable - 1);
+                                      if (maxGameSellable > 0) {
                                         setSellGameDupeModal({ item, maxSellable: maxGameSellable });
                                         setSellGameDupeAmount(1);
                                         setSellGameDupePrice('');
-                                      }}
-                                      className="w-full bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-800/50 text-[10px] py-1.5 rounded-lg font-bold transition-all"
-                                    >
-                                      <Store size={10} className="inline mr-1" />На Ринок
-                                    </button>
-                                  );
-                                })()}
+                                      } else {
+                                        setListingCard(item.card);
+                                      }
+                                    }}
+                                    className="w-full bg-blue-900/40 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-800/50 text-[10px] py-1.5 rounded-lg font-bold transition-all"
+                                  >
+                                    <Store size={10} className="inline mr-1" />На Ринок
+                                  </button>
+                                ) : null}
                               </div>
                             )}
                           </div>
