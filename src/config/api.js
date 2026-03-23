@@ -611,11 +611,11 @@ export const clearAdminLogsRequest = async (token) => {
   });
 };
 
-export const claim2048RewardRequest = async (token, score) => {
+export const claim2048RewardRequest = async (token, score, adBonus = false) => {
   const res = await safeFetch(`${API_URL}/game/2048/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ score }),
+    body: JSON.stringify({ score, adBonus }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);
@@ -632,11 +632,11 @@ export const start2048GameRequest = async (token) => {
   return data;
 };
 
-export const claimTetrisRewardRequest = async (token, score) => {
+export const claimTetrisRewardRequest = async (token, score, adBonus = false) => {
   const res = await safeFetch(`${API_URL}/game/tetris/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ score }),
+    body: JSON.stringify({ score, adBonus }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error);

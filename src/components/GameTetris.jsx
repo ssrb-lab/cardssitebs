@@ -91,6 +91,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
   const [isPaused, setIsPaused] = useState(false);
   const [dropSpeed, setDropSpeed] = useState(800); // ms
   const [timeElapsed, setTimeElapsed] = useState(0); // in seconds
+  const [adBonusUsed, setAdBonusUsed] = useState(false);
 
   const [currentPiece, setCurrentPiece] = useState(null);
   const [nextPiece, setNextPiece] = useState(null);
@@ -454,7 +455,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
     }
     setIsProcessing(true);
     try {
-      const data = await claimTetrisRewardRequest(getToken(), score);
+      const data = await claimTetrisRewardRequest(getToken(), score, adBonusUsed);
       setProfile(data.profile);
       if (data.earned > 0) {
         showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
@@ -690,12 +691,28 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
           >
             Гру закінчено
           </h2>
-          <p className="text-neutral-300 mb-8 text-xl">
+          <p className="text-neutral-300 mb-4 text-xl">
             Ваш рахунок:{' '}
             <span className="text-green-400 font-bold drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]">
               {score}
             </span>
           </p>
+
+          {!adBonusUsed ? (
+            <a
+              href="https://omg10.com/4/10768852"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setAdBonusUsed(true)}
+              className="mb-4 flex items-center gap-2 bg-gradient-to-r from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 text-white font-black py-3 px-8 rounded-2xl shadow-[0_0_20px_rgba(34,197,94,0.5)] transform transition hover:scale-105 text-base"
+            >
+              🎁 Клікни на рекламу → отримай +50% до нагороди
+            </a>
+          ) : (
+            <div className="mb-4 flex items-center gap-2 bg-green-900/40 border border-green-600 text-green-400 font-bold py-2 px-6 rounded-2xl text-sm">
+              ✓ Бонус активовано! +50% до нагороди
+            </div>
+          )}
 
           <button
             onClick={claimReward}
@@ -703,7 +720,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
             className="bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-yellow-950 font-black py-4 px-10 rounded-2xl flex items-center gap-3 shadow-[0_0_30px_rgba(234,179,8,0.6)] transform transition hover:scale-105 mb-4"
           >
             {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <Coins size={24} />}
-            <span className="text-lg">Забрати {score * 6} монет</span>
+            <span className="text-lg">Забрати {adBonusUsed ? Math.floor(score * 6 * 1.5) : score * 6} монет</span>
           </button>
 
           <button
@@ -711,7 +728,7 @@ export default function GameTetris({ setProfile, goBack, showToast }) {
               if (score >= 50) {
                 setIsProcessing(true);
                 try {
-                  const data = await claimTetrisRewardRequest(getToken(), score);
+                  const data = await claimTetrisRewardRequest(getToken(), score, adBonusUsed);
                   setProfile(data.profile);
                   if (data.earned > 0) {
                     showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');

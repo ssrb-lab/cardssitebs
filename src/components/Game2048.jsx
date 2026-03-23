@@ -27,6 +27,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
+  const [adBonusUsed, setAdBonusUsed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -236,7 +237,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
     }
     setIsProcessing(true);
     try {
-      const data = await claim2048RewardRequest(getToken(), score);
+      const data = await claim2048RewardRequest(getToken(), score, adBonusUsed);
       setProfile(data.profile);
       if (data.earned > 0) {
         showToast(`Ви отримали ${data.earned} монет за гру!`, 'success');
@@ -391,9 +392,25 @@ export default function Game2048({ setProfile, goBack, showToast }) {
           >
             {gameWon ? 'Перемога! 4096!' : 'Гру закінчено!'}
           </h2>
-          <p className="text-neutral-300 mb-6">
+          <p className="text-neutral-300 mb-4">
             Ваш рахунок: <span className="text-white font-bold">{score}</span>
           </p>
+
+          {!adBonusUsed ? (
+            <a
+              href="https://omg10.com/4/10768852"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setAdBonusUsed(true)}
+              className="mb-4 flex items-center gap-2 bg-gradient-to-r from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 text-white font-black py-3 px-6 rounded-2xl shadow-[0_0_20px_rgba(34,197,94,0.5)] transform transition hover:scale-105 text-sm"
+            >
+              🎁 Клікни на рекламу → отримай +50% до нагороди
+            </a>
+          ) : (
+            <div className="mb-4 flex items-center gap-2 bg-green-900/40 border border-green-600 text-green-400 font-bold py-2 px-5 rounded-2xl text-sm">
+              ✓ Бонус активовано! +50% до нагороди
+            </div>
+          )}
 
           <button
             onClick={claimReward}
@@ -401,7 +418,7 @@ export default function Game2048({ setProfile, goBack, showToast }) {
             className="bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-black py-4 px-8 rounded-2xl flex items-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.5)]"
           >
             {isProcessing ? <Loader2 size={20} className="animate-spin" /> : <Coins size={20} />}
-            Забрати {score} монет
+            Забрати {adBonusUsed ? Math.floor(score * 1.5) : score} монет
           </button>
 
           <button

@@ -2558,7 +2558,7 @@ app.post('/api/game/2048/start', authenticate, async (req, res) => {
 });
 
 app.post('/api/game/2048/claim', authenticate, async (req, res) => {
-  const { score } = req.body;
+  const { score, adBonus } = req.body;
 
   if (score < 100) return res.status(400).json({ error: 'Занадто малий рахунок для обміну.' });
 
@@ -2610,6 +2610,11 @@ app.post('/api/game/2048/claim', authenticate, async (req, res) => {
 
     // Курс: 1 поїнт рахунку = 1 монета
     let coinsToGive = claimedScore;
+
+    // Бонус за рекламу: +50%
+    if (adBonus) {
+      coinsToGive = Math.floor(coinsToGive * 1.5);
+    }
 
     // Обрізаємо нагороду, якщо вона перевищує залишок ліміту
     if (currentDailyFarm + coinsToGive > 500000) {
@@ -2663,7 +2668,7 @@ app.post('/api/game/tetris/start', authenticate, async (req, res) => {
 });
 
 app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
-  const { score } = req.body;
+  const { score, adBonus } = req.body;
 
   if (score < 50) {
     // Дозволяємо вийти з гри при малому рахунку, просто очищаємо стан
@@ -2721,6 +2726,11 @@ app.post('/api/game/tetris/claim', authenticate, async (req, res) => {
 
     // Курс: 1 поїнт рахунку = 6 монет
     let coinsToGive = claimedScore * 6;
+
+    // Бонус за рекламу: +50%
+    if (adBonus) {
+      coinsToGive = Math.floor(coinsToGive * 1.5);
+    }
 
     if (currentDailyFarm + coinsToGive > 500000) {
       coinsToGive = Math.max(0, 500000 - currentDailyFarm);

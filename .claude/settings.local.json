@@ -15,7 +15,8 @@
       "Bash(git push:*)",
       "Bash(find /f/cardssitebs -name *forge* -o -name *level*)",
       "Bash(head -30 /f/cardssitebs/src/components/Game*.jsx)",
-      "Bash(wc -l /f/cardssitebs/src/**/*.jsx)"
+      "Bash(wc -l /f/cardssitebs/src/**/*.jsx)",
+      "Bash(find F:cardssitebs/src -iname *tetris* -o -iname *2048*)"
     ]
   }
 }
