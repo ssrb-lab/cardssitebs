@@ -47,6 +47,8 @@ import {
   fetchNotifications,
   toggleSafeRequest,
   safeFetch,
+  submitPackRequestApi,
+  getMyPackRequestsCount,
 } from './config/api';
 import NotificationsModal from './components/NotificationsModal';
 import DonateModal from './components/DonateModal';
@@ -87,6 +89,12 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const actionLock = useRef(false);
   const lastCheckRef = useRef(null);
+
+  const [showPackRequestModal, setShowPackRequestModal] = useState(false);
+  const [packReqForm, setPackReqForm] = useState({ name: '', contact: '', message: '' });
+  const [packReqSending, setPackReqSending] = useState(false);
+  const [packReqSent, setPackReqSent] = useState(false);
+  const [packReqPending, setPackReqPending] = useState(0);
 
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgotPassword', 'resetPassword'
@@ -506,6 +514,34 @@ export default function App() {
     setToastMsg({ text: msg, type });
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = setTimeout(() => setToastMsg({ text: '', type: '' }), 3000);
+  };
+
+  const openPackRequestModal = async () => {
+    setPackReqSent(false);
+    setPackReqForm({ name: '', contact: '', message: '' });
+    try {
+      const { pendingCount } = await getMyPackRequestsCount(getToken());
+      setPackReqPending(pendingCount);
+    } catch {
+      setPackReqPending(0);
+    }
+    setShowPackRequestModal(true);
+  };
+
+  const submitPackRequest = async (e) => {
+    e.preventDefault();
+    if (!packReqForm.name.trim() || !packReqForm.contact.trim()) return;
+    setPackReqSending(true);
+    try {
+      await submitPackRequestApi(getToken(), packReqForm.name, packReqForm.contact, packReqForm.message);
+      setPackReqSent(true);
+      setPackReqPending((n) => n + 1);
+      setPackReqForm({ name: '', contact: '', message: '' });
+    } catch (err) {
+      showToast(err.message || 'Помилка надсилання заявки.', 'error');
+    } finally {
+      setPackReqSending(false);
+    }
   };
 
   const reloadMarket = async () => {
@@ -1701,6 +1737,12 @@ export default function App() {
           >
             Політика конфіденційності
           </button>
+          <button
+            onClick={openPackRequestModal}
+            className="hover:text-yellow-400 text-yellow-600 transition-colors font-semibold"
+          >
+            🃏 Свій пак
+          </button>
         </div>
       </footer>
 
@@ -1799,6 +1841,95 @@ export default function App() {
       )}
 
       <DonateModal isOpen={showDonateModal} onClose={() => setShowDonateModal(false)} />
+
+      {showPackRequestModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-yellow-700/40 rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl">
+            <button
+              onClick={() => setShowPackRequestModal(false)}
+              className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors text-xl font-bold"
+            >
+              ✕
+            </button>
+            <div className="text-center mb-5">
+              <div className="text-4xl mb-2">🃏</div>
+              <h2 className="text-xl font-black text-white">Свій пак на сайті</h2>
+              <p className="text-neutral-400 text-sm mt-2 leading-relaxed">
+                Хочеш додати власний пак карток? Залиш контакт — адміністратор зв'яжеться з тобою та обговорить умови.
+              </p>
+            </div>
+            {packReqPending >= 2 ? (
+              <div className="text-center py-4">
+                <div className="text-yellow-400 text-3xl mb-3">⏳</div>
+                <p className="text-yellow-300 font-bold text-sm">У тебе вже є 2 заявки на розгляді</p>
+                <p className="text-neutral-500 text-xs mt-2">Дочекайся відповіді адміністратора перед тим як створювати нову заявку.</p>
+              </div>
+            ) : packReqSent ? (
+              <div className="text-center py-4">
+                <div className="text-green-400 text-3xl mb-3">✓</div>
+                <p className="text-green-400 font-bold">Заявку надіслано!</p>
+                <p className="text-neutral-500 text-sm mt-2">Скоро зв'яжемось з тобою.</p>
+                {packReqPending < 2 && (
+                  <button
+                    onClick={() => setPackReqSent(false)}
+                    className="mt-4 text-neutral-500 text-sm underline hover:text-neutral-400"
+                  >
+                    Надіслати ще одну заявку
+                  </button>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={submitPackRequest} className="flex flex-col gap-3">
+                <div>
+                  <label className="text-neutral-400 text-xs font-bold mb-1 block">Ім'я або нік *</label>
+                  <input
+                    type="text"
+                    placeholder="Як до тебе звертатися?"
+                    value={packReqForm.name}
+                    onChange={(e) => setPackReqForm((f) => ({ ...f, name: e.target.value }))}
+                    maxLength={100}
+                    required
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-neutral-400 text-xs font-bold mb-1 block">Контакт для зв'язку *</label>
+                  <input
+                    type="text"
+                    placeholder="Email, Telegram або Discord"
+                    value={packReqForm.contact}
+                    onChange={(e) => setPackReqForm((f) => ({ ...f, contact: e.target.value }))}
+                    maxLength={200}
+                    required
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-neutral-400 text-xs font-bold mb-1 block">Коротко про пак</label>
+                  <textarea
+                    placeholder="Тематика, кількість карток, будь-яка інформація..."
+                    value={packReqForm.message}
+                    onChange={(e) => setPackReqForm((f) => ({ ...f, message: e.target.value }))}
+                    maxLength={1000}
+                    rows={3}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-600 transition-colors resize-none"
+                  />
+                </div>
+                {packReqPending === 1 && (
+                  <p className="text-yellow-600 text-xs text-center">⚠ У тебе вже є 1 заявка на розгляді. Залишилась 1 спроба.</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={packReqSending}
+                  className="w-full bg-gradient-to-b from-yellow-400 to-yellow-600 text-yellow-950 font-black py-3 rounded-xl hover:from-yellow-300 hover:to-yellow-500 transition-all disabled:opacity-50 mt-1"
+                >
+                  {packReqSending ? 'Надсилання...' : 'Надіслати заявку'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <nav className="fixed bottom-0 w-full bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-0 sm:px-2 py-1 sm:py-2 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] overflow-x-auto hide-scrollbar safe-area-bottom">
         <div className="min-w-max mx-auto flex justify-center gap-0 sm:gap-2">

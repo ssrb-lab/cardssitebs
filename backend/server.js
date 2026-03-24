@@ -7722,3 +7722,80 @@ app.put('/api/admin/emerald-settings', authenticate, checkAdmin, async (req, res
     res.status(500).json({ error: 'Помилка оновлення налаштувань смарагдів.' });
   }
 });
+
+// ============================================================
+// PACK REQUESTS (заявки на додавання власного паку)
+// ============================================================
+
+// POST /api/pack-requests — requires auth, limit 2 unreviewed per user
+app.post('/api/pack-requests', authenticate, async (req, res) => {
+  const { name, contact, message } = req.body;
+  if (!name || !contact) return res.status(400).json({ error: 'Вкажіть ім\'я та контакт.' });
+  const userId = req.user.uid;
+  const userIp = req.ip || req.headers['x-forwarded-for'] || null;
+  try {
+    // Server-side limit: max 2 unreviewed requests per user
+    const pendingCount = await prisma.packRequest.count({
+      where: { userId, isReviewed: false },
+    });
+    if (pendingCount >= 2) {
+      return res.status(429).json({
+        error: 'У вас вже є 2 заявки на розгляді. Дочекайтесь відповіді адміністратора.',
+      });
+    }
+    const request = await prisma.packRequest.create({
+      data: {
+        name: String(name).trim().slice(0, 100),
+        contact: String(contact).trim().slice(0, 200),
+        message: String(message || '').trim().slice(0, 1000),
+        userId,
+        userIp,
+      },
+    });
+    res.json({ success: true, id: request.id });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка збереження заявки.' });
+  }
+});
+
+// GET /api/pack-requests/my — check how many pending requests current user has
+app.get('/api/pack-requests/my', authenticate, async (req, res) => {
+  try {
+    const pendingCount = await prisma.packRequest.count({
+      where: { userId: req.user.uid, isReviewed: false },
+    });
+    res.json({ pendingCount });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка.' });
+  }
+});
+
+// GET /api/admin/pack-requests
+app.get('/api/admin/pack-requests', authenticate, checkAdmin, async (req, res) => {
+  try {
+    const requests = await prisma.packRequest.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка завантаження заявок.' });
+  }
+});
+
+// PATCH /api/admin/pack-requests/:id — mark as reviewed
+app.patch('/api/admin/pack-requests/:id', authenticate, checkAdmin, async (req, res) => {
+  try {
+    await prisma.packRequest.update({ where: { id: req.params.id }, data: { isReviewed: true } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка оновлення заявки.' });
+  }
+});
+
+// DELETE /api/admin/pack-requests/:id
+app.delete('/api/admin/pack-requests/:id', authenticate, checkAdmin, async (req, res) => {
+  try {
+    await prisma.packRequest.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Помилка видалення заявки.' });
+  }
+});

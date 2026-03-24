@@ -59,6 +59,9 @@ import {
   deleteEmeraldTypeRequest,
   fetchAdminEmeraldSettings,
   saveEmeraldSettingsRequest,
+  fetchAdminPackRequests,
+  reviewPackRequestApi,
+  deletePackRequestApi,
 } from '../config/api';
 import { formatDate, getCardStyle } from '../utils/helpers';
 import { EFFECT_OPTIONS, FRAME_OPTIONS, SELL_PRICE, DROP_ANIMATIONS } from '../config/constants';
@@ -456,6 +459,8 @@ export default function AdminView({
   const [emeraldTypeForm, setEmeraldTypeForm] = useState({ name: '', color: '#10b981', perkBoostPercent: 10, dropWeight: 50 });
   const [isSavingEmerald, setIsSavingEmerald] = useState(false);
 
+  const [packRequests, setPackRequests] = useState([]);
+
   const updatePackStatsRange = (rarity, field, value) => {
     setPackForm((prev) => ({
       ...prev,
@@ -551,6 +556,12 @@ export default function AdminView({
         }
       };
       loadEmeralds();
+    }
+
+    if (activeTab === 'packRequests' && currentProfile.isAdmin) {
+      fetchAdminPackRequests(getToken())
+        .then((data) => setPackRequests(data || []))
+        .catch(console.error);
     }
   }, [activeTab, db, appId, currentProfile]);
 
@@ -2070,6 +2081,12 @@ export default function AdminView({
               className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'emeralds' ? 'bg-emerald-700 text-white' : 'text-emerald-400/70 hover:bg-neutral-800'}`}
             >
               💎 Смарагди
+            </button>
+            <button
+              onClick={() => setActiveTab('packRequests')}
+              className={`shrink-0 min-w-[100px] sm:min-w-[120px] sm:flex-1 whitespace-nowrap py-2.5 sm:py-3 px-3 rounded-lg font-bold text-sm sm:text-base flex justify-center items-center gap-2 ${activeTab === 'packRequests' ? 'bg-yellow-600 text-white' : 'text-yellow-400/70 hover:bg-neutral-800'}`}
+            >
+              <Mail size={18} /> Заявки
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -4750,6 +4767,90 @@ export default function AdminView({
               Надіслати {notifForm.type === 'gift' ? 'Подарунок' : 'Сповіщення'}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* --- Вкладка: ЗАЯВКИ НА ВЛАСНИЙ ПАК --- */}
+      {activeTab === 'packRequests' && currentProfile.isAdmin && (
+        <div className="space-y-4 animate-in fade-in">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-black text-yellow-400 flex items-center gap-2">
+              <Mail size={20} /> Заявки на власний пак
+            </h2>
+            <button
+              onClick={() =>
+                fetchAdminPackRequests(getToken())
+                  .then((d) => setPackRequests(d || []))
+                  .catch(console.error)
+              }
+              className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Оновити
+            </button>
+          </div>
+          {packRequests.length === 0 ? (
+            <div className="text-center py-16 text-neutral-500 text-sm">Заявок поки немає.</div>
+          ) : (
+            <div className="space-y-3">
+              {packRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className={`border rounded-xl p-4 flex flex-col sm:flex-row sm:items-start gap-3 ${req.isReviewed ? 'border-neutral-700 bg-neutral-900/40 opacity-60' : 'border-yellow-700/40 bg-yellow-950/20'}`}
+                >
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-white text-sm">{req.name}</span>
+                      {req.isReviewed && (
+                        <span className="text-[10px] bg-green-900/50 text-green-400 border border-green-700/40 px-2 py-0.5 rounded-full font-bold">
+                          Переглянуто
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-yellow-400 text-xs font-mono break-all">{req.contact}</div>
+                    {req.message && (
+                      <p className="text-neutral-400 text-xs leading-relaxed mt-1 whitespace-pre-wrap">{req.message}</p>
+                    )}
+                    <div className="text-neutral-600 text-[10px] mt-1">
+                      {new Date(req.createdAt).toLocaleString('uk-UA')}
+                    </div>
+                  </div>
+                  <div className="flex sm:flex-col gap-2 shrink-0">
+                    {!req.isReviewed && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await reviewPackRequestApi(getToken(), req.id);
+                            setPackRequests((prev) =>
+                              prev.map((r) => (r.id === req.id ? { ...r, isReviewed: true } : r))
+                            );
+                          } catch {
+                            showToast('Помилка оновлення.', 'error');
+                          }
+                        }}
+                        className="text-xs bg-green-900/40 hover:bg-green-900/70 text-green-400 border border-green-700/40 px-3 py-1.5 rounded-lg transition-colors font-bold"
+                      >
+                        Переглянуто
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Видалити заявку?')) return;
+                        try {
+                          await deletePackRequestApi(getToken(), req.id);
+                          setPackRequests((prev) => prev.filter((r) => r.id !== req.id));
+                        } catch {
+                          showToast('Помилка видалення.', 'error');
+                        }
+                      }}
+                      className="text-xs bg-red-900/30 hover:bg-red-900/60 text-red-400 border border-red-700/30 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

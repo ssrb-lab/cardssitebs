@@ -273,6 +273,17 @@ model EmeraldSettings {
   maxDailyOpens   Int    @default(3)
 }
 
+model PackRequest {
+  id         String   @id @default(uuid())
+  name       String
+  contact    String
+  message    String   @db.Text
+  isReviewed Boolean  @default(false)
+  userId     String?
+  userIp     String?
+  createdAt  DateTime @default(now())
+}
+
 model ArenaPoint {
   id                 String    @id @default(uuid())
   x                  Float

@@ -1004,6 +1004,56 @@ export const saveEmeraldSettingsRequest = async (token, settings) => {
   return data;
 };
 
+// --- ЗАЯВКИ НА ВЛАСНИЙ ПАК ---
+export const submitPackRequestApi = async (token, name, contact, message) => {
+  const res = await safeFetch(`${API_URL}/pack-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, contact, message }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const getMyPackRequestsCount = async (token) => {
+  const res = await safeFetch(`${API_URL}/pack-requests/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const fetchAdminPackRequests = async (token) => {
+  const res = await safeFetch(`${API_URL}/admin/pack-requests`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const reviewPackRequestApi = async (token, id) => {
+  const res = await safeFetch(`${API_URL}/admin/pack-requests/${id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
+export const deletePackRequestApi = async (token, id) => {
+  const res = await safeFetch(`${API_URL}/admin/pack-requests/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+};
+
 // --- РЕМОНТ КАРТОК ---
 export const repairCardRequest = async (token, cardId, statsIndex, currency) => {
   const res = await safeFetch(`${API_URL}/game/repair-card`, {
