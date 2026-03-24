@@ -151,7 +151,7 @@ export default function App() {
   const isPremiumActive = checkIsPremiumActive(profile);
 
   useEffect(() => {
-    document.title = 'Card Game';
+    document.title = 'Card Game — Колекційна карткова гра онлайн';
     
     // Redirect logic on load to maintain previous tab
     const savedPath = localStorage.getItem('lastActiveView');
