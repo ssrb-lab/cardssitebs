@@ -127,6 +127,7 @@ export default function App() {
   const [listingCard, setListingCard] = useState(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [adblockDetected, setAdblockDetected] = useState(false);
 
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -149,6 +150,50 @@ export default function App() {
     if (savedPath && savedPath !== '/' && location.pathname === '/') {
       navigate(savedPath, { replace: true });
     }
+  }, []);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('adblock-banner-dismissed')) return;
+
+    // Method 1: bait div that adblockers hide
+    const bait = document.createElement('div');
+    bait.id = 'ad-banner';
+    bait.className = 'adsbox ad-placement ad-banner textads banner-ads adsbygoogle';
+    bait.style.cssText = 'position:absolute;top:0;left:0;width:300px;height:250px;pointer-events:none;opacity:0;z-index:-1;';
+    bait.innerHTML = '<ins class="adsbygoogle" style="display:block;width:300px;height:250px;"></ins>';
+    document.body.appendChild(bait);
+
+    // Method 2: try to fetch a URL that adblockers typically block
+    let fetchBlocked = false;
+    const fetchCheck = fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', {
+      method: 'HEAD',
+      mode: 'no-cors',
+    }).catch(() => {
+      fetchBlocked = true;
+    });
+
+    const checkAdblock = setTimeout(async () => {
+      await fetchCheck;
+
+      // Check bait: removed, hidden, or zero-size
+      const baitBlocked = !bait.parentNode
+        || bait.offsetHeight === 0
+        || bait.offsetWidth === 0
+        || getComputedStyle(bait).display === 'none'
+        || getComputedStyle(bait).visibility === 'hidden'
+        || bait.querySelector('ins')?.offsetHeight === 0;
+
+      if (bait.parentNode) bait.parentNode.removeChild(bait);
+
+      if (baitBlocked || fetchBlocked) {
+        setAdblockDetected(true);
+      }
+    }, 1500);
+
+    return () => {
+      clearTimeout(checkAdblock);
+      if (bait.parentNode) bait.parentNode.removeChild(bait);
+    };
   }, []);
 
   const addSystemLog = async (type, details) => {
@@ -1285,7 +1330,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24 relative overflow-x-hidden flex flex-col">
-      <header className="bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 shadow-md">
+      <header className="bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 shadow-md safe-area-top">
         <div className="max-w-5xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
           <div
             className="flex items-center gap-2 text-white font-black text-lg tracking-wider cursor-pointer shrink-0"
@@ -1371,6 +1416,38 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {adblockDetected && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-yellow-500/30 rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center">
+              <AlertCircle size={32} className="text-yellow-400" />
+            </div>
+            <h2 className="text-xl font-black text-white mb-3">AdBlock виявлено</h2>
+            <p className="text-neutral-300 text-sm leading-relaxed mb-2">
+              Привіт! Ми — повністю <strong className="text-white">безкоштовний проект</strong> без жодних мікротранзакцій та донатних переваг.
+            </p>
+            <p className="text-neutral-300 text-sm leading-relaxed mb-2">
+              Реклама — наше <strong className="text-white">єдине джерело підтримки</strong>, яке допомагає нам оплачувати сервери та розвивати гру.
+            </p>
+            <p className="text-neutral-300 text-sm leading-relaxed mb-4">
+              Ми обіцяємо, що реклама <strong className="text-yellow-400">не заважатиме ігровому процесу</strong> — жодних нав'язливих попапів чи відео посеред гри.
+            </p>
+            <p className="text-neutral-400 text-xs mb-5">
+              Будь ласка, додайте наш сайт до винятків AdBlock 🙏
+            </p>
+            <button
+              onClick={() => {
+                setAdblockDetected(false);
+                sessionStorage.setItem('adblock-banner-dismissed', '1');
+              }}
+              className="w-full btn-game-primary py-3 text-base"
+            >
+              Зрозуміло, продовжити
+            </button>
+          </div>
+        </div>
+      )}
 
       {toastMsg.text && (
         <div

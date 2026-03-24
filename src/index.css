@@ -587,9 +587,19 @@
   animation: spin 8s linear infinite;
 }
 
+/* Fill entire screen including notch/dynamic island areas */
+body {
+  background-color: #0d0d0f;
+}
+
 /* iOS safe area for bottom navigation */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* iOS safe area for top header */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Prevent horizontal overflow on mobile */
